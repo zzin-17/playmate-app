@@ -20,6 +20,8 @@ class MockAuthService {
       'hasLesson': true,
       'mannerScore': 4.5,
       'profileImage': null,
+      'followingIds': [2], // 양재시민의숲 호스트(ID: 2) 팔로우
+      'followerIds': [],
       'createdAt': DateTime.now().subtract(const Duration(days: 30)),
       'updatedAt': DateTime.now(),
     },
@@ -39,6 +41,8 @@ class MockAuthService {
       'hasLesson': false,
       'mannerScore': 4.8,
       'profileImage': null,
+      'followingIds': [1], // 테스트유저(ID: 1) 팔로우
+      'followerIds': [1], // 테스트유저(ID: 1)에게 팔로우됨
       'createdAt': DateTime.now().subtract(const Duration(days: 15)),
       'updatedAt': DateTime.now(),
     },
@@ -107,6 +111,8 @@ class MockAuthService {
             hasLesson: userData['hasLesson'] as bool?,
             mannerScore: userData['mannerScore'] as double?,
             profileImage: userData['profileImage'] as String?,
+            followingIds: (userData['followingIds'] as List<dynamic>?)?.cast<int>() ?? [],
+            followerIds: (userData['followerIds'] as List<dynamic>?)?.cast<int>() ?? [],
             createdAt: userData['createdAt'] as DateTime,
             updatedAt: userData['updatedAt'] as DateTime,
           ),
@@ -159,26 +165,28 @@ class MockAuthService {
     _mockUsers[email] = newUser;
     
             return {
-          'success': true,
-          'token': 'mock_token_$newUserId',
-          'user': User(
-            id: newUser['id'] as int,
-            email: newUser['email'] as String,
-            nickname: newUser['nickname'] as String,
-            gender: newUser['gender'] as String?,
-            birthYear: newUser['birthYear'] as int?,
-            region: newUser['region'] as String?,
-            skillLevel: newUser['skillLevel'] as int?,
-            preferredCourt: newUser['preferredCourt'] as String?,
-            preferredTime: newUser['preferredTime'] as List<String>?,
-            playStyle: newUser['playStyle'] as String?,
-            hasLesson: newUser['hasLesson'] as bool?,
-            mannerScore: newUser['mannerScore'] as double?,
-            profileImage: newUser['profileImage'] as String?,
-            createdAt: newUser['createdAt'] as DateTime,
-            updatedAt: newUser['updatedAt'] as DateTime,
-          ),
-        };
+              'success': true,
+              'token': 'mock_token_$newUserId',
+              'user': User(
+                id: newUser['id'] as int,
+                email: newUser['email'] as String,
+                nickname: newUser['nickname'] as String,
+                gender: newUser['gender'] as String?,
+                birthYear: newUser['birthYear'] as int?,
+                region: newUser['region'] as String?,
+                skillLevel: newUser['skillLevel'] as int?,
+                preferredCourt: newUser['preferredCourt'] as String?,
+                preferredTime: newUser['preferredTime'] as List<String>?,
+                playStyle: newUser['playStyle'] as String?,
+                hasLesson: newUser['hasLesson'] as bool?,
+                mannerScore: newUser['mannerScore'] as double?,
+                profileImage: newUser['profileImage'] as String?,
+                followingIds: [], // 회원가입 시 팔로우 목록은 비워둠
+                followerIds: [], // 회원가입 시 팔로워 목록은 비워둠
+                createdAt: newUser['createdAt'] as DateTime,
+                updatedAt: newUser['updatedAt'] as DateTime,
+              ),
+            };
   }
 
   // 사용자 정보 조회 시뮬레이션
@@ -209,6 +217,8 @@ class MockAuthService {
       hasLesson: userData['hasLesson'] as bool?,
       mannerScore: userData['mannerScore'] as double?,
       profileImage: userData['profileImage'] as String?,
+      followingIds: (userData['followingIds'] as List<dynamic>?)?.cast<int>() ?? [],
+      followerIds: (userData['followerIds'] as List<dynamic>?)?.cast<int>() ?? [],
       createdAt: userData['createdAt'] as DateTime,
       updatedAt: userData['updatedAt'] as DateTime,
     );
@@ -243,6 +253,8 @@ class MockAuthService {
       hasLesson: userData['hasLesson'] as bool?,
       mannerScore: userData['mannerScore'] as double?,
       profileImage: userData['profileImage'] as String?,
+      followingIds: (userData['followingIds'] as List<dynamic>?)?.cast<int>() ?? [],
+      followerIds: (userData['followerIds'] as List<dynamic>?)?.cast<int>() ?? [],
       createdAt: userData['createdAt'] as DateTime,
       updatedAt: userData['updatedAt'] as DateTime,
     );
@@ -276,6 +288,8 @@ class MockAuthService {
         hasLesson: userData['hasLesson'] as bool?,
         mannerScore: userData['mannerScore'] as double?,
         profileImage: userData['profileImage'] as String?,
+        followingIds: (userData['followingIds'] as List<dynamic>?)?.cast<int>() ?? [],
+        followerIds: (userData['followerIds'] as List<dynamic>?)?.cast<int>() ?? [],
         createdAt: userData['createdAt'] as DateTime,
         updatedAt: userData['updatedAt'] as DateTime,
       ),
@@ -304,6 +318,8 @@ class MockAuthService {
         hasLesson: userData['hasLesson'] as bool?,
         mannerScore: userData['mannerScore'] as double?,
         profileImage: userData['profileImage'] as String?,
+        followingIds: (userData['followingIds'] as List<dynamic>?)?.cast<int>() ?? [],
+        followerIds: (userData['followerIds'] as List<dynamic>?)?.cast<int>() ?? [],
         createdAt: userData['createdAt'] as DateTime,
         updatedAt: userData['updatedAt'] as DateTime,
       ),

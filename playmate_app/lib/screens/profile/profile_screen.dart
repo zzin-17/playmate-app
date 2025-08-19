@@ -4,6 +4,8 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
+import 'my_hosted_matchings_screen.dart';
+import 'my_guest_matchings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -44,11 +46,29 @@ class ProfileScreen extends StatelessWidget {
                   title: '내 활동',
                   items: [
                     MenuItem(
-                      icon: Icons.people,
-                      title: '내 매칭',
-                      subtitle: '참여한 매칭 내역',
+                      icon: Icons.sports_tennis,
+                      title: '내가 모집한 일정',
+                      subtitle: '호스트로 등록한 매칭 일정 관리',
                       onTap: () {
-                        // 내 매칭 페이지로 이동
+                        // 내가 모집한 일정 페이지로 이동
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => MyHostedMatchingsScreen(currentUser: user!),
+                          ),
+                        );
+                      },
+                    ),
+                    MenuItem(
+                      icon: Icons.people,
+                      title: '게스트로 참여한 일정',
+                      subtitle: '참여한 매칭 일정 및 히스토리',
+                      onTap: () {
+                        // 게스트로 참여한 일정 페이지로 이동
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => MyGuestMatchingsScreen(currentUser: user!),
+                          ),
+                        );
                       },
                     ),
                     MenuItem(

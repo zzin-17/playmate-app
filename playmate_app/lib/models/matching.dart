@@ -29,6 +29,7 @@ class Matching {
   final List<User>? guests;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final int? recoveryCount; // 취소된 매칭을 모집중으로 복구한 횟수
 
   Matching({
     required this.id,
@@ -52,10 +53,60 @@ class Matching {
     this.guests,
     required this.createdAt,
     required this.updatedAt,
+    this.recoveryCount,
   });
 
   factory Matching.fromJson(Map<String, dynamic> json) => _$MatchingFromJson(json);
   Map<String, dynamic> toJson() => _$MatchingToJson(this);
+
+  // 복사 및 수정 메서드
+  Matching copyWith({
+    int? id,
+    String? type,
+    String? courtName,
+    double? courtLat,
+    double? courtLng,
+    DateTime? date,
+    String? timeSlot,
+    int? minLevel,
+    int? maxLevel,
+    String? gameType,
+    int? maleRecruitCount,
+    int? femaleRecruitCount,
+    String? status,
+    String? message,
+    int? guestCost,
+    bool? isFollowersOnly,
+    User? host,
+    List<User>? guests,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    int? recoveryCount,
+  }) {
+    return Matching(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      courtName: courtName ?? this.courtName,
+      courtLat: courtLat ?? this.courtLat,
+      courtLng: courtLng ?? this.courtLng,
+      date: date ?? this.date,
+      timeSlot: timeSlot ?? this.timeSlot,
+      minLevel: minLevel ?? this.minLevel,
+      maxLevel: maxLevel ?? this.maxLevel,
+      gameType: gameType ?? this.gameType,
+      maleRecruitCount: maleRecruitCount ?? this.maleRecruitCount,
+      femaleRecruitCount: femaleRecruitCount ?? this.femaleRecruitCount,
+      status: status ?? this.status,
+      message: message ?? this.message,
+      guestCost: guestCost ?? this.guestCost,
+      isFollowersOnly: isFollowersOnly ?? this.isFollowersOnly,
+      host: host ?? this.host,
+      guests: guests ?? this.guests,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      recoveryCount: recoveryCount ?? this.recoveryCount,
+    );
+  }
 
   // 구력 범위 텍스트
   String get skillRangeText {
@@ -97,9 +148,17 @@ class Matching {
         return '완료';
       case 'cancelled':
         return '취소';
+      case 'deleted':
+        return '삭제됨';
       default:
         return '알 수 없음';
     }
+  }
+
+  // 복구 횟수 표시 텍스트
+  String get recoveryCountText {
+    if (recoveryCount == null || recoveryCount == 0) return '';
+    return ' (${recoveryCount}회 복구)';
   }
 
   // 날짜 포맷팅

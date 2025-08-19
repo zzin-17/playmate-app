@@ -7,6 +7,8 @@ import '../../constants/app_text_styles.dart';
 import 'user_profile_screen.dart';
 import 'edit_profile_screen.dart';
 import '../review/my_reviews_screen.dart';
+import 'my_hosted_matchings_screen.dart';
+import 'my_guest_matchings_screen.dart';
 
 class MyProfileScreen extends StatelessWidget {
   const MyProfileScreen({super.key});
@@ -71,6 +73,32 @@ class MyProfileScreen extends StatelessWidget {
               },
             ),
             const SizedBox(height: 16),
+            // 내가 모집한 일정 섹션
+            _buildSection(
+              title: '내가 모집한 일정',
+              icon: Icons.sports_tennis,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => MyHostedMatchingsScreen(currentUser: currentUser),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            // 게스트로 참여한 일정 섹션
+            _buildSection(
+              title: '게스트로 참여한 일정',
+              icon: Icons.people_outline,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => MyGuestMatchingsScreen(currentUser: currentUser),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
             // 리뷰 섹션
             _buildSection(
               title: '리뷰',
@@ -107,6 +135,22 @@ class MyProfileScreen extends StatelessWidget {
         ),
               ),
       );
+    }
+  }
+
+  // 섹션별 설명 텍스트 반환
+  String _getSectionDescription(String title) {
+    switch (title) {
+      case '내 프로필':
+        return '기본정보, 테니스정보, 매너점수, 나의 리뷰';
+      case '내가 모집한 일정':
+        return '호스트로 등록한 매칭 일정 관리';
+      case '게스트로 참여한 일정':
+        return '참여한 매칭 일정 및 히스토리';
+      case '리뷰':
+        return '리뷰 가능한 멤버 리스트';
+      default:
+        return '';
     }
   }
 
@@ -156,9 +200,7 @@ class MyProfileScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        title == '내 프로필' 
-                            ? '기본정보, 테니스정보, 매너점수, 나의 리뷰'
-                            : '리뷰 가능한 멤버 리스트',
+                        _getSectionDescription(title),
                         style: AppTextStyles.caption.copyWith(
                           color: AppColors.textSecondary,
                         ),

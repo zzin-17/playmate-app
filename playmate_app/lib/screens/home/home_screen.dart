@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import '../../providers/auth_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
@@ -46,6 +47,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _searchController.addListener(_onSearchChanged);
     
     _applyFilters();
+    
+    // 자동 완료 처리 타이머 시작
+    _startAutoCompletionTimer();
   }
 
   @override
@@ -71,6 +75,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String? _selectedSkillLevel;
   String? _selectedEndSkillLevel;
   bool _showOnlyRecruiting = false;
+  bool _showOnlyFollowing = false; // 팔로우만 보기 추가
   DateTime? _startDate;
   DateTime? _endDate;
   String? _startTime;
@@ -97,7 +102,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _addNewMatching(Matching newMatching) {
     setState(() {
       // 새 매칭을 맨 위에 추가
-      _mockMatchings.insert(0, newMatching);
+              // 새로 생성된 매칭에 recoveryCount 추가
+        final newMatchingWithRecovery = newMatching.copyWith(recoveryCount: 0);
+        _mockMatchings.insert(0, newMatchingWithRecovery);
       // 필터링된 목록도 업데이트
       _applyFilters();
     });
@@ -122,9 +129,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _showSearchHistory = _searchQuery.isEmpty && _searchHistory.isNotEmpty;
       _applyFilters();
     });
+    
+    // 검색어가 변경될 때마다 히스토리 업데이트
+    if (_searchQuery.isNotEmpty) {
+      _updateSearchHistory(_searchQuery);
+    }
   }
   
-  // 검색어 추가
+  // 검색 히스토리 업데이트 (중복 제거 및 최신순 정렬)
+  void _updateSearchHistory(String query) {
+    if (query.isNotEmpty) {
+      setState(() {
+        // 기존에 같은 검색어가 있으면 제거
+        _searchHistory.remove(query);
+        // 맨 앞에 추가 (최신순)
+        _searchHistory.insert(0, query);
+        // 최대 15개까지만 유지
+        if (_searchHistory.length > 15) {
+          _searchHistory.removeLast();
+        }
+      });
+    }
+  }
+
+  // 검색어 추가 (기존 함수 유지)
   void _addToSearchHistory(String query) {
     if (query.isNotEmpty && !_searchHistory.contains(query)) {
       setState(() {
@@ -135,6 +163,62 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
       });
     }
+  }
+
+  // 검색 히스토리 칩 위젯
+  Widget _buildSearchHistoryChip(String search) {
+    return GestureDetector(
+      onTap: () {
+        _searchController.text = search;
+        setState(() {
+          _searchQuery = search;
+          _applyFilters();
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.cardBorder),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.history,
+              size: 14,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              search,
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 6),
+            // 개별 삭제 버튼
+            GestureDetector(
+              onTap: () => _removeFromSearchHistory(search),
+              child: Icon(
+                Icons.close,
+                size: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 검색 히스토리 전체 삭제
+  void _clearSearchHistory() {
+    setState(() {
+      _searchHistory.clear();
+    });
   }
   
   // 검색어 선택
@@ -178,6 +262,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     print('날짜 범위: $_startDate ~ $_endDate');
     print('시간 범위: $_startTime ~ $_endTime');
     print('모집중만 보기: $_showOnlyRecruiting');
+    print('팔로우만 보기: $_showOnlyFollowing');
     
     _filteredMatchings = _mockMatchings.where((matching) {
       print('매칭 필터링: ${matching.courtName}');
@@ -195,6 +280,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (_showOnlyRecruiting && matching.status != 'recruiting') {
         print('  - 모집중이 아니므로 제외');
         return false;
+      }
+      
+      // 팔로우만 보기 필터
+      if (_showOnlyFollowing) {
+        final authProvider = context.read<AuthProvider>();
+        final currentUser = authProvider.currentUser;
+        if (currentUser != null) {
+          // 현재 사용자가 팔로우하는 사용자들의 ID 목록
+          final followingIds = currentUser.followingIds ?? [];
+          // 매칭 호스트가 팔로우 목록에 있는지 확인
+          if (!followingIds.contains(matching.host.id)) {
+            print('  - 팔로우하지 않는 사용자의 매칭이므로 제외');
+            return false;
+          }
+        } else {
+          // 로그인하지 않은 경우 팔로우 필터 적용 안함
+          print('  - 로그인하지 않아 팔로우 필터 무시');
+        }
       }
       
       // 게임 유형 필터
@@ -448,12 +551,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
       }
       
-      // 모집중만 보기가 활성화된 경우 추가
-      if (_showOnlyRecruiting) {
-        if (!_selectedFilters.contains('모집중')) {
-          _selectedFilters.add('모집중');
-        }
-      }
+      // 모집중만 보기는 전용 체크박스로 관리하므로 필터 요약에서 제외
+      // if (_showOnlyRecruiting) {
+      //   if (!_selectedFilters.contains('모집중')) {
+      //         _selectedFilters.add('모집중');
+      //       }
+      //   }
+      
+      // 팔로우만 보기는 전용 체크박스로 관리하므로 필터 요약에서 제외
+      // if (_showOnlyFollowing) {
+      //   if (!_selectedFilters.contains('팔로우만')) {
+      //     _selectedFilters.add('팔로우만');
+      //   }
+      // }
       
       print('=== 필터 상태 동기화 완료 ===');
       print('_selectedFilters: $_selectedFilters');
@@ -485,6 +595,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      recoveryCount: 0,
     ),
     Matching(
       id: 2,
@@ -510,6 +621,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      recoveryCount: 0,
     ),
     // 추가 매칭 데이터 (위치 필터 테스트용)
     Matching(
@@ -535,6 +647,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      recoveryCount: 0,
     ),
     Matching(
       id: 4,
@@ -559,6 +672,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      recoveryCount: 0,
     ),
     // 다양한 지역의 매칭 추가 (위치 필터 테스트용)
     Matching(
@@ -584,6 +698,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      recoveryCount: 0,
     ),
     Matching(
       id: 6,
@@ -608,6 +723,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      recoveryCount: 0,
     ),
   ];
 
@@ -631,10 +747,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       body: Column(
         children: [
-          // 검색바 추가
-          Container(
-            margin: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
+                          // 검색바 추가
+                Container(
+                  margin: const EdgeInsets.only(left: 16, right: 16, top: 16), // bottom margin 완전 제거
+                  decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.cardBorder),
@@ -676,7 +792,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16,
-                      vertical: 14,
+                      vertical: 10, // 14 → 10 (약 29% 감소)
                     ),
                   ),
                   style: AppTextStyles.body.copyWith(
@@ -703,7 +819,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 // 검색 제안 (검색어가 비어있을 때만 표시)
                 if (_searchQuery.isEmpty)
                   Container(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0), // bottom padding 제거
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -712,7 +828,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           height: 1,
                           color: AppColors.cardBorder,
                         ),
-                        const SizedBox(height: 12),
+                        // SizedBox(height: 12) 제거 - 간격 완전 제거
                         // 최근 검색어만 표시 (인기 검색어 제거)
                         if (_searchHistory.isNotEmpty) ...[
                           Row(
@@ -727,11 +843,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 ),
                               ),
                               TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _searchHistory.clear();
-                                  });
-                                },
+                                onPressed: () => _clearSearchHistory(),
                                 style: TextButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   minimumSize: Size.zero,
@@ -747,47 +859,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 4), // 8 → 4 (50% 감소)
                           Wrap(
                             spacing: 8,
                             runSpacing: 6,
-                            children: _searchHistory.take(5).map((search) => 
-                              GestureDetector(
-                                onTap: () {
-                                  _searchController.text = search;
-                                  setState(() {
-                                    _searchQuery = search;
-                                    _applyFilters();
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surface,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: AppColors.cardBorder),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.history,
-                                        size: 14,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        search,
-                                        style: AppTextStyles.body.copyWith(
-                                          color: AppColors.textPrimary,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ).toList(),
+                            children: _searchHistory.take(8).map((search) => _buildSearchHistoryChip(search)).toList(),
                           ),
                         ],
                       ],
@@ -797,11 +873,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
           
-          // 검색 결과 정보 및 필터 요약
-          if (_searchQuery.isNotEmpty || _selectedFilters.isNotEmpty)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          // "적용된 필터" 섹션 복원 (필터 칩들과 초기화 버튼)
+                if (_selectedFilters.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(left: 16, right: 16), // top margin 완전 제거
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), // 8 → 4 (50% 추가 감소)
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
@@ -819,115 +895,112 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       Icon(
                         Icons.filter_list,
                         color: AppColors.primary,
-                        size: 18,
+                        size: 16, // 18 → 16 (11% 감소)
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6), // 8 → 6 (25% 감소)
                       Text(
                         '적용된 필터',
                         style: AppTextStyles.body.copyWith(
                           color: AppColors.primary,
-                          fontSize: 14,
+                          fontSize: 12, // 14 → 12 (14% 감소)
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       const Spacer(),
-                      if (_selectedFilters.isNotEmpty)
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _selectedFilters.clear();
-                              _selectedGameTypes.clear();
-                              _selectedSkillLevel = null;
-                              _selectedEndSkillLevel = null;
-                              _startDate = null;
-                              _endDate = null;
-                              _startTime = null;
-                              _endTime = null;
-                              _showOnlyRecruiting = false;
-                              _selectedCityId = null;
-                              _selectedDistrictIds.clear();
-                              _applyFilters();
-                            });
-                          },
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text(
-                            '모두 해제',
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedFilters.clear();
+                            _selectedGameTypes.clear();
+                            _selectedSkillLevel = null;
+                            _selectedEndSkillLevel = null;
+                            _startDate = null;
+                            _endDate = null;
+                            _startTime = null;
+                            _endTime = null;
+                            // 모집중만 보기는 전용 체크박스로 관리하므로 여기서는 제거하지 않음
+                            // _showOnlyRecruiting = false;
+                            // 팔로우만 보기는 전용 체크박스로 관리하므로 여기서는 제거하지 않음
+                            // _showOnlyFollowing = false;
+                            _selectedCityId = null;
+                            _selectedDistrictIds.clear();
+                            _applyFilters();
+                          });
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // 12,6 → 10,4 (17%,33% 감소)
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
                         ),
+                        child: Text(
+                          '초기화',
+                          style: AppTextStyles.body.copyWith(
+                            color: AppColors.primary,
+                            fontSize: 11, // 12 → 11 (8% 감소)
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   if (_selectedFilters.isNotEmpty) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 4), // 8 → 4 (50% 추가 감소)
                     // 필터 칩들
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 4, // 6 → 4 (33% 추가 감소)
+                      runSpacing: 2, // 4 → 2 (50% 추가 감소)
                       children: _selectedFilters.map((filter) => _buildFilterChip(filter)).toList(),
-                    ),
-                  ],
-                  if (_searchQuery.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: AppColors.primary,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _getSearchResultText(),
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.primary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {
-                              _searchQuery = '';
-                              _applyFilters();
-                            });
-                          },
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(
-                            '검색어 지우기',
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ],
               ),
             ),
-          // 필터 버튼들 (카테고리별 그룹화)
-          if (_selectedFilters.isNotEmpty)
+                                                      // 모집중만 보기 & 팔로우만 보기 체크박스 (좌우로 나란히 배치)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildRecruitingOnlyCheckbox(),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _buildFollowOnlyCheckbox(),
+                                ),
+                              ],
+                            ),
+                            // 검색 결과 개수 표시
+                            Container(
+                              margin: const EdgeInsets.only(left: 16, right: 16, top: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.cardBorder),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.search,
+                                    color: AppColors.primary,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _getSearchResultText(),
+                                    style: AppTextStyles.body.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // 필터 버튼들 (카테고리별 그룹화)
+                            if (_selectedFilters.isNotEmpty)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Column(
@@ -946,55 +1019,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     child: Row(
                       children: [
-                        Row(
-                          children: [
-                            Icon(Icons.filter_list, color: AppColors.primary, size: 16),
-                            const SizedBox(width: 6),
-                            Text(
-                              '적용된 필터',
-                              style: AppTextStyles.body.copyWith(
-                                color: AppColors.primary,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () {
-                            print('=== 필터 초기화 시작 ===');
-                            
-                            // 실제 변수 초기화
-                            setState(() {
-                              _showOnlyRecruiting = false;
-                              _selectedGameTypes.clear();
-                              _selectedSkillLevel = null;
-                              _selectedEndSkillLevel = null;
-                              _startDate = null;
-                              _endDate = null;
-                              _startTime = null;
-                              _endTime = null;
-                              _selectedCityId = null;
-                              _selectedDistrictIds.clear();
-                              _selectedFilters.clear();
-                            });
-                            
-                            print('=== 필터 초기화 완료 ===');
-                            print('모든 필터가 초기화되었습니다.');
-                            
-                            // 필터 적용하여 검색 결과 업데이트
-                            _applyFilters();
-                          },
-                          child: Text(
-                            '초기화',
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.textSecondary,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
+                        // 중복 제목 제거 - 상단에 이미 "적용된 필터" 섹션이 있음
+                        const SizedBox.shrink(),
+                        // 하단 중복 초기화 버튼 제거 - 상단에 이미 초기화 버튼이 있음
+                        const SizedBox.shrink(),
                       ],
                     ),
                   ),
@@ -1009,7 +1037,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 : _filteredMatchings.isEmpty
                     ? _buildEmptyState()
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.only(
+                          left: 16,
+                          right: 16,
+                          bottom: 100, // 플로팅 버튼 높이(56) + 하단 네비게이션(56) + 여유 공간(20)
+                        ),
                         itemCount: _filteredMatchings.length,
                         itemBuilder: (context, index) {
                           final matching = _filteredMatchings[index];
@@ -1032,39 +1064,259 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // 매칭 삭제 메서드
-  void _deleteMatching(Matching matching) {
+    // 상태 변경 다이얼로그 표시
+  void _showStatusChangeDialog(Matching matching) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('매칭 삭제'),
-          content: const Text('정말로 이 매칭을 삭제하시겠습니까?'),
+          title: Text('${matching.courtName} 상태 변경'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('현재 상태: ${matching.statusText}'),
+              const SizedBox(height: 16),
+              Text('변경할 상태를 선택하세요:'),
+              const SizedBox(height: 8),
+              // 상태 옵션들 (완료는 시스템이 자동 처리)
+              // 취소된 매칭을 모집중으로 복구할 수 있는지 확인
+              if (matching.status == 'cancelled' && (matching.recoveryCount ?? 0) < 1)
+                _buildStatusOption(context, matching, 'recruiting', '모집중으로 복구', Colors.blue),
+              if (matching.status == 'recruiting')
+                _buildStatusOption(context, matching, 'confirmed', '확정', Colors.green),
+              if (matching.status == 'recruiting')
+                _buildStatusOption(context, matching, 'cancelled', '취소', Colors.red, requiresConfirmation: true),
+              if (matching.status != 'deleted')
+                _buildStatusOption(context, matching, 'deleted', '삭제됨', Colors.grey, requiresConfirmation: true),
+              const SizedBox(height: 12),
+              Text(
+                '• 취소된 매칭은 1회에 한해서 모집중으로 복구할 수 있습니다.\n• 완료 상태는 게임 시간 종료 시 시스템이 자동으로 처리합니다.',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _mockMatchings.removeWhere((m) => m.id == matching.id);
-                });
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('매칭이 삭제되었습니다.'),
-                    backgroundColor: AppColors.error,
-                  ),
-                );
-              },
-              child: const Text('삭제', style: TextStyle(color: AppColors.error)),
             ),
           ],
         );
       },
     );
   }
+
+  // 취소 확인 다이얼로그 표시
+  void _showCancellationConfirmation(BuildContext context, Matching matching) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('매칭 취소 확인'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${matching.courtName} 매칭을 취소하시겠습니까?'),
+              const SizedBox(height: 16),
+              Text(
+                '⚠️ 취소된 매칭은 1회에 한해서만 복구할 수 있습니다!',
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('아니오'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // 취소 확인 다이얼로그 닫기
+                Navigator.of(context).pop(); // 상태 변경 다이얼로그 닫기
+                _changeMatchingStatus(matching, 'cancelled');
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('취소하기'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 상태 옵션 위젯
+  Widget _buildStatusOption(BuildContext context, Matching matching, String status, String label, Color color, {bool requiresConfirmation = false}) {
+    return GestureDetector(
+      onTap: () {
+        if (requiresConfirmation) {
+          // 취소 상태 변경 시 추가 확인
+          _showCancellationConfirmation(context, matching);
+        } else {
+          _changeMatchingStatus(matching, status);
+          Navigator.of(context).pop();
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _getStatusIcon(status),
+              color: color,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: AppTextStyles.body.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 매칭 상태 변경
+  void _changeMatchingStatus(Matching matching, String newStatus) {
+    setState(() {
+      final index = _mockMatchings.indexWhere((m) => m.id == matching.id);
+      if (index != -1) {
+        // 취소된 매칭을 모집중으로 복구할 때 복구 횟수 증가
+        final newRecoveryCount = newStatus == 'recruiting' && matching.status == 'cancelled' 
+            ? (matching.recoveryCount ?? 0) + 1 
+            : matching.recoveryCount;
+        
+        _mockMatchings[index] = matching.copyWith(
+          status: newStatus,
+          recoveryCount: newRecoveryCount,
+          updatedAt: DateTime.now(),
+        );
+      }
+    });
+    
+    // 필터 적용
+    _applyFilters();
+    
+    // 성공 메시지 표시
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('매칭 상태가 "${_getStatusText(newStatus)}"로 변경되었습니다.'),
+        backgroundColor: _getStatusColor(newStatus),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // 상태 텍스트 반환 메서드
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'recruiting':
+        return '모집중';
+      case 'confirmed':
+        return '확정';
+      case 'completed':
+        return '완료';
+      case 'cancelled':
+        return '취소';
+      case 'deleted':
+        return '삭제됨';
+      default:
+        return '알 수 없음';
+    }
+  }
+
+  // 관련 데이터 확인 메서드
+  bool _checkRelatedData(Matching matching) {
+    // 게스트가 있는 경우
+    if (matching.guests != null && matching.guests!.isNotEmpty) {
+      return true;
+    }
+    
+    // 채팅 이력이 있는 경우 (실제로는 API 호출이 필요하지만, 현재는 모의 데이터)
+    // 여기서는 간단하게 게스트 수로 판단
+    if (matching.maleRecruitCount > 0 || matching.femaleRecruitCount > 0) {
+      return true;
+    }
+    
+    // 상태가 모집중이 아닌 경우 (확정, 완료 등)
+    if (matching.status != 'recruiting') {
+      return true;
+    }
+    
+    return false;
+  }
+
+  // 관련 데이터 경고 메시지 반환
+  String _getRelatedDataWarning(Matching matching) {
+    final warnings = <String>[];
+    
+    // 게스트가 있는 경우
+    if (matching.guests != null && matching.guests!.isNotEmpty) {
+      warnings.add('신청자가 ${matching.guests!.length}명 있습니다');
+    }
+    
+    // 상태가 모집중이 아닌 경우
+    if (matching.status != 'recruiting') {
+      warnings.add('매칭이 ${matching.statusText} 상태입니다');
+    }
+    
+    // 채팅 이력이 있을 가능성이 있는 경우
+    if (matching.maleRecruitCount > 0 || matching.femaleRecruitCount > 0) {
+      warnings.add('채팅 이력이 있을 수 있습니다');
+    }
+    
+    if (warnings.isEmpty) {
+      return '관련 데이터가 있을 수 있습니다';
+    }
+    
+    return '⚠️ ${warnings.join(', ')}';
+  }
+
+  // 카드 배경색 반환 메서드
+  Color _getCardBackgroundColor(Matching matching) {
+    // 팔로워 전용인 경우
+    if (matching.isFollowersOnly) {
+      return Colors.blue[50]!; // 연한 파란색
+    }
+    
+    // 상태별 배경색
+    switch (matching.status) {
+      case 'recruiting':
+        return AppColors.surface; // 모집중: 기본 배경색
+      case 'confirmed':
+        return Colors.green[50]!; // 확정: 연한 초록색
+      case 'completed':
+        return Colors.blue[50]!; // 완료: 연한 파란색
+      case 'cancelled':
+        return Colors.red[50]!; // 취소: 연한 빨간색
+      case 'deleted':
+        return Colors.grey[100]!; // 삭제됨: 연한 회색
+      default:
+        return AppColors.surface; // 기본: 기본 배경색
+    }
+  }
+
+  // 삭제는 이제 상태 변경으로 통합됨 (삭제됨 상태로 변경)
 
   Widget _buildMatchingCard(Matching matching) {
     final authProvider = context.read<AuthProvider>();
@@ -1090,10 +1342,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
       },
       child: Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        color: matching.isFollowersOnly 
-            ? Colors.blue[50] // 팔로워 전용: 연한 파란색
-            : AppColors.surface, // 일반 공개: 기본 배경색
+        margin: const EdgeInsets.only(bottom: 16), // 12 → 16 (카드 간격 증가로 가독성 향상)
+        color: _getCardBackgroundColor(matching),
         elevation: matching.isFollowersOnly ? 2 : 1, // 팔로워 전용: 약간 더 높은 그림자
         shape: matching.isFollowersOnly 
             ? RoundedRectangleBorder(
@@ -1107,7 +1357,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(12),
               ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18), // 16 → 18 (내부 여백 증가로 내용 가독성 향상)
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1143,26 +1393,42 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   // 오른쪽: 상태 배지와 버튼들
                   Row(
                     children: [
-                      // 상태 배지
+                      // 상태 배지 (상태별 색상 및 스타일 적용)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppColors.accent,
+                          color: _getStatusColor(matching.status).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          matching.statusText,
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w500,
+                          border: Border.all(
+                            color: _getStatusColor(matching.status).withValues(alpha: 0.6),
+                            width: 1.2,
                           ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getStatusIcon(matching.status),
+                              size: 12,
+                              color: _getStatusColor(matching.status),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              matching.statusText + matching.recoveryCountText,
+                              style: AppTextStyles.caption.copyWith(
+                                color: _getStatusColor(matching.status),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       // 팔로워 전용 공개 표시
                       if (matching.isFollowersOnly) ...[
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), // 8,4 → 10,6 (팔로워 배지 크기 증가로 가독성 향상)
                           decoration: BoxDecoration(
                             color: AppColors.accent, // 모집중과 동일한 노란색 배경
                             borderRadius: BorderRadius.circular(12),
@@ -1195,11 +1461,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       // 호스트인 경우에만 수정/삭제 버튼 표시
                       if (isHost) ...[
                         const SizedBox(width: 8),
+                        // 상태 변경 버튼 (호스트만)
+                        if (isHost) ...[
+                          Tooltip(
+                            message: '상태 변경 (확정/취소/삭제됨)',
+                            child: GestureDetector(
+                              onTap: () => _showStatusChangeDialog(matching),
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Icon(
+                                  Icons.swap_horiz,
+                                  size: 16,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                        ],
                         // 수정 버튼
                         GestureDetector(
                           onTap: () => _editMatching(matching),
                           child: Container(
-                            padding: const EdgeInsets.all(4),
+                            padding: const EdgeInsets.all(6), // 4 → 6 (수정 버튼 크기 증가로 터치 영역 확대)
                             decoration: BoxDecoration(
                               color: AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
@@ -1212,22 +1500,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                         ),
                         const SizedBox(width: 4),
-                        // 삭제 버튼
-                        GestureDetector(
-                          onTap: () => _deleteMatching(matching),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: AppColors.error.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Icon(
-                              Icons.delete,
-                              size: 16,
-                              color: AppColors.error,
-                            ),
-                          ),
-                        ),
+                        // 삭제 버튼 제거 - 상태 변경으로 통합됨
                       ],
                     ],
                   ),
@@ -1248,7 +1521,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         // 위치 정보
                         Row(
                           children: [
-                            Icon(Icons.location_on, color: AppColors.textSecondary, size: 16),
+                            Icon(Icons.location_on, color: AppColors.textSecondary, size: 18), // 16 → 18 (아이콘 크기 증가로 가독성 향상)
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
@@ -1263,7 +1536,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         // 날짜
                         Row(
                           children: [
-                            Icon(Icons.calendar_today, color: AppColors.textSecondary, size: 16),
+                            Icon(Icons.calendar_today, color: AppColors.textSecondary, size: 18), // 16 → 18 (아이콘 크기 증가로 가독성 향상)
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
@@ -1278,7 +1551,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         // 시간
                         Row(
                           children: [
-                            Icon(Icons.access_time, color: AppColors.textSecondary, size: 16),
+                            Icon(Icons.access_time, color: AppColors.textSecondary, size: 18), // 16 → 18 (아이콘 크기 증가로 가독성 향상)
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
@@ -1306,7 +1579,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.sports_tennis, color: AppColors.primary, size: 16),
+                            Icon(Icons.sports_tennis, color: AppColors.primary, size: 18), // 16 → 18 (아이콘 크기 증가로 가독성 향상)
                             const SizedBox(width: 4),
                             Text(
                               matching.gameTypeText,
@@ -1324,7 +1597,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // 6,2 → 8,4 (구력 배지 크기 증가로 가독성 향상)
                               decoration: BoxDecoration(
                                 color: AppColors.accent.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(8),
@@ -1344,7 +1617,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.people, color: AppColors.textSecondary, size: 16),
+                            Icon(Icons.people, color: AppColors.textSecondary, size: 18), // 16 → 18 (아이콘 크기 증가로 가독성 향상)
                             const SizedBox(width: 4),
                             Text(
                               matching.recruitCountText,
@@ -1722,25 +1995,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             },
           ),
         ),
-        const SizedBox(height: 16),
-        // 마감 시간 체크박스
-        Row(
-          children: [
-            Checkbox(
-              value: false,
-              onChanged: (value) {
-                // 마감 시간 체크박스 (기능 추가 예정)
-              },
-              activeColor: AppColors.primary,
-            ),
-            Text(
-              '마감',
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
+        // 마감 체크박스 제거 - 모집중만 보기와 중복 기능
       ],
     );
   }
@@ -2671,6 +2926,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             _endTime = null;
           } else if (filter.contains('모집중')) {
             _showOnlyRecruiting = false;
+          } else if (filter.contains('팔로우만')) {
+            // 팔로우만 보기는 전용 체크박스로 관리하므로 여기서는 제거하지 않음
+            // _showOnlyFollowing = false;
           }
         });
       },
@@ -2817,41 +3075,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // 검색 결과 텍스트 생성
   String _getSearchResultText() {
-    int totalCount = _getFilteredMatchings().length;
+    final totalCount = _mockMatchings.length;
+    final filteredCount = _filteredMatchings.length;
     String resultText = '';
 
     if (_searchQuery.isNotEmpty) {
-      resultText += '검색어: "${_searchQuery}" - ${totalCount}개 매칭';
-      if (_showOnlyRecruiting) {
-        resultText += ' (모집중만)';
+      if (filteredCount == 0) {
+        return '"$_searchQuery" 검색 결과가 없습니다';
+      } else if (filteredCount == totalCount) {
+        return '"$_searchQuery" 검색 결과: $filteredCount개 매칭';
+      } else {
+        return '"$_searchQuery" 검색 결과: $filteredCount개 매칭 (전체 $totalCount개 중)';
       }
-      if (_selectedGameTypes.isNotEmpty) {
-        resultText += ' (게임 유형: ${_selectedGameTypes.map(_getGameTypeText).join(', ')})';
-      }
-      if (_selectedSkillLevel != null && _selectedEndSkillLevel != null) {
-        resultText += ' (구력: ${_selectedSkillLevel}부터 ${_selectedEndSkillLevel}까지)';
-      } else if (_selectedSkillLevel != null) {
-        resultText += ' (구력: ${_selectedSkillLevel} 이상)';
-      }
-      if (_startDate != null && _endDate != null) {
-        resultText += ' (날짜: ${_startDate!.month}월 ${_startDate!.day}일 ~ ${_endDate!.month}월 ${_endDate!.day}일)';
-      } else if (_startDate != null) {
-        resultText += ' (날짜: ${_startDate!.month}월 ${_startDate!.day}일부터)';
-      } else if (_endDate != null) {
-        resultText += ' (날짜: ${_endDate!.month}월 ${_endDate!.day}일까지)';
-      }
-      if (_startTime != null && _endTime != null) {
-        resultText += ' (시간: ${_startTime} ~ ${_endTime})';
-      } else if (_startTime != null) {
-        resultText += ' (시간: ${_startTime}부터)';
-      } else if (_endTime != null) {
-        resultText += ' (시간: ${_endTime}까지)';
-      }
-    } else if (_selectedFilters.isNotEmpty) {
-      resultText = '적용된 필터: ${_selectedFilters.map(_getFilterDisplayText).join(', ')} - ${totalCount}개 매칭';
     }
-
-    return resultText;
+    
+    // 필터만 적용된 경우
+    if (_selectedFilters.isNotEmpty || _showOnlyRecruiting || _showOnlyFollowing) {
+      if (filteredCount == 0) {
+        return '필터 결과가 없습니다';
+      } else if (filteredCount == totalCount) {
+        return '$filteredCount개 매칭';
+      } else {
+        return '$filteredCount개 매칭 (전체 $totalCount개 중)';
+      }
+    }
+    
+    // 기본 상태
+    return '$totalCount개 매칭';
   }
 
 
@@ -2970,36 +3220,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), // 12,8 → 10,6 (약 20% 감소)
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        border: Border.all(color: color.withValues(alpha: 0.6), width: 1.2),
-        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.6), width: 1.0), // 1.2 → 1.0 (약 17% 감소)
+        borderRadius: BorderRadius.circular(16), // 20 → 16 (20% 감소)
         boxShadow: [
           BoxShadow(
             color: color.withValues(alpha: 0.15),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            blurRadius: 5, // 6 → 5 (약 17% 감소)
+            offset: const Offset(0, 1), // 2 → 1 (50% 감소)
           ),
         ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 16),
-          const SizedBox(width: 6),
+          Icon(icon, color: color, size: 14), // 16 → 14 (12.5% 감소)
+          const SizedBox(width: 5), // 6 → 5 (약 17% 감소)
           Flexible(
             child: Text(
               filter,
               style: AppTextStyles.body.copyWith(
                 color: color.withValues(alpha: 0.8),
-                fontSize: 13,
+                fontSize: 12, // 13 → 12 (약 8% 감소)
                 fontWeight: FontWeight.w600,
               ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5), // 6 → 5 (약 17% 감소)
           GestureDetector(
             onTap: () {
               setState(() {
@@ -3035,6 +3285,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   _endTime = null;
                 } else if (filter.contains('모집중')) {
                   _showOnlyRecruiting = false;
+                } else if (filter.contains('팔로우만')) {
+                  // 팔로우만 보기는 전용 체크박스로 관리하므로 여기서는 제거하지 않음
+                  // _showOnlyFollowing = false;
                 }
                 
                 // 필터 상태 동기화하여 요약 UI 업데이트
@@ -3047,7 +3300,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: Icon(
               Icons.close,
               color: color.withValues(alpha: 0.7),
-              size: 16,
+              size: 14, // 16 → 14 (12.5% 감소)
             ),
           ),
         ],
@@ -3245,6 +3498,261 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           }).toList(),
         ),
       ],
+    );
+  }
+
+  // 자동 완료 처리 타이머 시작
+  void _startAutoCompletionTimer() {
+    // 1분마다 체크 (실제로는 더 긴 간격으로 설정 가능)
+    Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (mounted) {
+        _checkAndUpdateCompletedMatchings();
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  // 완료된 매칭 체크 및 업데이트
+  void _checkAndUpdateCompletedMatchings() {
+    final now = DateTime.now();
+    bool hasUpdates = false;
+    
+    for (int i = 0; i < _mockMatchings.length; i++) {
+      final matching = _mockMatchings[i];
+      
+      // 확정 상태이고 게임 시간이 종료된 경우
+      if (matching.status == 'confirmed' && _isGameTimeEnded(matching, now)) {
+        // 새로운 Matching 객체 생성 (불변성 유지)
+        final updatedMatching = Matching(
+          id: matching.id,
+          type: matching.type,
+          courtName: matching.courtName,
+          courtLat: matching.courtLat,
+          courtLng: matching.courtLng,
+          date: matching.date,
+          timeSlot: matching.timeSlot,
+          minLevel: matching.minLevel,
+          maxLevel: matching.maxLevel,
+          gameType: matching.gameType,
+          maleRecruitCount: matching.maleRecruitCount,
+          femaleRecruitCount: matching.femaleRecruitCount,
+          status: 'completed', // 완료 상태로 변경
+          message: matching.message,
+          guestCost: matching.guestCost,
+          isFollowersOnly: matching.isFollowersOnly,
+          host: matching.host,
+          guests: matching.guests,
+          createdAt: matching.createdAt,
+          updatedAt: now,
+        );
+        
+        _mockMatchings[i] = updatedMatching.copyWith(recoveryCount: matching.recoveryCount);
+        hasUpdates = true;
+        
+        print('자동 완료 처리: ${matching.courtName} (${matching.timeSlot})');
+      }
+    }
+    
+    // 업데이트가 있으면 필터 적용
+    if (hasUpdates) {
+      _applyFilters();
+    }
+  }
+
+  // 게임 시간이 종료되었는지 확인
+  bool _isGameTimeEnded(Matching matching, DateTime now) {
+    // 매칭 날짜가 오늘이 아니면 false
+    if (matching.date.year != now.year || 
+        matching.date.month != now.month || 
+        matching.date.day != now.day) {
+      return false;
+    }
+    
+    // 시간대 파싱 (예: "18:00~20:00")
+    final timeParts = matching.timeSlot.split('~');
+    if (timeParts.length != 2) return false;
+    
+    try {
+      final endTimeParts = timeParts[1].split(':');
+      final endHour = int.parse(endTimeParts[0]);
+      final endMinute = int.parse(endTimeParts[1]);
+      
+      // 종료 시간 + 30분 (정리 시간 포함)
+      final gameEndTime = DateTime(
+        now.year, 
+        now.month, 
+        now.day, 
+        endHour, 
+        endMinute,
+      ).add(const Duration(minutes: 30));
+      
+      return now.isAfter(gameEndTime);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 상태별 색상 반환 메서드
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'recruiting':
+        return Colors.orange; // 모집중: 주황색
+      case 'confirmed':
+        return Colors.green; // 확정: 초록색
+      case 'completed':
+        return Colors.blue; // 완료: 파란색
+      case 'cancelled':
+        return Colors.red; // 취소: 빨간색
+      case 'deleted':
+        return Colors.grey; // 삭제됨: 회색
+      default:
+        return AppColors.textSecondary; // 기본: 회색
+    }
+  }
+
+
+
+  // 상태별 아이콘 반환 메서드
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'recruiting':
+        return Icons.person_add; // 모집중: 사람 추가 아이콘
+      case 'confirmed':
+        return Icons.check_circle; // 확정: 체크 원 아이콘
+      case 'completed':
+        return Icons.done_all; // 완료: 완료 아이콘
+      case 'cancelled':
+        return Icons.cancel; // 취소: 취소 아이콘
+      case 'deleted':
+        return Icons.delete_forever; // 삭제됨: 영구 삭제 아이콘
+      default:
+        return Icons.info; // 기본: 정보 아이콘
+    }
+  }
+
+  // 모집중만 보기 체크박스
+  Widget _buildRecruitingOnlyCheckbox() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: Checkbox(
+              value: _showOnlyRecruiting,
+              onChanged: (value) {
+                setState(() {
+                  _showOnlyRecruiting = value ?? false;
+                  _applyFilters();
+                });
+              },
+              activeColor: AppColors.primary,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _showOnlyRecruiting = !_showOnlyRecruiting;
+                _applyFilters();
+              });
+            },
+            child: Text(
+              '모집중만',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 팔로우만 보기 체크박스
+  Widget _buildFollowOnlyCheckbox() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2), // 4 → 2 (50% 추가 감소)
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), // 6 → 4 (33% 추가 감소)
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.accent.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Checkbox(
+            value: _showOnlyFollowing,
+            onChanged: (value) {
+              setState(() {
+                _showOnlyFollowing = value ?? false;
+                
+                // 팔로우만 보기는 전용 체크박스로 관리하므로 _selectedFilters에 추가하지 않음
+                // 기존 팔로우 관련 필터 제거
+                // _selectedFilters.removeWhere((filter) => filter.contains('팔로우만'));
+                
+                // 새로운 팔로우 필터 추가하지 않음
+                // if (value == true) {
+                //   if (!_selectedFilters.contains('팔로우만')) {
+                //     _selectedFilters.add('팔로우만');
+                //   }
+                // }
+              });
+              
+              // 필터 적용
+              _applyFilters();
+            },
+            activeColor: AppColors.accent,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          const SizedBox(width: 6), // 8 → 6 (25% 감소)
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _showOnlyFollowing = !_showOnlyFollowing;
+                
+                // 팔로우만 보기는 전용 체크박스로 관리하므로 _selectedFilters에 추가하지 않음
+                // 기존 팔로우 관련 필터 제거
+                // _selectedFilters.removeWhere((filter) => filter.contains('팔로우만'));
+                
+                // 새로운 팔로우 필터 추가하지 않음
+                // if (value == true) {
+                //   if (!_selectedFilters.contains('팔로우만')) {
+                //         _selectedFilters.add('팔로우만');
+                //       }
+                //   }
+              });
+              
+              // 필터 적용
+              _applyFilters();
+            },
+            child: Text(
+              '팔로우만',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
