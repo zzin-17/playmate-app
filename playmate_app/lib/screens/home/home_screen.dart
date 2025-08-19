@@ -71,7 +71,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String? _selectedSkillLevel;
   String? _selectedEndSkillLevel;
   bool _showOnlyRecruiting = false;
-  bool _showOnlyFollowing = false;
   DateTime? _startDate;
   DateTime? _endDate;
   String? _startTime;
@@ -179,7 +178,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     print('날짜 범위: $_startDate ~ $_endDate');
     print('시간 범위: $_startTime ~ $_endTime');
     print('모집중만 보기: $_showOnlyRecruiting');
-    print('팔로우만 보기: $_showOnlyFollowing');
     
     _filteredMatchings = _mockMatchings.where((matching) {
       print('매칭 필터링: ${matching.courtName}');
@@ -197,24 +195,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (_showOnlyRecruiting && matching.status != 'recruiting') {
         print('  - 모집중이 아니므로 제외');
         return false;
-      }
-      
-      // 팔로우만 보기 필터
-      if (_showOnlyFollowing) {
-        final authProvider = context.read<AuthProvider>();
-        final currentUser = authProvider.currentUser;
-        if (currentUser != null) {
-          // 현재 사용자가 팔로우하는 사용자들의 ID 목록
-          final followingIds = currentUser.followingIds ?? [];
-          // 매칭 호스트가 팔로우 목록에 있는지 확인
-          if (!followingIds.contains(matching.host.id)) {
-            print('  - 팔로우하지 않는 사용자의 매칭이므로 제외');
-            return false;
-          }
-        } else {
-          // 로그인하지 않은 경우 팔로우 필터 적용 안함
-          print('  - 로그인하지 않아 팔로우 필터 무시');
-        }
       }
       
       // 게임 유형 필터
@@ -472,13 +452,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (_showOnlyRecruiting) {
         if (!_selectedFilters.contains('모집중')) {
           _selectedFilters.add('모집중');
-        }
-      }
-      
-      // 팔로우만 보기가 활성화된 경우 추가
-      if (_showOnlyFollowing) {
-        if (!_selectedFilters.contains('팔로우만')) {
-          _selectedFilters.add('팔로우만');
         }
       }
       
@@ -1458,7 +1431,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _showFilterBottomSheet(BuildContext context) {
     // 로컬 변수들 (모달 내부에서 사용)
     bool localShowOnlyRecruiting = _showOnlyRecruiting;
-    bool localShowOnlyFollowing = _showOnlyFollowing;
     List<String> localSelectedGameTypes = List.from(_selectedGameTypes);
     String? localSelectedSkillLevel = _selectedSkillLevel;
     String? localSelectedEndSkillLevel = _selectedEndSkillLevel;
@@ -1539,7 +1511,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               localStartTime = null;
                               localEndTime = null;
                               localShowOnlyRecruiting = false;
-                              localShowOnlyFollowing = false;
                               localSelectedCityId = null;
                               localSelectedDistrictIds.clear();
                             });
@@ -1584,7 +1555,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             
                             setState(() {
                               _showOnlyRecruiting = localShowOnlyRecruiting;
-                              _showOnlyFollowing = localShowOnlyFollowing;
                               _selectedGameTypes = List.from(localSelectedGameTypes);
                               _selectedSkillLevel = localSelectedSkillLevel;
                               _selectedEndSkillLevel = localSelectedEndSkillLevel;
@@ -1679,7 +1649,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           // 게임 유형 탭
                           SingleChildScrollView(
                             padding: const EdgeInsets.all(16),
-                            child: _buildGameTypeTab(localSelectedGameTypes, localSelectedFilters, localShowOnlyFollowing, setModalState),
+                            child: _buildGameTypeTab(localSelectedGameTypes, localSelectedFilters, setModalState),
                           ),
                           // 구력 탭
                           SingleChildScrollView(
@@ -2254,7 +2224,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // 게임 유형 필터 탭 위젯
-  Widget _buildGameTypeTab(List<String> selectedGameTypes, List<String> selectedFilters, bool showOnlyFollowing, StateSetter setModalState) {
+  Widget _buildGameTypeTab(List<String> selectedGameTypes, List<String> selectedFilters, StateSetter setModalState) {
     return Column(
       children: [
         // 게임 유형 필터
@@ -2265,62 +2235,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
         const SizedBox(height: 12),
-        
-        // 팔로우만 보기 체크박스
-        CheckboxListTile(
-          title: Text(
-            '팔로우한 사용자의 매칭만 보기',
-            style: AppTextStyles.body.copyWith(
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          subtitle: Text(
-            '팔로우한 사용자가 작성한 매칭만 표시됩니다',
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-            ),
-          ),
-          value: showOnlyFollowing,
-          onChanged: (value) {
-                          setModalState(() {
-                showOnlyFollowing = value ?? false;
-              
-              // 기존 팔로우 관련 필터 제거
-              selectedFilters.removeWhere((filter) => filter.contains('팔로우만'));
-              
-              // 새로운 팔로우 필터 추가
-              if (value == true) {
-                if (!selectedFilters.contains('팔로우만')) {
-                  selectedFilters.add('팔로우만');
-                }
-              }
-            });
-            
-            // 실제 변수에도 즉시 반영
-            setState(() {
-              _showOnlyFollowing = value ?? false;
-            });
-            
-            // 필터 적용
-            _applyFilters();
-          },
-          activeColor: AppColors.primary,
-          checkColor: AppColors.surface,
-          contentPadding: EdgeInsets.zero,
-        ),
-        
-        const SizedBox(height: 16),
-        
-        // 게임 유형 선택 안내
-        Text(
-          '게임 유형을 선택해 주세요',
-          style: AppTextStyles.body.copyWith(
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -3044,9 +2958,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } else if (filter.contains('모집중')) {
       icon = Icons.people;
       color = const Color(0xFF7FB069); // 부드러운 초록색
-    } else if (filter.contains('팔로우만')) {
-      icon = Icons.favorite;
-      color = const Color(0xFFE57373); // 부드러운 빨간색
     } else if (filter == '서울' || filter == '경기도' || filter == '인천') {
       icon = Icons.location_city;
       color = const Color(0xFF7BA7BC); // 부드러운 파란색
@@ -3124,8 +3035,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   _endTime = null;
                 } else if (filter.contains('모집중')) {
                   _showOnlyRecruiting = false;
-                } else if (filter.contains('팔로우만')) {
-                  _showOnlyFollowing = false;
                 }
                 
                 // 필터 상태 동기화하여 요약 UI 업데이트
