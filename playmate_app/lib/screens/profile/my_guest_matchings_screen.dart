@@ -7,6 +7,7 @@ import '../../constants/app_text_styles.dart';
 import '../../models/matching.dart';
 import '../../models/user.dart';
 import '../matching/matching_detail_screen.dart';
+import '../review/write_review_screen.dart';
 
 class MyGuestMatchingsScreen extends StatefulWidget {
   final User currentUser;
@@ -44,9 +45,116 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
     // TODO: 실제 API 호출로 대체
     setState(() {
       _isLoading = false;
-      // 임시로 홈 화면의 모의 데이터 사용
+      // 홈 화면의 모의 데이터를 사용하여 테스트
       _myGuestMatchings = [
-        // 여기에 실제 사용자의 게스트 매칭 데이터가 들어갈 예정
+        // 잠실종합운동장 (참여중)
+        Matching(
+          id: 101,
+          type: 'guest',
+          courtName: '잠실종합운동장',
+          courtLat: 37.512,
+          courtLng: 127.102,
+          date: DateTime.now().add(const Duration(days: 1)),
+          timeSlot: '18:00~20:00',
+          minLevel: 2,
+          maxLevel: 4,
+          gameType: 'mixed',
+          maleRecruitCount: 1,
+          femaleRecruitCount: 1,
+          status: 'recruiting',
+          guestCost: 15000,
+          host: User(
+            id: 101,
+            email: 'host101@example.com',
+            nickname: '잠실테니스',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          recoveryCount: 0,
+        ),
+        // 양재시민의숲 (확정)
+        Matching(
+          id: 102,
+          type: 'guest',
+          courtName: '양재시민의숲',
+          courtLat: 37.469,
+          courtLng: 127.038,
+          date: DateTime.now().add(const Duration(days: 2)),
+          timeSlot: '20:00~22:00',
+          minLevel: 3,
+          maxLevel: 5,
+          gameType: 'male_doubles',
+          maleRecruitCount: 2,
+          femaleRecruitCount: 0,
+          status: 'confirmed',
+          guestCost: 20000,
+          host: User(
+            id: 102,
+            email: 'player102@example.com',
+            nickname: '양재마스터',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          recoveryCount: 0,
+        ),
+        // 올림픽공원 테니스장 (완료)
+        Matching(
+          id: 103,
+          type: 'guest',
+          courtName: '올림픽공원 테니스장',
+          courtLat: 37.521,
+          courtLng: 127.128,
+          date: DateTime.now().subtract(const Duration(days: 1)),
+          timeSlot: '14:00~16:00',
+          minLevel: 1,
+          maxLevel: 3,
+          gameType: 'mixed',
+          maleRecruitCount: 1,
+          femaleRecruitCount: 1,
+          status: 'completed',
+          guestCost: 12000,
+          host: User(
+            id: 103,
+            email: 'tennis103@example.com',
+            nickname: '올림픽테니스',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          recoveryCount: 0,
+        ),
+        // 한강공원 테니스장 (취소)
+        Matching(
+          id: 104,
+          type: 'guest',
+          courtName: '한강공원 테니스장',
+          courtLat: 37.528,
+          courtLng: 126.933,
+          date: DateTime.now().add(const Duration(days: 3)),
+          timeSlot: '16:00~18:00',
+          minLevel: 4,
+          maxLevel: 6,
+          gameType: 'singles',
+          maleRecruitCount: 0,
+          femaleRecruitCount: 1,
+          status: 'cancelled',
+          guestCost: 18000,
+          host: User(
+            id: 104,
+            email: 'pro104@example.com',
+            nickname: '한강프로',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          recoveryCount: 0,
+        ),
       ];
     });
   }
@@ -64,9 +172,9 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(text: '참여중'),
-            Tab(text: '확정'),
             Tab(text: '완료'),
+            Tab(text: '확정'),
+            Tab(text: '참여중'),
           ],
         ),
       ),
@@ -75,9 +183,9 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
           : TabBarView(
               controller: _tabController,
               children: [
-                _buildMatchingList(_getMatchingsByStatus('recruiting'), '참여중'),
-                _buildMatchingList(_getMatchingsByStatus('confirmed'), '확정'),
                 _buildMatchingList(_getMatchingsByStatus('completed'), '완료'),
+                _buildMatchingList(_getMatchingsByStatus('confirmed'), '확정'),
+                _buildMatchingList(_getMatchingsByStatus('recruiting'), '참여중'),
               ],
             ),
     );
@@ -253,6 +361,24 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
                   ],
                 ),
               ],
+              
+              // 후기 작성 버튼 (완료된 매칭에만)
+              if (matching.status == 'completed') ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _navigateToWriteReview(matching),
+                    icon: const Icon(Icons.rate_review, size: 16),
+                    label: const Text('후기 작성하기'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppColors.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -290,5 +416,19 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
       default:
         return '알 수 없음';
     }
+  }
+
+
+
+  // 후기 작성 화면으로 이동
+  void _navigateToWriteReview(Matching matching) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => WriteReviewScreen(
+          targetUser: matching.host,
+          matching: matching,
+        ),
+      ),
+    );
   }
 }

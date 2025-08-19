@@ -1,23 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../models/review.dart';
 import '../../models/user.dart';
 import '../../models/matching.dart';
+import '../../providers/auth_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
-import '../../widgets/common/app_button.dart';
-import '../../services/notification_service.dart';
-import '../../providers/auth_provider.dart';
 
 class WriteReviewScreen extends StatefulWidget {
-  final Matching matching;
-  final User targetUser; // 후기를 받을 사용자
-  final User currentUser; // 후기를 작성하는 사용자
+  final User targetUser; // 리뷰 대상자
+  final Matching matching; // 해당 매칭
 
   const WriteReviewScreen({
     super.key,
-    required this.matching,
     required this.targetUser,
-    required this.currentUser,
+    required this.matching,
   });
 
   @override
@@ -25,60 +23,57 @@ class WriteReviewScreen extends StatefulWidget {
 }
 
 class _WriteReviewScreenState extends State<WriteReviewScreen> {
-  double _rating = 5.0;
-  double _mannerScore = 5.0;
-  final TextEditingController _reviewController = TextEditingController();
+  double _ntrpScore = 3.0; // 기본값 3.0
+  double _mannerScore = 4.0; // 기본값 4.0
+  final TextEditingController _commentController = TextEditingController();
   bool _isSubmitting = false;
-  
-  // 선택된 태그들
-  final Set<String> _selectedTags = {};
-  
-  // 미리 정의된 태그들
-  static const List<String> _availableTags = [
-    '응답이 빨라요',
-    '시간약속을 잘지켜요',
-    '기본기가 충실해요',
-    '매너가 좋아요',
-    '게임운영능력이 뛰어나요',
-    '테니스 실력이 좋아요',
-    '친절해요',
-    '정확한 스코어를 잘 쳐요',
-    '코트 예약을 잘 챙겨요',
-    '게임 분위기가 좋아요',
-  ];
 
   @override
   void dispose() {
-    _reviewController.dispose();
+    _commentController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('후기 작성'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        actions: [
+          TextButton(
+            onPressed: _isSubmitting ? null : _submitReview,
+            child: _isSubmitting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('완료'),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 대상자 정보
             _buildTargetUserInfo(),
             const SizedBox(height: 24),
-            _buildRatingSection(),
+            
+            // NTRP 점수 평가
+            _buildNtrpScoreSection(),
             const SizedBox(height: 24),
+            
+            // 매너 점수 평가
             _buildMannerScoreSection(),
             const SizedBox(height: 24),
-            _buildTagSelectionSection(),
-            const SizedBox(height: 24),
-            _buildReviewContentSection(),
+            
+            // 후기 텍스트
+            _buildCommentSection(),
             const SizedBox(height: 32),
+            
+            // 제출 버튼
             _buildSubmitButton(),
           ],
         ),
@@ -86,6 +81,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     );
   }
 
+  // 대상자 정보 위젯
   Widget _buildTargetUserInfo() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -100,26 +96,41 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
             radius: 24,
             backgroundColor: AppColors.primary.withOpacity(0.1),
             child: Text(
-              widget.targetUser.nickname.substring(0, 1),
-              style: AppTextStyles.h3.copyWith(
+              widget.targetUser.nickname.isNotEmpty 
+                  ? widget.targetUser.nickname[0] 
+                  : '?',
+              style: AppTextStyles.h2.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.targetUser.nickname,
-                  style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.bold),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.targetUser.nickname,
+                        style: AppTextStyles.h3.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // 팔로우 버튼
+                    _buildFollowButton(),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${widget.matching.courtName} • ${widget.matching.formattedDate}',
-                  style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+                  '${widget.matching.courtName} • ${widget.matching.date.month}월 ${widget.matching.date.day}일',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -129,233 +140,386 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     );
   }
 
-  Widget _buildRatingSection() {
+  // 팔로우 버튼 위젯
+  Widget _buildFollowButton() {
+    // TODO: 실제 팔로우 상태 확인 로직으로 대체
+    bool isFollowing = false; // 임시로 false로 설정
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          isFollowing = !isFollowing;
+        });
+        
+        // 팔로우/언팔로우 성공 메시지
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isFollowing 
+                ? '${widget.targetUser.nickname}님을 팔로우했습니다!' 
+                : '${widget.targetUser.nickname}님을 언팔로우했습니다!',
+            ),
+            backgroundColor: isFollowing ? AppColors.success : AppColors.textSecondary,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isFollowing 
+            ? AppColors.primary.withOpacity(0.1)
+            : AppColors.primary,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isFollowing ? AppColors.primary : Colors.transparent,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isFollowing ? Icons.person : Icons.person_add,
+              size: 14,
+              color: isFollowing ? AppColors.primary : Colors.white,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              isFollowing ? '팔로잉' : '팔로우',
+              style: AppTextStyles.caption.copyWith(
+                color: isFollowing ? AppColors.primary : Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NTRP 점수 평가 위젯
+  Widget _buildNtrpScoreSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '전체 만족도',
-          style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.cardBorder),
+          '테니스 실력 평가 (NTRP)',
+          style: AppTextStyles.h3.copyWith(
+            fontWeight: FontWeight.bold,
           ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _rating.toStringAsFixed(1),
-                    style: AppTextStyles.h2.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.star, color: AppColors.ratingStar, size: 32),
-                ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'NTRP 점수는 테니스 실력 수준을 객관적으로 평가하는 시스템입니다.',
+          style: AppTextStyles.caption.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // 점수 표시
+        Center(
+          child: Text(
+            '${_ntrpScore.toStringAsFixed(1)}',
+            style: AppTextStyles.h1.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        
+        // 슬라이더
+        Slider(
+          value: _ntrpScore,
+          min: 1.0,
+          max: 7.0,
+          divisions: 60, // 0.1 단위로 60개 구간
+          activeColor: AppColors.primary,
+          inactiveColor: AppColors.cardBorder,
+          onChanged: (value) {
+            setState(() {
+              _ntrpScore = value;
+            });
+          },
+        ),
+        
+        // 점수 범위 설명
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '1.0\n초보자',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 10,
               ),
-              const SizedBox(height: 16),
-              Slider(
-                value: _rating,
-                min: 1.0,
-                max: 5.0,
-                divisions: 8,
-                activeColor: AppColors.primary,
-                inactiveColor: AppColors.cardBorder,
-                onChanged: (value) {
-                  setState(() {
-                    _rating = value;
-                  });
-                },
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              '4.0\n중급자',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 10,
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('매우 나쁨', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
-                  Text('매우 좋음', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
-                ],
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              '7.0\n엘리트',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 10,
               ),
-            ],
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // 현재 점수 설명
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            _getNtrpDescription(_ntrpScore),
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.primary,
+              fontSize: 13,
+            ),
           ),
         ),
       ],
     );
   }
 
+  // 매너 점수 평가 위젯
   Widget _buildMannerScoreSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '매너 점수',
-          style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.cardBorder),
+          '매너 점수 평가',
+          style: AppTextStyles.h3.copyWith(
+            fontWeight: FontWeight.bold,
           ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _mannerScore.toStringAsFixed(1),
-                    style: AppTextStyles.h2.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.favorite, color: AppColors.primary, size: 32),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Slider(
-                value: _mannerScore,
-                min: 1.0,
-                max: 5.0,
-                divisions: 8,
-                activeColor: AppColors.primary,
-                inactiveColor: AppColors.cardBorder,
-                onChanged: (value) {
-                  setState(() {
-                    _mannerScore = value;
-                  });
-                },
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('매우 나쁨', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
-                  Text('매우 좋음', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTagSelectionSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '어떤 점이 좋았나요?',
-          style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
         Text(
-          '해당하는 항목들을 선택해주세요 (복수 선택 가능)',
-          style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.cardBorder),
+          '테니스 코트에서의 예의와 매너를 평가해주세요.',
+          style: AppTextStyles.caption.copyWith(
+            color: AppColors.textSecondary,
           ),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _availableTags.map((tag) {
-              final isSelected = _selectedTags.contains(tag);
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedTags.remove(tag);
-                    } else {
-                      _selectedTags.add(tag);
-                    }
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : AppColors.background,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : AppColors.cardBorder,
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    tag,
-                    style: AppTextStyles.caption.copyWith(
-                      color: isSelected ? Colors.white : AppColors.textPrimary,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+        ),
+        const SizedBox(height: 16),
+        
+        // 점수 표시
+        Center(
+          child: Text(
+            '${_mannerScore.toStringAsFixed(1)}',
+            style: AppTextStyles.h1.copyWith(
+              color: _getMannerScoreColor(_mannerScore),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        
+        // 슬라이더
+        Slider(
+          value: _mannerScore,
+          min: 1.0,
+          max: 5.0,
+          divisions: 40, // 0.1 단위로 40개 구간
+          activeColor: _getMannerScoreColor(_mannerScore),
+          inactiveColor: AppColors.cardBorder,
+          onChanged: (value) {
+            setState(() {
+              _mannerScore = value;
+            });
+          },
+        ),
+        
+        // 점수 범위 설명
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '1.0\n매우 나쁨',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.error,
+                fontSize: 10,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              '3.0\n보통',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 10,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              '5.0\n매우 좋음',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.success,
+                fontSize: 10,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // 현재 점수 설명
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _getMannerScoreColor(_mannerScore).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            _getMannerDescription(_mannerScore),
+            style: AppTextStyles.body.copyWith(
+              color: _getMannerScoreColor(_mannerScore),
+              fontSize: 13,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildReviewContentSection() {
+  // 후기 텍스트 위젯
+  Widget _buildCommentSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '리뷰 내용',
-          style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.cardBorder),
+          '후기 작성',
+          style: AppTextStyles.h3.copyWith(
+            fontWeight: FontWeight.bold,
           ),
-          child: TextField(
-            controller: _reviewController,
-            maxLines: 5,
-            maxLength: 200,
-            decoration: const InputDecoration(
-              hintText: '매칭 참여 후기를 작성해주세요 (최대 200자)',
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.all(16),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '이번 매칭에 대한 솔직한 후기를 작성해주세요.',
+          style: AppTextStyles.caption.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        TextField(
+          controller: _commentController,
+          maxLines: 5,
+          maxLength: 500,
+          decoration: InputDecoration(
+            hintText: '매칭 경험, 상대방의 실력과 매너, 개선점 등을 자유롭게 작성해주세요.',
+            hintStyle: AppTextStyles.body.copyWith(
+              color: AppColors.textSecondary,
             ),
-            style: AppTextStyles.body,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.cardBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.primary),
+            ),
+            filled: true,
+            fillColor: AppColors.surface,
+          ),
+          style: AppTextStyles.body,
+        ),
+        
+        const SizedBox(height: 8),
+        Text(
+          '${_commentController.text.length}/500',
+          style: AppTextStyles.caption.copyWith(
+            color: AppColors.textSecondary,
           ),
         ),
       ],
     );
   }
 
+  // 제출 버튼 위젯
   Widget _buildSubmitButton() {
     return SizedBox(
       width: double.infinity,
-      child: AppButton(
-        text: _isSubmitting ? '후기 작성 중...' : '후기 작성 완료',
+      child: ElevatedButton(
         onPressed: _isSubmitting ? null : _submitReview,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        child: _isSubmitting
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : Text(
+                '후기 제출하기',
+                style: AppTextStyles.h3.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
       ),
     );
   }
 
+  // NTRP 점수 설명 반환
+  String _getNtrpDescription(double score) {
+    if (score < 1.5) return '테니스를 처음 시작하는 초보자';
+    if (score < 2.5) return '기본적인 샷을 칠 수 있음';
+    if (score < 3.5) return '일관성 있게 샷을 칠 수 있음';
+    if (score < 4.5) return '다양한 샷과 전략을 구사할 수 있음';
+    if (score < 5.5) return '고급 테크닉과 전략을 보유';
+    if (score < 6.5) return '프로 수준의 실력';
+    return '세계적 수준의 엘리트 선수';
+  }
+
+  // 매너 점수 설명 반환
+  String _getMannerDescription(double score) {
+    if (score < 2.0) return '매우 나쁜 매너와 예의';
+    if (score < 3.0) return '개선이 필요한 매너';
+    if (score < 4.0) return '보통 수준의 매너';
+    if (score < 4.5) return '좋은 매너와 예의';
+    return '매우 좋은 매너와 예의';
+  }
+
+  // 매너 점수 색상 반환
+  Color _getMannerScoreColor(double score) {
+    if (score < 2.0) return AppColors.error;
+    if (score < 3.0) return Colors.orange;
+    if (score < 4.0) return Colors.amber;
+    if (score < 4.5) return Colors.lightGreen;
+    return AppColors.success;
+  }
+
+  // 후기 제출
   Future<void> _submitReview() async {
-    if (_reviewController.text.trim().isEmpty && _selectedTags.isEmpty) {
+    if (_commentController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('리뷰 내용을 입력하거나 태그를 선택해주세요')),
+        const SnackBar(
+          content: Text('후기 내용을 입력해주세요.'),
+          backgroundColor: AppColors.error,
+        ),
       );
       return;
     }
@@ -365,33 +529,27 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     });
 
     try {
-      // TODO: API 호출로 후기 저장
-      // 선택된 태그들과 리뷰 내용을 함께 저장
-      final reviewData = {
-        'rating': _rating,
-        'mannerScore': _mannerScore,
-        'content': _reviewController.text.trim(),
-        'tags': _selectedTags.toList(),
-        'targetUserId': widget.targetUser.id,
-        'reviewerId': widget.currentUser.id,
-        'matchingId': widget.matching.id,
-      };
+      // TODO: 실제 API 호출로 대체
+      await Future.delayed(const Duration(seconds: 2)); // API 호출 시뮬레이션
       
-      print('후기 데이터: $reviewData'); // 디버깅용
-      
-      await Future.delayed(const Duration(seconds: 1)); // 임시 딜레이
-
-      // 후기 작성 완료 알림 보내기
-      _sendReviewCompletedNotification();
-
-      // 팔로우 제안 다이얼로그 표시
       if (mounted) {
-        _showFollowSuggestion();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('후기가 성공적으로 작성되었습니다!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        
+        // 이전 화면으로 돌아가기
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('후기 작성에 실패했습니다. 다시 시도해주세요')),
+          SnackBar(
+            content: Text('후기 작성에 실패했습니다: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {
@@ -400,90 +558,6 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
           _isSubmitting = false;
         });
       }
-    }
-  }
-
-  /// 후기 작성 완료 알림 전송
-  void _sendReviewCompletedNotification() {
-    try {
-      NotificationService().showReviewCompletedNotification(
-        reviewerName: widget.currentUser.nickname,
-        targetName: widget.targetUser.nickname,
-        userId: widget.targetUser.id,
-      );
-    } catch (e) {
-      print('후기 작성 완료 알림 전송 실패: $e');
-    }
-  }
-
-  /// 팔로우 제안 다이얼로그 표시
-  void _showFollowSuggestion() {
-    final currentUser = context.read<AuthProvider>().currentUser;
-    if (currentUser == null) return;
-
-    final isFollowing = currentUser.followingIds?.contains(widget.targetUser.id) ?? false;
-    
-    if (!isFollowing) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('팔로우 제안'),
-          content: Text('${widget.targetUser.nickname}님과 함께 테니스를 치면서 좋은 시간을 보냈나요?\n\n이제 팔로우하여 앞으로의 활동을 지켜보세요!'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).pop(true); // 후기 작성 화면 닫기
-              },
-              child: const Text('나중에'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _followUser();
-              },
-              child: const Text('팔로우하기'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      Navigator.of(context).pop(true); // 이미 팔로우 중이면 바로 닫기
-    }
-  }
-
-  /// 사용자 팔로우
-  Future<void> _followUser() async {
-    try {
-      final currentUser = context.read<AuthProvider>().currentUser;
-      if (currentUser == null) return;
-
-      // TODO: 실제 API 호출로 변경
-      print('팔로우 시도: ${widget.targetUser.nickname}');
-      
-      // Mock: 팔로우 상태 업데이트
-      setState(() {
-        currentUser.followingIds ??= [];
-        currentUser.followingIds!.add(widget.targetUser.id);
-        widget.targetUser.followerIds ??= [];
-        widget.targetUser.followerIds!.add(currentUser.id);
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${widget.targetUser.nickname}님을 팔로우했습니다!'),
-          backgroundColor: AppColors.primary,
-        ),
-      );
-
-      Navigator.of(context).pop(true); // 후기 작성 화면 닫기
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('팔로우 처리 중 오류가 발생했습니다: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
     }
   }
 }

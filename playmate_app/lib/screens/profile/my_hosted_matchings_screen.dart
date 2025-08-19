@@ -7,6 +7,7 @@ import '../../constants/app_text_styles.dart';
 import '../../models/matching.dart';
 import '../../models/user.dart';
 import '../matching/matching_detail_screen.dart';
+import '../review/guest_review_list_screen.dart';
 
 class MyHostedMatchingsScreen extends StatefulWidget {
   final User currentUser;
@@ -44,16 +45,214 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
     // TODO: 실제 API 호출로 대체
     setState(() {
       _isLoading = false;
-      // 임시로 홈 화면의 모의 데이터 사용
+      // 홈 화면의 모의 데이터를 사용하여 테스트
       _myHostedMatchings = [
-        // 여기에 실제 사용자의 호스트 매칭 데이터가 들어갈 예정
+        // 잠실종합운동장
+        Matching(
+          id: 1,
+          type: 'host',
+          courtName: '잠실종합운동장',
+          courtLat: 37.512,
+          courtLng: 127.102,
+          date: DateTime.now().add(const Duration(days: 1)),
+          timeSlot: '18:00~20:00',
+          minLevel: 2,
+          maxLevel: 4,
+          gameType: 'mixed',
+          maleRecruitCount: 1,
+          femaleRecruitCount: 1,
+          status: 'recruiting',
+          host: User(
+            id: 1,
+            email: 'host@example.com',
+            nickname: '테린이',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          recoveryCount: 0,
+        ),
+        // 양재시민의숲
+        Matching(
+          id: 2,
+          type: 'host',
+          courtName: '양재시민의숲',
+          courtLat: 37.469,
+          courtLng: 127.038,
+          date: DateTime.now().add(const Duration(days: 2)),
+          timeSlot: '20:00~22:00',
+          minLevel: 3,
+          maxLevel: 5,
+          gameType: 'male_doubles',
+          maleRecruitCount: 2,
+          femaleRecruitCount: 0,
+          status: 'recruiting',
+          isFollowersOnly: true,
+          host: User(
+            id: 2,
+            email: 'player@example.com',
+            nickname: '테니스마스터',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          recoveryCount: 0,
+        ),
+        // 올림픽공원 테니스장
+        Matching(
+          id: 3,
+          type: 'host',
+          courtName: '올림픽공원 테니스장',
+          courtLat: 37.521,
+          courtLng: 127.128,
+          date: DateTime.now().subtract(const Duration(days: 1)), // 어제 완료된 매칭
+          timeSlot: '14:00~16:00',
+          minLevel: 1,
+          maxLevel: 3,
+          gameType: 'mixed',
+          maleRecruitCount: 1,
+          femaleRecruitCount: 1,
+          status: 'completed',
+          host: User(
+            id: 3,
+            email: 'tennis@example.com',
+            nickname: '테니스초보',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+          guests: [
+            User(
+              id: 301,
+              email: 'guest1@example.com',
+              nickname: '테니스러버',
+              skillLevel: 2,
+              gender: 'male',
+              startYearMonth: '2022-03',
+              mannerScore: 4.2,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+            User(
+              id: 302,
+              email: 'guest2@example.com',
+              nickname: '테니스초보',
+              skillLevel: 1,
+              gender: 'female',
+              startYearMonth: '2023-01',
+              mannerScore: 4.5,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          ],
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          recoveryCount: 0,
+        ),
+        // 한강공원 테니스장
+        Matching(
+          id: 4,
+          type: 'host',
+          courtName: '한강공원 테니스장',
+          courtLat: 37.528,
+          courtLng: 126.933,
+          date: DateTime.now().subtract(const Duration(days: 2)), // 이틀 전 완료된 매칭
+          timeSlot: '16:00~18:00',
+          minLevel: 4,
+          maxLevel: 6,
+          gameType: 'singles',
+          maleRecruitCount: 0,
+          femaleRecruitCount: 1,
+          status: 'completed',
+          host: User(
+            id: 4,
+            email: 'pro@example.com',
+            nickname: '테니스프로',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+          guests: [
+            User(
+              id: 401,
+              email: 'guest401@example.com',
+              nickname: '한강테니스',
+              skillLevel: 4,
+              gender: 'female',
+              startYearMonth: '2021-08',
+              mannerScore: 4.6,
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+            ),
+          ],
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          recoveryCount: 0,
+        ),
+        // 분당테니스장
+        Matching(
+          id: 5,
+          type: 'host',
+          courtName: '분당테니스장',
+          courtLat: 37.350,
+          courtLng: 127.108,
+          date: DateTime.now().add(const Duration(days: 5)),
+          timeSlot: '10:00~12:00',
+          minLevel: 2,
+          maxLevel: 4,
+          gameType: 'female_doubles',
+          maleRecruitCount: 0,
+          femaleRecruitCount: 2,
+          status: 'cancelled',
+          host: User(
+            id: 5,
+            email: 'bundang@example.com',
+            nickname: '분당테니스',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          recoveryCount: 0,
+        ),
+        // 인천대공원 테니스장
+        Matching(
+          id: 6,
+          type: 'host',
+          courtName: '인천대공원 테니스장',
+          courtLat: 37.448,
+          courtLng: 126.752,
+          date: DateTime.now().add(const Duration(days: 6)),
+          timeSlot: '19:00~21:00',
+          minLevel: 3,
+          maxLevel: 5,
+          gameType: 'mixed',
+          maleRecruitCount: 1,
+          femaleRecruitCount: 1,
+          status: 'recruiting',
+          host: User(
+            id: 6,
+            email: 'incheon@example.com',
+            nickname: '인천테니스',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          ),
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          recoveryCount: 0,
+        ),
       ];
     });
   }
 
   // 상태별 매칭 필터링
   List<Matching> _getMatchingsByStatus(String status) {
-    return _myHostedMatchings.where((matching) => matching.status == status).toList();
+    final filtered = _myHostedMatchings.where((matching) => matching.status == status).toList();
+    print('=== $status 탭 매칭 개수: ${filtered.length} ===');
+    for (final matching in filtered) {
+      print('  - ${matching.courtName}: ${matching.status}, 게스트 ${matching.guests?.length ?? 0}명');
+    }
+    return filtered;
   }
 
   @override
@@ -64,9 +263,9 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(text: '모집중'),
-            Tab(text: '확정'),
             Tab(text: '완료'),
+            Tab(text: '확정'),
+            Tab(text: '모집중'),
           ],
         ),
       ),
@@ -75,9 +274,9 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
           : TabBarView(
               controller: _tabController,
               children: [
-                _buildMatchingList(_getMatchingsByStatus('recruiting'), '모집중'),
-                _buildMatchingList(_getMatchingsByStatus('confirmed'), '확정'),
                 _buildMatchingList(_getMatchingsByStatus('completed'), '완료'),
+                _buildMatchingList(_getMatchingsByStatus('confirmed'), '확정'),
+                _buildMatchingList(_getMatchingsByStatus('recruiting'), '모집중'),
               ],
             ),
     );
@@ -225,6 +424,24 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
                   ],
                 ),
               ],
+              
+              // 게스트 후기 작성 버튼 (완료된 매칭에만)
+              if (matching.status == 'completed' && (matching.guests?.isNotEmpty ?? false)) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _navigateToGuestReviewList(matching),
+                    icon: const Icon(Icons.rate_review, size: 16),
+                    label: Text('게스트 후기 작성 (${matching.guests?.length ?? 0}명)'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppColors.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -262,5 +479,19 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
       default:
         return '알 수 없음';
     }
+  }
+
+
+
+  // 게스트 후기 작성 목록 화면으로 이동
+  void _navigateToGuestReviewList(Matching matching) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => GuestReviewListScreen(
+          matching: matching,
+          hostUser: widget.currentUser,
+        ),
+      ),
+    );
   }
 }

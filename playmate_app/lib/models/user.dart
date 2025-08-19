@@ -12,6 +12,7 @@ class User {
   final String? region;
   final int? skillLevel;
   final String? startYearMonth; // 'YYYY-MM' 형태. 가입/테니스 시작월
+  final double? ntrpScore; // NTRP 점수 (1.0 ~ 7.0)
   final String? preferredCourt;
   final List<String>? preferredTime;
   final String? playStyle;
@@ -33,6 +34,7 @@ class User {
     this.region,
     this.skillLevel,
     this.startYearMonth,
+    this.ntrpScore,
     this.preferredCourt,
     this.preferredTime,
     this.playStyle,
@@ -81,6 +83,24 @@ class User {
       default:
         return '미설정';
     }
+  }
+
+  // NTRP 점수 표시
+  String get ntrpScoreText {
+    if (ntrpScore == null) return '평가 없음';
+    return '${ntrpScore!.toStringAsFixed(1)}';
+  }
+
+  // NTRP 점수 레벨 텍스트
+  String get ntrpLevelText {
+    if (ntrpScore == null) return '미평가';
+    if (ntrpScore! < 1.5) return '초보자 (1.0-1.5)';
+    if (ntrpScore! < 2.5) return '입문자 (1.5-2.5)';
+    if (ntrpScore! < 3.5) return '초급자 (2.5-3.5)';
+    if (ntrpScore! < 4.5) return '중급자 (3.5-4.5)';
+    if (ntrpScore! < 5.5) return '고급자 (4.5-5.5)';
+    if (ntrpScore! < 6.5) return '전문가 (5.5-6.5)';
+    return '엘리트 (6.5+)';
   }
 
   // 매너 점수 표시

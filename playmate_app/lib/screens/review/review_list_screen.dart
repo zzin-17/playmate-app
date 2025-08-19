@@ -251,9 +251,8 @@ class _ReviewListScreenState extends State<ReviewListScreen> {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => WriteReviewScreen(
-          matching: widget.matching,
           targetUser: participant,
-          currentUser: widget.currentUser,
+          matching: widget.matching,
         ),
       ),
     );

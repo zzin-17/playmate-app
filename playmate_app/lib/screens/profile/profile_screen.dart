@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
 import 'my_hosted_matchings_screen.dart';
 import 'my_guest_matchings_screen.dart';
+import '../review/my_reviews_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -85,6 +86,27 @@ class ProfileScreen extends StatelessWidget {
                       subtitle: '구매/판매 내역',
                       onTap: () {
                         // 내 거래 페이지로 이동
+                      },
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 24),
+                
+                _buildMenuSection(
+                  title: '리뷰',
+                  items: [
+                    MenuItem(
+                      icon: Icons.rate_review,
+                      title: '나의 리뷰',
+                      subtitle: '나를 평가한 리뷰 확인',
+                      onTap: () {
+                        // 나의 리뷰 페이지로 이동
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => MyReviewsScreen(currentUser: user!),
+                          ),
+                        );
                       },
                     ),
                   ],
