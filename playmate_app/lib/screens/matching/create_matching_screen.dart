@@ -26,11 +26,11 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
   String _selectedEndTime = '20:00';
   int? _selectedMinLevel;
   int? _selectedMaxLevel;
-  String _selectedGenderPreference = 'any';
   String _selectedGameType = 'mixed';
   int _maleRecruitCount = 1;
   int _femaleRecruitCount = 1;
   final _guestCostController = TextEditingController();
+  bool _isFollowersOnly = false; // 팔로워 전용 공개 여부
 
   final List<String> _timeOptions = [
     '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
@@ -38,11 +38,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
     '20:00', '21:00', '22:00', '23:00'
   ];
 
-  final List<Map<String, String>> _genderPreferences = [
-    {'value': 'any', 'label': '성별무관'},
-    {'value': 'male', 'label': '남성'},
-    {'value': 'female', 'label': '여성'},
-  ];
+
 
   final List<Map<String, String>> _gameTypes = [
     {'value': 'mixed', 'label': '혼복'},
@@ -65,7 +61,6 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
       _selectedEndTime = matching.timeSlot.split('~')[1];
       _selectedMinLevel = matching.minLevel;
       _selectedMaxLevel = matching.maxLevel;
-      _selectedGenderPreference = matching.genderPreference ?? 'any';
       _selectedGameType = matching.gameType;
       _maleRecruitCount = matching.maleRecruitCount;
       _femaleRecruitCount = matching.femaleRecruitCount;
@@ -137,7 +132,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
       timeSlot: timeSlot,
       minLevel: _selectedMinLevel,
       maxLevel: _selectedMaxLevel,
-      genderPreference: _selectedGenderPreference,
+      
       gameType: _selectedGameType,
       maleRecruitCount: _maleRecruitCount,
       femaleRecruitCount: _femaleRecruitCount,
@@ -164,7 +159,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
     print('시간: ${newMatching.timeSlot}');
     print('구력: ${newMatching.skillRangeText}');
     print('게임 유형: ${newMatching.gameTypeText}');
-    print('성별 선호도: ${newMatching.genderPreferenceText}');
+    
     print('모집 인원: 남${newMatching.maleRecruitCount}명, 여${newMatching.femaleRecruitCount}명');
     print('게스트비용: ${_guestCostController.text}원');
     print('메시지: ${newMatching.message}');
@@ -323,19 +318,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
                 // 게임 유형
                 _buildGameTypeSection(),
                 
-                const SizedBox(height: 24),
-                
-                // 성별 선호도
-                _buildDropdownSection(
-                  '성별 선호도',
-                  _selectedGenderPreference,
-                  _genderPreferences.map((e) => e['value'] as String).toList(),
-                  (value) => setState(() => _selectedGenderPreference = value!),
-                  '성별 선호도를 선택해주세요',
-                  displayValues: _genderPreferences.map((e) => e['label'] as String).toList(),
-                ),
-                
-                const SizedBox(height: 24),
+
                 
                 // 모집 인원
                 _buildRecruitCountSection(),
@@ -422,6 +405,11 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
                     ),
                   ],
                 ),
+                
+                const SizedBox(height: 24),
+                
+                // 팔로워 전용 공개 옵션
+                _buildFollowersOnlyOption(),
                 
                 const SizedBox(height: 32),
                 
@@ -767,6 +755,65 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFollowersOnlyOption() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.lock_outline,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '공개 설정',
+                style: AppTextStyles.body.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          CheckboxListTile(
+            value: _isFollowersOnly,
+            onChanged: (value) {
+              setState(() {
+                _isFollowersOnly = value ?? false;
+              });
+            },
+            activeColor: AppColors.primary,
+            title: Text(
+              '팔로워에게만 공개',
+              style: AppTextStyles.body.copyWith(
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            subtitle: Text(
+              '팔로우한 사용자에게만 모집글을 보여줍니다',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
+        ],
+      ),
     );
   }
 

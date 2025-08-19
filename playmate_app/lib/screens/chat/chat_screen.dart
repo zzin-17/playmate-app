@@ -6,6 +6,9 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_text_field.dart';
+import '../review/write_review_screen.dart';
+import '../review/review_list_screen.dart';
+import '../../services/notification_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final Matching matching;
@@ -123,6 +126,9 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
 
+    // 매칭 확정 알림 보내기
+    _sendMatchingConfirmedNotification();
+
     // 성공 메시지 표시
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -132,22 +138,126 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _writeReview() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('후기 작성'),
-          content: const Text('후기 작성 기능은 곧 추가될 예정입니다!'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('확인'),
-            ),
-          ],
+  /// 매칭 확정 알림 전송
+  void _sendMatchingConfirmedNotification() {
+    try {
+      // 게스트들에게 매칭 확정 알림
+      if (widget.matching.guests != null) {
+        for (final guest in widget.matching.guests!) {
+          NotificationService().showMatchingConfirmedNotification(
+            hostName: widget.matching.host.nickname,
+            courtName: widget.matching.courtName,
+            date: _formatDate(widget.matching.date),
+            matchingId: widget.matching.id,
+          );
+        }
+      }
+      
+      // 목업 데이터가 있는 경우에도 알림
+      if (widget.matching.guests == null || widget.matching.guests!.isEmpty) {
+        NotificationService().showMatchingConfirmedNotification(
+          hostName: widget.matching.host.nickname,
+          courtName: widget.matching.courtName,
+          date: _formatDate(widget.matching.date),
+          matchingId: widget.matching.id,
         );
-      },
+      }
+    } catch (e) {
+      print('매칭 확정 알림 전송 실패: $e');
+    }
+  }
+
+  /// 날짜 포맷팅
+  String _formatDate(DateTime date) {
+    return '${date.month}월 ${date.day}일';
+  }
+
+  Future<void> _writeReview() async {
+    // 채팅 상대방 찾기
+    User? chatPartner;
+    
+    if (_isHost) {
+      // 호스트인 경우: 게스트 중 하나를 채팅 상대방으로 설정
+      if (widget.matching.guests != null && widget.matching.guests!.isNotEmpty) {
+        chatPartner = widget.matching.guests!.first;
+      } else {
+        // 목업 데이터 사용
+        chatPartner = User(
+          id: 999,
+          email: 'test@example.com',
+          nickname: '테니스러버',
+          birthYear: 1990,
+          gender: 'male',
+          skillLevel: 3,
+          region: '서울',
+          preferredCourt: '잠실종합운동장',
+          preferredTime: ['오후', '저녁'],
+          playStyle: '공격적',
+          hasLesson: false,
+          mannerScore: 4.5,
+          startYearMonth: '2020-03',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      }
+    } else {
+      // 게스트인 경우: 호스트를 채팅 상대방으로 설정
+      chatPartner = widget.matching.host;
+    }
+    
+    // 후기 목록 화면으로 이동 (채팅 상대방 정보 포함)
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ReviewListScreen(
+          matching: widget.matching,
+          currentUser: widget.currentUser,
+          chatPartner: chatPartner,
+        ),
+      ),
     );
+  }
+
+  List<User> _getParticipants() {
+    // 매칭 참여자 목록 반환 (현재 사용자 제외)
+    final participants = <User>[];
+    
+    // 호스트가 현재 사용자가 아닌 경우 호스트 추가
+    if (widget.matching.host.id != widget.currentUser.id) {
+      participants.add(widget.matching.host);
+    }
+    
+    // 게스트 목록 추가 (null 체크 포함)
+    if (widget.matching.guests != null) {
+      for (final guest in widget.matching.guests!) {
+        if (guest.id != widget.currentUser.id) {
+          participants.add(guest);
+        }
+      }
+    }
+    
+    // 목업 데이터: 실제 게스트가 없을 때 테스트용
+    if (participants.isEmpty && widget.matching.host.id != widget.currentUser.id) {
+      // 테스트용 더미 게스트 추가
+      participants.add(User(
+        id: 999,
+        email: 'test@example.com',
+        nickname: '테니스러버',
+        birthYear: 1990,
+        gender: 'male',
+        skillLevel: 3,
+        region: '서울',
+        preferredCourt: '잠실종합운동장',
+        preferredTime: ['오후', '저녁'],
+        playStyle: '공격적',
+        hasLesson: false,
+        mannerScore: 4.5,
+        startYearMonth: '2020-03',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+    }
+    
+    return participants;
   }
 
   @override

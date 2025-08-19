@@ -203,7 +203,9 @@ class _DateRangeCalendarState extends State<DateRangeCalendar> {
   }
 
   Widget _buildDayCell(int day, {required bool isCurrentMonth}) {
-    final currentDate = DateTime(_focusedDay.year, _focusedDay.month, day);
+    // 현재 연도를 사용하여 날짜 생성
+    final currentYear = DateTime.now().year;
+    final currentDate = DateTime(currentYear, _focusedDay.month, day);
     final isToday = _isToday(currentDate);
     final isSelected = _isDateSelected(currentDate);
     final isInRange = _isDateInRange(currentDate);
@@ -300,22 +302,34 @@ class _DateRangeCalendarState extends State<DateRangeCalendar> {
   }
 
   void _onDaySelected(DateTime selectedDate) {
+    // 현재 연도를 사용하여 날짜 생성
+    final currentYear = DateTime.now().year;
+    final correctedDate = DateTime(currentYear, selectedDate.month, selectedDate.day);
+    
+    print('=== DateRangeCalendar 날짜 선택 ===');
+    print('선택된 날짜: $selectedDate');
+    print('수정된 날짜: $correctedDate');
+    print('현재 연도: $currentYear');
+    
     setState(() {
       if (_selectedStartDate == null) {
-        _selectedStartDate = selectedDate;
+        _selectedStartDate = correctedDate;
         _selectedEndDate = null;
       } else if (_selectedEndDate == null) {
-        if (selectedDate.isBefore(_selectedStartDate!)) {
+        if (correctedDate.isBefore(_selectedStartDate!)) {
           _selectedEndDate = _selectedStartDate;
-          _selectedStartDate = selectedDate;
+          _selectedStartDate = correctedDate;
         } else {
-          _selectedEndDate = selectedDate;
+          _selectedEndDate = correctedDate;
         }
       } else {
-        _selectedStartDate = selectedDate;
+        _selectedStartDate = correctedDate;
         _selectedEndDate = null;
       }
     });
+    
+    print('최종 선택된 시작 날짜: $_selectedStartDate');
+    print('최종 선택된 종료 날짜: $_selectedEndDate');
     
     widget.onDateRangeChanged(_selectedStartDate, _selectedEndDate);
   }

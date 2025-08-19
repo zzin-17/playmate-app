@@ -17,13 +17,14 @@ class Matching {
   final String timeSlot;
   final int? minLevel;
   final int? maxLevel;
-  final String? genderPreference;
+
   final String gameType; // 'mixed', 'male_doubles', 'female_doubles', 'singles', 'rally'
   final int maleRecruitCount;
   final int femaleRecruitCount;
   final String status;
   final String? message;
   final int? guestCost;
+  final bool isFollowersOnly; // 팔로워 전용 공개 여부
   final User host;
   final List<User>? guests;
   final DateTime createdAt;
@@ -39,13 +40,14 @@ class Matching {
     required this.timeSlot,
     this.minLevel,
     this.maxLevel,
-    this.genderPreference,
+
     required this.gameType,
     required this.maleRecruitCount,
     required this.femaleRecruitCount,
     required this.status,
     this.message,
     this.guestCost,
+    this.isFollowersOnly = false,
     required this.host,
     this.guests,
     required this.createdAt,
@@ -82,19 +84,7 @@ class Matching {
     }
   }
 
-  // 성별 선호도 텍스트
-  String get genderPreferenceText {
-    switch (genderPreference) {
-      case 'male':
-        return '남성';
-      case 'female':
-        return '여성';
-      case 'any':
-        return '성별무관';
-      default:
-        return '성별무관';
-    }
-  }
+
 
   // 상태 텍스트
   String get statusText {

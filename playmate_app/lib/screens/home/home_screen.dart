@@ -5,6 +5,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../models/matching.dart';
 import '../../models/user.dart';
+import '../../models/location.dart';
 import '../matching/create_matching_screen.dart';
 import '../matching/matching_detail_screen.dart';
 import '../profile/my_profile_screen.dart';
@@ -13,14 +14,56 @@ import '../../widgets/common/app_logo.dart';
 import '../../widgets/common/date_range_calendar.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final Matching? newMatching;
+  final VoidCallback? onMatchingAdded;
+  
+  const HomeScreen({
+    super.key,
+    this.newMatching,
+    this.onMatchingAdded,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _currentIndex = 0;
+  late TabController _filterTabController;
+  
+  @override
+  void initState() {
+    super.initState();
+    _filterTabController = TabController(length: 5, vsync: this);
+    _filteredMatchings = List.from(_mockMatchings);
+    
+    // 위치 데이터 초기화 (디폴트로 선택 안됨)
+    _locationData = LocationData.cities;
+    _selectedCityId = null;
+    _selectedDistrictIds = [];
+    
+    // 검색 컨트롤러 리스너 추가
+    _searchController.addListener(_onSearchChanged);
+    
+    _applyFilters();
+  }
+
+  @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // 새 매칭이 추가되면 처리
+    if (widget.newMatching != null && oldWidget.newMatching != widget.newMatching) {
+      _addNewMatching(widget.newMatching!);
+    }
+  }
+  
+  @override
+  void dispose() {
+    _filterTabController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
   
   // 필터 관련 변수들
   final List<String> _selectedFilters = [];
@@ -28,10 +71,421 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _selectedSkillLevel;
   String? _selectedEndSkillLevel;
   bool _showOnlyRecruiting = false;
+  bool _showOnlyFollowing = false;
   DateTime? _startDate;
   DateTime? _endDate;
   String? _startTime;
   String? _endTime;
+  
+  // 위치 필터 관련 변수들
+  List<Location> _locationData = [];
+  String? _selectedCityId;
+  List<String> _selectedDistrictIds = [];
+  
+  // 검색 관련 변수들
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  List<Matching> _filteredMatchings = [];
+  List<String> _searchHistory = [];
+  bool _showSearchHistory = false;
+  
+  // UI 상태 변수들
+  bool _isLoading = false;
+  String? _errorMessage;
+
+
+  // 새 매칭 추가 메서드
+  void _addNewMatching(Matching newMatching) {
+    setState(() {
+      // 새 매칭을 맨 위에 추가
+      _mockMatchings.insert(0, newMatching);
+      // 필터링된 목록도 업데이트
+      _applyFilters();
+    });
+    
+    // 콜백 호출하여 MainScreen에 알림
+    widget.onMatchingAdded?.call();
+    
+    // 성공 메시지 표시
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('새 매칭이 추가되었습니다: ${newMatching.courtName}'),
+        backgroundColor: AppColors.primary,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // 검색 및 필터링 메서드
+  void _onSearchChanged() {
+    setState(() {
+      _searchQuery = _searchController.text.trim();
+      _showSearchHistory = _searchQuery.isEmpty && _searchHistory.isNotEmpty;
+      _applyFilters();
+    });
+  }
+  
+  // 검색어 추가
+  void _addToSearchHistory(String query) {
+    if (query.isNotEmpty && !_searchHistory.contains(query)) {
+      setState(() {
+        _searchHistory.insert(0, query);
+        // 최대 10개까지만 유지
+        if (_searchHistory.length > 10) {
+          _searchHistory.removeLast();
+        }
+      });
+    }
+  }
+  
+  // 검색어 선택
+  void _selectSearchHistory(String query) {
+    setState(() {
+      _searchController.text = query;
+      _searchQuery = query;
+      _showSearchHistory = false;
+      _applyFilters();
+    });
+  }
+  
+  // 검색 히스토리 삭제
+  void _removeFromSearchHistory(String query) {
+    setState(() {
+      _searchHistory.remove(query);
+    });
+  }
+  
+  void _applyFilters() {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    
+    // 실제 필터링은 비동기로 처리 (UI 반응성 향상)
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _performFiltering();
+      }
+    });
+  }
+  
+  void _performFiltering() {
+    print('=== 필터 적용 시작 ===');
+    print('검색어: $_searchQuery');
+    print('선택된 도시: $_selectedCityId');
+    print('선택된 구/군: $_selectedDistrictIds');
+    print('선택된 게임 유형: $_selectedGameTypes');
+    print('구력 범위: $_selectedSkillLevel ~ $_selectedEndSkillLevel');
+    print('날짜 범위: $_startDate ~ $_endDate');
+    print('시간 범위: $_startTime ~ $_endTime');
+    print('모집중만 보기: $_showOnlyRecruiting');
+    print('팔로우만 보기: $_showOnlyFollowing');
+    
+    _filteredMatchings = _mockMatchings.where((matching) {
+      print('매칭 필터링: ${matching.courtName}');
+      
+      // 검색어 필터링
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        if (!matching.courtName.toLowerCase().contains(query)) {
+          print('  - 검색어 불일치로 제외');
+          return false;
+        }
+      }
+      
+      // 모집중만 보기 필터
+      if (_showOnlyRecruiting && matching.status != 'recruiting') {
+        print('  - 모집중이 아니므로 제외');
+        return false;
+      }
+      
+      // 팔로우만 보기 필터
+      if (_showOnlyFollowing) {
+        final authProvider = context.read<AuthProvider>();
+        final currentUser = authProvider.currentUser;
+        if (currentUser != null) {
+          // 현재 사용자가 팔로우하는 사용자들의 ID 목록
+          final followingIds = currentUser.followingIds ?? [];
+          // 매칭 호스트가 팔로우 목록에 있는지 확인
+          if (!followingIds.contains(matching.host.id)) {
+            print('  - 팔로우하지 않는 사용자의 매칭이므로 제외');
+            return false;
+          }
+        } else {
+          // 로그인하지 않은 경우 팔로우 필터 적용 안함
+          print('  - 로그인하지 않아 팔로우 필터 무시');
+        }
+      }
+      
+      // 게임 유형 필터
+      if (_selectedGameTypes.isNotEmpty && 
+          !_selectedGameTypes.contains(matching.gameType)) {
+        print('  - 게임 유형 불일치로 제외');
+        return false;
+      }
+      
+      // 구력 범위 필터
+      if (_selectedSkillLevel != null || _selectedEndSkillLevel != null) {
+        final startValue = _getSkillLevelFromText(_selectedSkillLevel);
+        final endValue = _getSkillLevelFromText(_selectedEndSkillLevel);
+        
+        print('  - 구력 필터 확인');
+        print('  - 선택된 시작 구력: $_selectedSkillLevel (값: $startValue)');
+        print('  - 선택된 종료 구력: $_selectedEndSkillLevel (값: $endValue)');
+        print('  - 매칭 구력: ${matching.minLevel}년-${matching.maxLevel}년');
+        
+        if (startValue != null && endValue != null) {
+          // 시작 구력과 종료 구력이 모두 선택된 경우
+          final minLevel = matching.minLevel ?? 0;
+          final maxLevel = matching.maxLevel ?? 10;
+          if (maxLevel < startValue || minLevel > endValue) {
+            print('  - 구력 범위 불일치로 제외');
+            return false;
+          }
+        } else if (startValue != null) {
+          // 시작 구력만 선택된 경우
+          final maxLevel = matching.maxLevel ?? 10;
+          if (maxLevel < startValue) {
+            print('  - 시작 구력보다 낮아서 제외');
+            return false;
+          }
+        } else if (endValue != null) {
+          // 종료 구력만 선택된 경우
+          final minLevel = matching.minLevel ?? 0;
+          if (minLevel > endValue) {
+            print('  - 종료 구력보다 높아서 제외');
+            return false;
+          }
+        }
+        
+        print('  - 구력 필터 통과');
+      }
+      
+      // 날짜 범위 필터
+      if (_startDate != null && matching.date.isBefore(_startDate!)) {
+        print('  - 시작 날짜 이전이므로 제외');
+        return false;
+      }
+      if (_endDate != null && matching.date.isAfter(_endDate!)) {
+        print('  - 종료 날짜 이후이므로 제외');
+        return false;
+      }
+      
+      // 시간 범위 필터
+      if (_startTime != null || _endTime != null) {
+        // 매칭의 시간 슬롯을 파싱
+        final timeParts = matching.timeSlot.split('~');
+        if (timeParts.length == 2) {
+          final matchStartTime = timeParts[0].trim();
+          final matchEndTime = timeParts[1].trim();
+          
+          print('  - 매칭 시간: $matchStartTime ~ $matchEndTime');
+          print('  - 선택된 시간: $_startTime ~ $_endTime');
+          
+          // 시작 시간이 선택된 시작 시간보다 이전이면 제외
+          if (_startTime != null) {
+            if (_compareTime(matchStartTime, _startTime!) < 0) {
+              print('  - 시작 시간이 선택된 시작 시간보다 이전이므로 제외');
+              return false;
+            }
+          }
+          
+          // 종료 시간이 선택된 종료 시간보다 늦으면 제외
+          if (_endTime != null) {
+            if (_compareTime(matchEndTime, _endTime!) > 0) {
+              print('  - 종료 시간이 선택된 종료 시간보다 늦으므로 제외');
+              return false;
+            }
+          }
+          
+          print('  - 시간 필터 통과');
+        }
+      }
+      
+      // 위치 필터
+      if (_selectedCityId != null || _selectedDistrictIds.isNotEmpty) {
+        // 도시 선택이 있거나 구/군 선택이 있는 경우
+        bool locationMatch = false;
+        
+        // 코트별 위치 정보 매핑 (실제로는 데이터베이스에서 가져올 예정)
+        Map<String, String> courtLocations = {
+          '잠실종합운동장': '서울 송파구',
+          '양재시민의숲': '서울 강남구',
+          '올림픽공원 테니스장': '서울 송파구',
+          '한강공원 테니스장': '서울 영등포구',
+          '분당테니스장': '경기도 성남시',
+          '인천대공원 테니스장': '인천 미추홀구',
+        };
+        
+        String? courtLocation = courtLocations[matching.courtName];
+        if (courtLocation == null) {
+          print('    - 위치 정보 없음으로 제외');
+          return false; // 위치 정보가 없으면 제외
+        }
+        
+        print('    - 코트 위치: $courtLocation');
+        
+        // 도시 선택이 있는 경우
+        if (_selectedCityId != null) {
+          String cityName = _getCityName(_selectedCityId!);
+          print('    - 선택된 도시: $cityName');
+          if (!courtLocation.contains(cityName)) {
+            print('    - 도시 불일치로 제외');
+            return false; // 도시가 일치하지 않으면 제외
+          }
+        }
+        
+        // 구/군 선택이 있는 경우
+        if (_selectedDistrictIds.isNotEmpty) {
+          print('    - 선택된 구/군: $_selectedDistrictIds');
+          bool districtMatch = false;
+          for (String districtId in _selectedDistrictIds) {
+            if (districtId.contains('_all')) {
+              // 전체 선택인 경우 해당 도시의 모든 구/군 매칭
+              String cityId = districtId.split('_')[0];
+              String cityName = _getCityName(cityId);
+              if (courtLocation.contains(cityName)) {
+                districtMatch = true;
+                print('    - 도시 전체 선택으로 매칭');
+                break;
+              }
+            } else {
+              // 특정 구/군 선택인 경우
+              String districtName = _getDistrictName(districtId);
+              print('    - 확인 중인 구/군: $districtName');
+              if (courtLocation.contains(districtName)) {
+                districtMatch = true;
+                print('    - 구/군 매칭 성공');
+                break;
+              }
+            }
+          }
+          if (!districtMatch) {
+            print('    - 구/군 불일치로 제외');
+            return false; // 구/군이 일치하지 않으면 제외
+          }
+        }
+        
+        locationMatch = true;
+        print('    - 위치 필터 통과');
+      }
+      
+      // 필터 상태 동기화
+      _syncFilterState();
+      
+      print('  - 모든 필터 통과');
+      return true;
+    }).toList();
+    
+    print('필터링 결과: ${_filteredMatchings.length}개 매칭');
+    print('=== 필터 적용 완료 ===');
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // 필터 상태 동기화
+  void _syncFilterState() {
+    setState(() {
+      // 기존 위치 관련 필터 제거
+      _selectedFilters.removeWhere((filter) => 
+        filter.contains('서울') || filter.contains('경기도') || 
+        filter.contains('인천') || filter.contains('대전') || 
+        filter.contains('세종') || filter.contains('충청남도') || 
+        filter.contains('충청북도') || filter.contains('강원도') ||
+        filter.contains('구') || filter.contains('시') || filter.contains('군'));
+      
+      // 기존 날짜 관련 필터 제거
+      _selectedFilters.removeWhere((filter) => 
+        filter.contains('월') && filter.contains('일'));
+      
+      // 기존 시간 관련 필터 제거
+      _selectedFilters.removeWhere((filter) => 
+        filter.contains('시'));
+      
+      // 기존 구력 관련 필터 제거
+      _selectedFilters.removeWhere((filter) => 
+        filter.contains('년') && (filter.contains('-') || filter.contains('이상') || filter.contains('이하')));
+      
+      // 도시 선택이 있는 경우 추가
+      if (_selectedCityId != null) {
+        String cityName = _getCityName(_selectedCityId!);
+        if (!_selectedFilters.contains(cityName)) {
+          _selectedFilters.add(cityName);
+        }
+      }
+      
+      // 구/군 선택이 있는 경우 추가
+      for (String districtId in _selectedDistrictIds) {
+        String districtName = _getDistrictName(districtId);
+        if (!_selectedFilters.contains(districtName)) {
+          _selectedFilters.add(districtName);
+        }
+      }
+      
+      // 날짜 범위가 있는 경우 추가
+      if (_startDate != null && _endDate != null) {
+        String dateFilter = '${_startDate!.month}월 ${_startDate!.day}일 ~ ${_endDate!.month}월 ${_endDate!.day}일';
+        if (!_selectedFilters.contains(dateFilter)) {
+          _selectedFilters.add(dateFilter);
+        }
+      }
+      
+      // 시간 범위가 있는 경우 추가
+      if (_startTime != null && _endTime != null) {
+        String timeFilter = '${_getHourFromString(_startTime!).toString().padLeft(2, '0')}:${_getMinuteFromString(_startTime!).toString().padLeft(2, '0')} ~ ${_getHourFromString(_endTime!).toString().padLeft(2, '0')}:${_getMinuteFromString(_endTime!).toString().padLeft(2, '0')}';
+        if (!_selectedFilters.contains(timeFilter)) {
+          _selectedFilters.add(timeFilter);
+        }
+      }
+      
+      // 게임 유형이 있는 경우 추가
+      for (String gameType in _selectedGameTypes) {
+        String gameTypeText = _getGameTypeText(gameType);
+        if (!_selectedFilters.contains(gameTypeText)) {
+          _selectedFilters.add(gameTypeText);
+        }
+      }
+      
+      // 구력 범위가 있는 경우 추가
+      if (_selectedSkillLevel != null && _selectedEndSkillLevel != null) {
+        String skillFilter = '$_selectedSkillLevel-$_selectedEndSkillLevel';
+        if (!_selectedFilters.contains(skillFilter)) {
+          _selectedFilters.add(skillFilter);
+        }
+      } else if (_selectedSkillLevel != null) {
+        String skillFilter = '$_selectedSkillLevel 이상';
+        if (!_selectedFilters.contains(skillFilter)) {
+          _selectedFilters.add(skillFilter);
+        }
+      } else if (_selectedEndSkillLevel != null) {
+        String skillFilter = '$_selectedEndSkillLevel 이하';
+        if (!_selectedFilters.contains(skillFilter)) {
+          _selectedFilters.add(skillFilter);
+        }
+      }
+      
+      // 모집중만 보기가 활성화된 경우 추가
+      if (_showOnlyRecruiting) {
+        if (!_selectedFilters.contains('모집중')) {
+          _selectedFilters.add('모집중');
+        }
+      }
+      
+      // 팔로우만 보기가 활성화된 경우 추가
+      if (_showOnlyFollowing) {
+        if (!_selectedFilters.contains('팔로우만')) {
+          _selectedFilters.add('팔로우만');
+        }
+      }
+      
+      print('=== 필터 상태 동기화 완료 ===');
+      print('_selectedFilters: $_selectedFilters');
+    });
+  }
 
   // 임시 데이터 (실제로는 API에서 가져올 예정)
   final List<Matching> _mockMatchings = [
@@ -45,7 +499,6 @@ class _HomeScreenState extends State<HomeScreen> {
       timeSlot: '18:00~20:00',
       minLevel: 2,
       maxLevel: 4,
-      genderPreference: 'any',
       gameType: 'mixed',
       maleRecruitCount: 1,
       femaleRecruitCount: 1,
@@ -70,15 +523,113 @@ class _HomeScreenState extends State<HomeScreen> {
       timeSlot: '20:00~22:00',
       minLevel: 3,
       maxLevel: 5,
-      genderPreference: 'male',
       gameType: 'male_doubles',
       maleRecruitCount: 2,
       femaleRecruitCount: 0,
       status: 'recruiting',
+      isFollowersOnly: true, // 팔로워 전용 공개
       host: User(
         id: 2,
         email: 'player@example.com',
         nickname: '테니스마스터',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    ),
+    // 추가 매칭 데이터 (위치 필터 테스트용)
+    Matching(
+      id: 3,
+      type: 'host',
+      courtName: '올림픽공원 테니스장',
+      courtLat: 37.521,
+      courtLng: 127.128,
+      date: DateTime.now().add(const Duration(days: 3)),
+      timeSlot: '14:00~16:00',
+      minLevel: 1,
+      maxLevel: 3,
+      gameType: 'mixed',
+      maleRecruitCount: 1,
+      femaleRecruitCount: 1,
+      status: 'recruiting',
+      host: User(
+        id: 3,
+        email: 'tennis@example.com',
+        nickname: '테니스초보',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    ),
+    Matching(
+      id: 4,
+      type: 'host',
+      courtName: '한강공원 테니스장',
+      courtLat: 37.528,
+      courtLng: 126.933,
+      date: DateTime.now().add(const Duration(days: 4)),
+      timeSlot: '16:00~18:00',
+      minLevel: 4,
+      maxLevel: 6,
+      gameType: 'singles',
+      maleRecruitCount: 0,
+      femaleRecruitCount: 1,
+      status: 'recruiting',
+      host: User(
+        id: 4,
+        email: 'pro@example.com',
+        nickname: '테니스프로',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    ),
+    // 다양한 지역의 매칭 추가 (위치 필터 테스트용)
+    Matching(
+      id: 5,
+      type: 'host',
+      courtName: '분당테니스장',
+      courtLat: 37.350,
+      courtLng: 127.108,
+      date: DateTime.now().add(const Duration(days: 5)),
+      timeSlot: '10:00~12:00',
+      minLevel: 2,
+      maxLevel: 4,
+      gameType: 'female_doubles',
+      maleRecruitCount: 0,
+      femaleRecruitCount: 2,
+      status: 'recruiting',
+      host: User(
+        id: 5,
+        email: 'bundang@example.com',
+        nickname: '분당테니스',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    ),
+    Matching(
+      id: 6,
+      type: 'host',
+      courtName: '인천대공원 테니스장',
+      courtLat: 37.448,
+      courtLng: 126.752,
+      date: DateTime.now().add(const Duration(days: 6)),
+      timeSlot: '19:00~21:00',
+      minLevel: 3,
+      maxLevel: 5,
+      gameType: 'mixed',
+      maleRecruitCount: 1,
+      femaleRecruitCount: 1,
+      status: 'recruiting',
+      host: User(
+        id: 6,
+        email: 'incheon@example.com',
+        nickname: '인천테니스',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       ),
@@ -95,36 +646,7 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
         actions: [
           // 프로필/로그아웃 메뉴
-          Consumer<AuthProvider>(
-            builder: (context, auth, _) {
-              return PopupMenuButton<String>(
-                icon: const Icon(Icons.person_outline),
-                onSelected: (value) async {
-                  if (value == 'logout') {
-                    await context.read<AuthProvider>().logout();
-                    if (mounted) {
-                      Navigator.of(context).pushReplacementNamed('/login');
-                    }
-                  } else if (value == 'profile') {
-                    if (!mounted) return;
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const MyProfileScreen()),
-                    );
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'profile',
-                    child: Text('내 프로필'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'logout',
-                    child: Text('로그아웃'),
-                  ),
-                ],
-              );
-            },
-          ),
+          // 상단 프로필 아이콘 제거: 하단바 마이페이지를 사용
           // 필터 버튼
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -136,6 +658,301 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
+          // 검색바 추가
+          Container(
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.cardBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: '코트명으로 검색하세요 (예: 잠실종합운동장)',
+                    hintStyle: AppTextStyles.body.copyWith(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: AppColors.textSecondary,
+                      size: 20,
+                    ),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(
+                              Icons.clear,
+                              color: AppColors.textSecondary,
+                              size: 18,
+                            ),
+                            onPressed: () {
+                              _searchController.clear();
+                            },
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                  ),
+                  style: AppTextStyles.body.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value.trim();
+                      _applyFilters();
+                    });
+                  },
+                  onSubmitted: (value) {
+                    if (value.trim().isNotEmpty) {
+                      _addToSearchHistory(value.trim());
+                      setState(() {
+                        _searchQuery = value.trim();
+                        _showSearchHistory = false;
+                        _applyFilters();
+                      });
+                    }
+                  },
+                ),
+                // 검색 제안 (검색어가 비어있을 때만 표시)
+                if (_searchQuery.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 구분선
+                        Container(
+                          height: 1,
+                          color: AppColors.cardBorder,
+                        ),
+                        const SizedBox(height: 12),
+                        // 최근 검색어만 표시 (인기 검색어 제거)
+                        if (_searchHistory.isNotEmpty) ...[
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                '최근 검색어',
+                                style: AppTextStyles.body.copyWith(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _searchHistory.clear();
+                                  });
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  '전체 삭제',
+                                  style: AppTextStyles.body.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: _searchHistory.take(5).map((search) => 
+                              GestureDetector(
+                                onTap: () {
+                                  _searchController.text = search;
+                                  setState(() {
+                                    _searchQuery = search;
+                                    _applyFilters();
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: AppColors.cardBorder),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.history,
+                                        size: 14,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        search,
+                                        style: AppTextStyles.body.copyWith(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ).toList(),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          
+          // 검색 결과 정보 및 필터 요약
+          if (_searchQuery.isNotEmpty || _selectedFilters.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 헤더
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.filter_list,
+                        color: AppColors.primary,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '적용된 필터',
+                        style: AppTextStyles.body.copyWith(
+                          color: AppColors.primary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_selectedFilters.isNotEmpty)
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedFilters.clear();
+                              _selectedGameTypes.clear();
+                              _selectedSkillLevel = null;
+                              _selectedEndSkillLevel = null;
+                              _startDate = null;
+                              _endDate = null;
+                              _startTime = null;
+                              _endTime = null;
+                              _showOnlyRecruiting = false;
+                              _selectedCityId = null;
+                              _selectedDistrictIds.clear();
+                              _applyFilters();
+                            });
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            '모두 해제',
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (_selectedFilters.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    // 필터 칩들
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _selectedFilters.map((filter) => _buildFilterChip(filter)).toList(),
+                    ),
+                  ],
+                  if (_searchQuery.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: AppColors.primary,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _getSearchResultText(),
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.primary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                              _applyFilters();
+                            });
+                          },
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            '검색어 지우기',
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
           // 필터 버튼들 (카테고리별 그룹화)
           if (_selectedFilters.isNotEmpty)
             Container(
@@ -156,30 +973,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: Row(
                       children: [
-                        GestureDetector(
-                          onTap: () {
-                            _showFilterBottomSheet(context);
-                          },
-                          child: Row(
-                            children: [
-                              Icon(Icons.filter_list, color: AppColors.primary, size: 16),
-                              const SizedBox(width: 6),
-                              Text(
-                                '적용된 필터',
-                                style: AppTextStyles.body.copyWith(
-                                  color: AppColors.primary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                        Row(
+                          children: [
+                            Icon(Icons.filter_list, color: AppColors.primary, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              '적용된 필터',
+                              style: AppTextStyles.body.copyWith(
+                                color: AppColors.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                         const Spacer(),
                         TextButton(
                           onPressed: () {
+                            print('=== 필터 초기화 시작 ===');
+                            
+                            // 실제 변수 초기화
                             setState(() {
-                              _selectedFilters.clear();
+                              _showOnlyRecruiting = false;
                               _selectedGameTypes.clear();
                               _selectedSkillLevel = null;
                               _selectedEndSkillLevel = null;
@@ -187,117 +1002,51 @@ class _HomeScreenState extends State<HomeScreen> {
                               _endDate = null;
                               _startTime = null;
                               _endTime = null;
-                              _showOnlyRecruiting = false;
+                              _selectedCityId = null;
+                              _selectedDistrictIds.clear();
+                              _selectedFilters.clear();
                             });
+                            
+                            print('=== 필터 초기화 완료 ===');
+                            print('모든 필터가 초기화되었습니다.');
+                            
+                            // 필터 적용하여 검색 결과 업데이트
+                            _applyFilters();
                           },
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
                           child: Text(
-                            '모두 해제',
+                            '초기화',
                             style: AppTextStyles.body.copyWith(
-                              color: AppColors.primary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  _buildFilterGroups(),
+                  // chips/그룹은 제거하여 상단에는 요약만 유지
                 ],
               ),
             ),
           // 매칭 목록
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _getFilteredMatchings().length,
-              itemBuilder: (context, index) {
-                final matching = _getFilteredMatchings()[index];
-                return _buildMatchingCard(matching);
-              },
-            ),
+            child: _isLoading
+                ? _buildLoadingState()
+                : _filteredMatchings.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _filteredMatchings.length,
+                        itemBuilder: (context, index) {
+                          final matching = _filteredMatchings[index];
+                          return _buildMatchingCard(matching);
+                        },
+                      ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final auth = context.read<AuthProvider>();
-          if (!auth.isLoggedIn) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('로그인이 필요합니다.')),
-            );
-            if (!mounted) return;
-            Navigator.of(context).pushNamed('/login');
-            return;
-          }
-
-          final result = await Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => const CreateMatchingScreen()),
-          );
-          
-          // 매칭이 생성되면 리스트에 추가
-          if (result != null && result is Matching) {
-            setState(() {
-              _mockMatchings.insert(0, result); // 새 매칭을 맨 위에 추가
-            });
-            
-            // 성공 메시지 표시
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('매칭이 생성되었습니다!'),
-                backgroundColor: AppColors.success,
-              ),
-            );
-          }
-        },
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.surface,
-        icon: const Icon(Icons.person_add),
-        label: const Text('게스트 모집'),
-        elevation: 4,
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          // TODO: 탭 네비게이션 구현
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: '홈',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: '코트',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.forum),
-            label: '커뮤니티',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_bag),
-            label: '중고거래',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: '마이페이지',
-          ),
-        ],
-      ),
+      // 플로팅 액션 버튼과 하단 네비게이션 바 제거 (MainScreen에서 관리)
     );
   }
 
@@ -369,6 +1118,21 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Card(
         margin: const EdgeInsets.only(bottom: 12),
+        color: matching.isFollowersOnly 
+            ? Colors.blue[50] // 팔로워 전용: 연한 파란색
+            : AppColors.surface, // 일반 공개: 기본 배경색
+        elevation: matching.isFollowersOnly ? 2 : 1, // 팔로워 전용: 약간 더 높은 그림자
+        shape: matching.isFollowersOnly 
+            ? RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: Colors.blue[300]!, // 팔로워 전용: 파란색 테두리
+                  width: 1.5,
+                ),
+              )
+            : RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -378,15 +1142,29 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // 왼쪽: 코트명
+                  // 왼쪽: 코트명과 팔로워 전용 표시
                   Expanded(
-                    child: Text(
-                      matching.courtName,
-                      style: AppTextStyles.h2.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      children: [
+                        if (matching.isFollowersOnly) ...[
+                          Icon(
+                            Icons.lock_outline,
+                            size: 16,
+                            color: Colors.blue[600], // 파란색 자물쇠 아이콘
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Expanded(
+                          child: Text(
+                            matching.courtName,
+                            style: AppTextStyles.h2.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   // 오른쪽: 상태 배지와 버튼들
@@ -407,6 +1185,40 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
+                      // 팔로워 전용 공개 표시
+                      if (matching.isFollowersOnly) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent, // 모집중과 동일한 노란색 배경
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.accent, // 노란색 테두리
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.lock_outline,
+                                size: 14,
+                                color: AppColors.textPrimary, // 어두운 색 아이콘
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '팔로워',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.textPrimary, // 어두운 색 텍스트
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       // 호스트인 경우에만 수정/삭제 버튼 표시
                       if (isHost) ...[
                         const SizedBox(width: 8),
@@ -467,7 +1279,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                '서울 송파구',
+                                _getMatchingLocationText(matching),
                                 style: AppTextStyles.body,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -644,8 +1456,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // 필터 바텀시트 표시
   void _showFilterBottomSheet(BuildContext context) {
-    // 로컬 상태 변수들
+    // 로컬 변수들 (모달 내부에서 사용)
     bool localShowOnlyRecruiting = _showOnlyRecruiting;
+    bool localShowOnlyFollowing = _showOnlyFollowing;
     List<String> localSelectedGameTypes = List.from(_selectedGameTypes);
     String? localSelectedSkillLevel = _selectedSkillLevel;
     String? localSelectedEndSkillLevel = _selectedEndSkillLevel;
@@ -654,6 +1467,33 @@ class _HomeScreenState extends State<HomeScreen> {
     String? localStartTime = _startTime;
     String? localEndTime = _endTime;
     List<String> localSelectedFilters = List.from(_selectedFilters);
+    String? localSelectedCityId = _selectedCityId;
+    List<String> localSelectedDistrictIds = List.from(_selectedDistrictIds);
+    
+    print('=== 모달 열기 시 현재 필터 상태 ===');
+    print('_startDate: $_startDate');
+    print('_endDate: $_endDate');
+    print('_startTime: $_startTime');
+    print('_endTime: $_endTime');
+    print('_selectedCityId: $_selectedCityId');
+    print('_selectedDistrictIds: $_selectedDistrictIds');
+    print('_selectedFilters: $_selectedFilters');
+    
+    // 현재 필터 상태가 null이 아닌 경우에만 로컬 변수에 복사
+    if (_startDate != null) localStartDate = _startDate;
+    if (_endDate != null) localEndDate = _endDate;
+    if (_startTime != null) localStartTime = _startTime;
+    if (_endTime != null) localEndTime = _endTime;
+    if (_selectedCityId != null) localSelectedCityId = _selectedCityId;
+    if (_selectedDistrictIds.isNotEmpty) localSelectedDistrictIds = List.from(_selectedDistrictIds);
+    
+    print('=== 모달 열기 시 로컬 변수 상태 ===');
+    print('localStartDate: $localStartDate');
+    print('localEndDate: $localEndDate');
+    print('localStartTime: $localStartTime');
+    print('localEndTime: $localEndTime');
+    print('localSelectedCityId: $localSelectedCityId');
+    print('localSelectedDistrictIds: $localSelectedDistrictIds');
     
     showModalBottomSheet(
       context: context,
@@ -699,6 +1539,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               localStartTime = null;
                               localEndTime = null;
                               localShowOnlyRecruiting = false;
+                              localShowOnlyFollowing = false;
+                              localSelectedCityId = null;
+                              localSelectedDistrictIds.clear();
                             });
                           },
                           child: Text(
@@ -711,8 +1554,37 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 16),
                         TextButton(
                           onPressed: () {
+                            print('=== 모달 닫기 시 로컬 변수 상태 ===');
+                            print('localStartDate: $localStartDate');
+                            print('localEndDate: $localEndDate');
+                            print('localStartTime: $localStartTime');
+                            print('localEndTime: $localEndTime');
+                            print('localSelectedCityId: $localSelectedCityId');
+                            print('localSelectedDistrictIds: $localSelectedDistrictIds');
+                            
+                            // 모달을 닫기 전에 현재 실제 변수 상태를 local 변수에 복사
+                            localStartDate = _startDate;
+                            localEndDate = _endDate;
+                            localStartTime = _startTime;
+                            localEndTime = _endTime;
+                            localSelectedCityId = _selectedCityId;
+                            localSelectedDistrictIds = List.from(_selectedDistrictIds);
+                            localSelectedSkillLevel = _selectedSkillLevel;
+                            localSelectedEndSkillLevel = _selectedEndSkillLevel;
+                            
+                            print('=== 모달 닫기 전 local 변수 업데이트 ===');
+                            print('localStartDate: $localStartDate');
+                            print('localEndDate: $localEndDate');
+                            print('localStartTime: $localStartTime');
+                            print('localEndTime: $localEndTime');
+                            print('localSelectedCityId: $localSelectedCityId');
+                            print('localSelectedDistrictIds: $localSelectedDistrictIds');
+                            print('localSelectedSkillLevel: $localSelectedSkillLevel');
+                            print('localSelectedEndSkillLevel: $localSelectedEndSkillLevel');
+                            
                             setState(() {
                               _showOnlyRecruiting = localShowOnlyRecruiting;
+                              _showOnlyFollowing = localShowOnlyFollowing;
                               _selectedGameTypes = List.from(localSelectedGameTypes);
                               _selectedSkillLevel = localSelectedSkillLevel;
                               _selectedEndSkillLevel = localSelectedEndSkillLevel;
@@ -720,15 +1592,40 @@ class _HomeScreenState extends State<HomeScreen> {
                               _endDate = localEndDate;
                               _startTime = localStartTime;
                               _endTime = localEndTime;
+                              _selectedCityId = localSelectedCityId;
+                              _selectedDistrictIds = List.from(localSelectedDistrictIds);
+                              // _selectedFilters 초기화 후 필터 상태 동기화
                               _selectedFilters.clear();
-                              _selectedFilters.addAll(localSelectedFilters);
                             });
+                            
+                            print('=== 모달 닫기 후 실제 변수 상태 ===');
+                            print('_startDate: $_startDate');
+                            print('_endDate: $_endDate');
+                            print('_startTime: $_startTime');
+                            print('_endTime: $_endTime');
+                            print('_selectedCityId: $_selectedCityId');
+                            print('_selectedDistrictIds: $_selectedDistrictIds');
+                            print('_selectedSkillLevel: $_selectedSkillLevel');
+                            print('_selectedEndSkillLevel: $_selectedEndSkillLevel');
+                            
+                            // 필터 상태 동기화하여 요약 UI 업데이트
+                            _syncFilterState();
+                            
+                            // 필터 적용 후 검색 결과 업데이트
+                            _applyFilters();
+                            
+                            print('=== 모달 닫기 후 _syncFilterState() 호출 완료 ===');
+                            print('_selectedFilters: $_selectedFilters');
+                            print('_selectedFilters.length: ${_selectedFilters.length}');
+                            
                             Navigator.pop(context);
                           },
                           child: Text(
-                            '닫기',
+                            '완료',
                             style: AppTextStyles.body.copyWith(
                               color: AppColors.primary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
@@ -739,364 +1636,60 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               // 필터 옵션들
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 모집중만 보기 필터
-                      GestureDetector(
-                        onTap: () {
-                          setModalState(() {
-                            localShowOnlyRecruiting = !localShowOnlyRecruiting;
-                            if (localShowOnlyRecruiting) {
-                              if (!localSelectedFilters.contains('모집중만')) {
-                                localSelectedFilters.add('모집중만');
-                              }
-                            } else {
-                              localSelectedFilters.remove('모집중만');
-                            }
-                          });
-                        },
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: localShowOnlyRecruiting,
-                              onChanged: (value) {
-                                setModalState(() {
-                                  localShowOnlyRecruiting = value ?? false;
-                                  if (localShowOnlyRecruiting) {
-                                    if (!localSelectedFilters.contains('모집중만')) {
-                                      localSelectedFilters.add('모집중만');
-                                    }
-                                  } else {
-                                    localSelectedFilters.remove('모집중만');
-                                  }
-                                });
-                              },
-                              activeColor: AppColors.primary,
-                            ),
-                            Expanded(
-                              child: Text(
-                                '모집중인 매칭만 보기',
-                                style: AppTextStyles.body,
-                              ),
-                            ),
-                          ],
+                child: Column(
+                  children: [
+                    // 탭 헤더
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: AppColors.cardBorder),
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      // 게임 유형 필터
-                      Text(
-                        '게임 유형',
-                        style: AppTextStyles.h2.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      child: TabBar(
+                        controller: _filterTabController,
+                        labelColor: AppColors.primary,
+                        unselectedLabelColor: AppColors.textSecondary,
+                        indicatorColor: AppColors.primary,
+                        tabs: const [
+                          Tab(text: '날짜'),
+                          Tab(text: '시간'),
+                          Tab(text: '위치'),
+                          Tab(text: '게임 유형'),
+                          Tab(text: '구력'),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
+                    ),
+                    // 탭 내용
+                    Expanded(
+                      child: TabBarView(
+                        controller: _filterTabController,
                         children: [
-                          'mixed', 'male_doubles', 'female_doubles', 'singles', 'rally'
-                        ].map((type) {
-                          final isSelected = localSelectedGameTypes.contains(type);
-                          return GestureDetector(
-                            onTap: () {
-                              setModalState(() {
-                                if (isSelected) {
-                                  localSelectedGameTypes.remove(type);
-                                  localSelectedFilters.remove(_getGameTypeText(type));
-                                } else {
-                                  localSelectedGameTypes.add(type);
-                                  if (!localSelectedFilters.contains(_getGameTypeText(type))) {
-                                    localSelectedFilters.add(_getGameTypeText(type));
-                                  }
-                                }
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected ? AppColors.primary : AppColors.surface,
-                                border: Border.all(
-                                  color: isSelected ? AppColors.primary : AppColors.cardBorder,
-                                ),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                _getGameTypeText(type),
-                                style: AppTextStyles.body.copyWith(
-                                  color: isSelected ? AppColors.surface : AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 24),
-                      // 구력 범위 필터 (바 형태)
-                      Text(
-                        '구력 범위',
-                        style: AppTextStyles.h2.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '최소 1년 ~ 최대 5년 선택 가능',
-                        style: AppTextStyles.body.copyWith(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // 구력 막대
-                      Container(
-                        height: 60,
-                        child: Row(
-                          children: List.generate(12, (index) {
-                            final skillLevels = [
-                              '6개월', '1년', '2년', '3년', '4년', '5년',
-                              '6년', '7년', '8년', '9년', '10년', '10년+'
-                            ];
-                            final skillText = skillLevels[index];
-                            
-                            // 선택된 구력들 확인
-                            final selectedSkills = _getSelectedSkillLevels(localSelectedSkillLevel, localSelectedEndSkillLevel);
-                            final isSelected = selectedSkills.contains(skillText);
-                            
-                            return Expanded(
-                              child: Column(
-                                children: [
-                                  Text(
-                                    skillText,
-                                    style: AppTextStyles.caption.copyWith(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setModalState(() {
-                                          if (localSelectedSkillLevel == null) {
-                                            // 첫 번째 선택
-                                            localSelectedSkillLevel = skillText;
-                                            localSelectedFilters.add('${skillText}부터');
-                                          } else if (localSelectedEndSkillLevel == null) {
-                                            // 두 번째 선택 (범위 설정) - 좌우 모두 가능
-                                            final startValue = _getSkillLevelValue(localSelectedSkillLevel!);
-                                            final endValue = _getSkillLevelValue(skillText);
-                                            final difference = (endValue - startValue).abs();
-                                            
-                                            if (difference > 0 && difference <= 5) {
-                                              // 범위가 5년 이하인 경우
-                                              if (endValue > startValue) {
-                                                // 좌에서 우로 선택
-                                                localSelectedEndSkillLevel = skillText;
-                                                localSelectedFilters.add('${skillText}까지');
-                                              } else {
-                                                // 우에서 좌로 선택 - 시작과 끝을 바꿈
-                                                localSelectedEndSkillLevel = localSelectedSkillLevel;
-                                                localSelectedSkillLevel = skillText;
-                                                localSelectedFilters.clear();
-                                                localSelectedFilters.add('${skillText}부터');
-                                                localSelectedFilters.add('${localSelectedEndSkillLevel}까지');
-                                              }
-                                            }
-                                          } else {
-                                            // 다시 시작
-                                            localSelectedSkillLevel = skillText;
-                                            localSelectedEndSkillLevel = null;
-                                            localSelectedFilters.removeWhere((filter) => 
-                                              filter.contains('부터') || filter.contains('까지'));
-                                            localSelectedFilters.add('${skillText}부터');
-                                          }
-                                        });
-                                      },
-                                      child: Container(
-                                        margin: const EdgeInsets.symmetric(horizontal: 1),
-                                        decoration: BoxDecoration(
-                                          color: isSelected ? AppColors.primary : AppColors.cardBorder,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // 날짜 범위 필터 (새로운 캘린더 UI)
-                      Text(
-                        '날짜 범위',
-                        style: AppTextStyles.h2.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.cardBorder),
-                        ),
-                        child: DateRangeCalendar(
-                          startDate: localStartDate,
-                          endDate: localEndDate,
-                          onDateRangeChanged: (start, end) {
-                            setModalState(() {
-                              localStartDate = start;
-                              localEndDate = end;
-                              
-                              // 기존 날짜 관련 필터 제거
-                              localSelectedFilters.removeWhere((filter) => 
-                                filter.contains('월') && filter.contains('일')
-                              );
-                              
-                              // 새로운 날짜 범위 필터 추가
-                              if (start != null && end != null) {
-                                final filterText = '${start.month}월 ${start.day}일 ~ ${end.month}월 ${end.day}일';
-                                if (!localSelectedFilters.contains(filterText)) {
-                                  localSelectedFilters.add(filterText);
-                                }
-                              } else if (start != null) {
-                                final filterText = '${start.month}월 ${start.day}일부터';
-                                if (!localSelectedFilters.contains(filterText)) {
-                                  localSelectedFilters.add(filterText);
-                                }
-                              } else if (end != null) {
-                                final filterText = '${end.month}월 ${end.day}일까지';
-                                if (!localSelectedFilters.contains(filterText)) {
-                                  localSelectedFilters.add(filterText);
-                                }
-                              }
-                            });
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // 시간 범위 필터 (막대 형태)
-                      Text(
-                        '시간 범위',
-                        style: AppTextStyles.h2.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '최소 1시간 ~ 최대 3시간 선택 가능',
-                        style: AppTextStyles.body.copyWith(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // 시간 막대
-                      Container(
-                        height: 60,
-                        child: Row(
-                          children: List.generate(18, (index) {
-                            final hour = index + 6; // 6시부터 23시까지
-                            final timeText = hour < 12 
-                              ? '오전 ${hour}시' 
-                              : hour == 12 
-                                ? '오후 12시' 
-                                : '오후 ${hour - 12}시';
-                            
-                            // 선택된 시간들 확인
-                            final selectedHours = _getSelectedTimeHours(localStartTime, localEndTime);
-                            final isSelected = selectedHours.contains(hour);
-                            
-                            return Expanded(
-                              child: Column(
-                                children: [
-                                  Text(
-                                    timeText,
-                                    style: AppTextStyles.caption.copyWith(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setModalState(() {
-                                          if (localStartTime == null) {
-                                            // 첫 번째 선택
-                                            localStartTime = '${hour.toString().padLeft(2, '0')}:00';
-                                            localSelectedFilters.add('${hour}시부터');
-                                          } else if (localEndTime == null) {
-                                            // 두 번째 선택 (범위 설정) - 좌우 모두 가능
-                                            final startHour = int.parse(localStartTime!.split(':')[0]);
-                                            final difference = (hour - startHour).abs();
-                                            
-                                            if (difference > 0 && difference <= 3) {
-                                              // 범위가 3시간 이하인 경우
-                                              if (hour > startHour) {
-                                                // 좌에서 우로 선택
-                                                localEndTime = '${hour.toString().padLeft(2, '0')}:00';
-                                                localSelectedFilters.add('${hour}시까지');
-                                              } else {
-                                                // 우에서 좌로 선택 - 시작과 끝을 바꿈
-                                                localEndTime = localStartTime;
-                                                localStartTime = '${hour.toString().padLeft(2, '0')}:00';
-                                                localSelectedFilters.clear();
-                                                localSelectedFilters.add('${hour}시부터');
-                                                localSelectedFilters.add('${localEndTime!.split(':')[0]}시까지');
-                                              }
-                                            }
-                                          } else {
-                                            // 다시 시작
-                                            localStartTime = '${hour.toString().padLeft(2, '0')}:00';
-                                            localEndTime = null;
-                                            localSelectedFilters.removeWhere((filter) => 
-                                              filter.contains('시부터') || filter.contains('시까지'));
-                                            localSelectedFilters.add('${hour}시부터');
-                                          }
-                                        });
-                                      },
-                                      child: Container(
-                                        margin: const EdgeInsets.symmetric(horizontal: 1),
-                                        decoration: BoxDecoration(
-                                          color: isSelected ? AppColors.primary : AppColors.cardBorder,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: false,
-                            onChanged: (value) {
-                              // 마감 시간 체크박스 (기능 추가 예정)
-                            },
-                            activeColor: AppColors.primary,
+                          // 날짜 탭
+                          SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: _buildDateTab(localStartDate, localEndDate, localSelectedFilters, setModalState),
                           ),
-                          Text(
-                            '마감',
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
+                          // 시간 탭
+                          SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: _buildTimeTab(localStartTime, localEndTime, localSelectedFilters, setModalState),
+                          ),
+                          // 위치 탭
+                          _buildLocationTab(setModalState),
+                          // 게임 유형 탭
+                          SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: _buildGameTypeTab(localSelectedGameTypes, localSelectedFilters, localShowOnlyFollowing, setModalState),
+                          ),
+                          // 구력 탭
+                          SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: _buildSkillLevelTab(localSelectedSkillLevel, localSelectedEndSkillLevel, localSelectedFilters, setModalState),
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1106,15 +1699,699 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 게임 유형 텍스트 변환
-  String _getGameTypeText(String type) {
-    switch (type) {
-      case 'mixed': return '혼복';
-      case 'male_doubles': return '남복';
-      case 'female_doubles': return '여복';
-      case 'singles': return '단식';
-      case 'rally': return '랠리';
-      default: return type;
+  // 날짜 필터 탭 위젯
+  Widget _buildDateTab(DateTime? startDate, DateTime? endDate, List<String> selectedFilters, StateSetter setModalState) {
+    return Column(
+      children: [
+        // 날짜 범위 필터 (새로운 캘린더 UI)
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.cardBorder),
+          ),
+          child: DateRangeCalendar(
+            startDate: startDate,
+            endDate: endDate,
+            onDateRangeChanged: (start, end) {
+              setModalState(() {
+                startDate = start;
+                endDate = end;
+                
+                // 기존 날짜 관련 필터 제거
+                selectedFilters.removeWhere((filter) => 
+                  filter.contains('월') && filter.contains('일')
+                );
+                
+                // 새로운 날짜 범위 필터 추가
+                if (start != null && end != null) {
+                  final filterText = '${start.month}월 ${start.day}일 ~ ${end.month}월 ${end.day}일';
+                  if (!selectedFilters.contains(filterText)) {
+                    selectedFilters.add(filterText);
+                  }
+                } else if (start != null) {
+                  final filterText = '${start.month}월 ${start.day}일부터';
+                  if (!selectedFilters.contains(filterText)) {
+                    selectedFilters.add(filterText);
+                  }
+                } else if (end != null) {
+                  final filterText = '${end.month}월 ${end.day}일까지';
+                  if (!selectedFilters.contains(filterText)) {
+                    selectedFilters.add(filterText);
+                  }
+                }
+              });
+              
+              // 실제 상태 변수도 즉시 업데이트
+              setState(() {
+                _startDate = start;
+                _endDate = end;
+                // 필터 적용하여 상태 동기화
+                _applyFilters();
+              });
+            },
+          ),
+        ),
+        const SizedBox(height: 16),
+        // 마감 시간 체크박스
+        Row(
+          children: [
+            Checkbox(
+              value: false,
+              onChanged: (value) {
+                // 마감 시간 체크박스 (기능 추가 예정)
+              },
+              activeColor: AppColors.primary,
+            ),
+            Text(
+              '마감',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // 시간 필터 탭 위젯
+  Widget _buildTimeTab(String? startTime, String? endTime, List<String> selectedFilters, StateSetter setModalState) {
+    return Column(
+      children: [
+        // 시간 범위 필터 개선된 UI
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.cardBorder),
+          ),
+          child: Column(
+            children: [
+              // 시간 범위 설명
+              Row(
+                children: [
+                  Icon(
+                    Icons.access_time,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '시간 범위 선택',
+                    style: AppTextStyles.h2.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '시작 시간과 종료 시간을 각각 클릭하여 범위를 선택하세요',
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              // 선택된 시간 표시
+              if (startTime != null || endTime != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.schedule,
+                        color: AppColors.primary,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        startTime != null && endTime != null
+                            ? '$startTime ~ $endTime'
+                            : startTime != null
+                                ? '$startTime부터'
+                                : '$endTime까지',
+                        style: AppTextStyles.body.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (startTime != null || endTime != null) const SizedBox(height: 16),
+              
+              // 시간 선택 가이드
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _startTime != null && _endTime != null 
+                      ? AppColors.primary.withValues(alpha: 0.1)
+                      : AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _startTime != null && _endTime != null 
+                        ? AppColors.primary 
+                        : AppColors.cardBorder,
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      color: _startTime != null && _endTime != null 
+                          ? AppColors.primary 
+                          : AppColors.textSecondary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _startTime == null
+                            ? '시작 시간을 선택해주세요'
+                            : _endTime == null
+                                ? '${_startTime}부터 종료 시간을 선택해주세요'
+                                : '${_startTime} ~ ${_endTime}',
+                        style: AppTextStyles.body.copyWith(
+                          color: _startTime == null || _endTime == null
+                              ? AppColors.textSecondary
+                              : AppColors.primary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        
+        // 시간 선택 그리드
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.cardBorder),
+          ),
+          child: Column(
+            children: [
+              // 시간대별 그룹
+              _buildTimeGroup('오전', 6, 11, setModalState),
+              const SizedBox(height: 16),
+              _buildTimeGroup('오후', 12, 23, setModalState),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 시간대별 그룹 위젯
+  Widget _buildTimeGroup(String period, int startHour, int endHour, StateSetter setModalState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          period,
+          style: AppTextStyles.body.copyWith(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: List.generate(endHour - startHour + 1, (index) {
+            final hour = startHour + index;
+            final timeText = hour == 12 ? '12시' : hour < 12 ? '${hour}시' : '${hour - 12}시';
+            final timeValue = '${hour.toString().padLeft(2, '0')}:00';
+            
+            // 선택된 시간들 확인 - 실제 상태 변수 사용
+            final selectedHours = _getSelectedTimeHours(_startTime, _endTime);
+            final isSelected = selectedHours.contains(hour);
+            final isStartTime = _startTime == timeValue;
+            final isEndTime = _endTime == timeValue;
+            
+            Color buttonColor;
+            Color textColor;
+            Color borderColor;
+            
+            if (isStartTime) {
+              buttonColor = AppColors.primary;
+              textColor = AppColors.surface;
+              borderColor = AppColors.primary;
+            } else if (isEndTime) {
+              buttonColor = AppColors.accent;
+              textColor = AppColors.surface;
+              borderColor = AppColors.accent;
+            } else if (isSelected) {
+              buttonColor = AppColors.primary.withValues(alpha: 0.2);
+              textColor = AppColors.primary;
+              borderColor = AppColors.primary;
+            } else {
+              buttonColor = AppColors.surface;
+              textColor = AppColors.textPrimary;
+              borderColor = AppColors.cardBorder;
+            }
+            
+            return GestureDetector(
+              onTap: () {
+                // 시간 선택 로직 - 모달 상태와 실제 상태 모두 업데이트
+                if (_startTime == null) {
+                  // 첫 번째 선택 (시작 시간)
+                  print('시작 시간 선택: $timeValue');
+                  setModalState(() {
+                    _startTime = timeValue;
+                  });
+                  // 실제 상태 변수도 즉시 업데이트
+                  setState(() {
+                    _startTime = timeValue;
+                    // 필터 적용하여 상태 동기화
+                    _applyFilters();
+                  });
+                  print('시작 시간 설정 완료: $_startTime');
+                } else if (_endTime == null) {
+                  // 두 번째 선택 (종료 시간)
+                  final startHourInt = int.parse(_startTime!.split(':')[0]);
+                  final difference = (hour - startHourInt).abs();
+                  
+                  // 디버깅 로그 추가
+                  print('종료 시간 선택 시도: 시작=$startHourInt, 선택=$hour, 차이=$difference');
+                  
+                  if (difference > 0 && difference <= 10) { // 10시간까지 허용
+                    // 범위가 10시간 이하인 경우
+                    setModalState(() {
+                      if (hour > startHourInt) {
+                        // 좌에서 우로 선택
+                        _endTime = timeValue;
+                      } else {
+                        // 우에서 좌로 선택 - 시작과 끝을 바꿈
+                        _endTime = _startTime;
+                        _startTime = timeValue;
+                      }
+                    });
+                    // 실제 상태 변수도 즉시 업데이트
+                    setState(() {
+                      if (hour > startHourInt) {
+                        // 좌에서 우로 선택
+                        _endTime = timeValue;
+                      } else {
+                        // 우에서 좌로 선택 - 시작과 끝을 바꿈
+                        _endTime = _startTime;
+                        _startTime = timeValue;
+                      }
+                      // 필터 적용하여 상태 동기화
+                      _applyFilters();
+                    });
+                    print('종료 시간 설정 완료: $_endTime');
+                  } else {
+                    print('시간 범위 제한 초과: $difference시간 (최대 10시간)');
+                  }
+                } else {
+                  // 다시 시작
+                  setModalState(() {
+                    _startTime = timeValue;
+                    _endTime = null;
+                  });
+                  // 실제 상태 변수도 즉시 업데이트
+                  setState(() {
+                    _startTime = timeValue;
+                    _endTime = null;
+                    // 필터 적용하여 상태 동기화
+                    _applyFilters();
+                  });
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: buttonColor,
+                  border: Border.all(color: borderColor, width: 1.5),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: isSelected ? [
+                    BoxShadow(
+                      color: borderColor.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ] : null,
+                ),
+                child: Text(
+                  timeText,
+                  style: AppTextStyles.body.copyWith(
+                    color: textColor,
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
+  // 위치 필터 탭 위젯
+  Widget _buildLocationTab(StateSetter setModalState) {
+    return Row(
+      children: [
+        // 왼쪽: 도시 목록
+        Expanded(
+          flex: 1,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border(
+                right: BorderSide(color: AppColors.cardBorder),
+              ),
+            ),
+            child: ListView.builder(
+              itemCount: _locationData.length,
+              itemBuilder: (context, index) {
+                final city = _locationData[index];
+                final isSelected = _selectedCityId == city.id;
+                
+                return GestureDetector(
+                  onTap: () {
+                    setModalState(() {
+                      _selectedCityId = city.id;
+                      _selectedDistrictIds.clear();
+                      
+                      // 기존 위치 관련 필터 제거
+                      _selectedFilters.removeWhere((filter) => 
+                        filter.contains('서울') || filter.contains('경기도') || 
+                        filter.contains('인천') || filter.contains('대전') || 
+                        filter.contains('세종') || filter.contains('충청남도') || 
+                        filter.contains('충청북도') || filter.contains('강원도') ||
+                        filter.contains('구') || filter.contains('시') || filter.contains('군'));
+                      
+                      // 도시 필터 추가
+                      _selectedFilters.add(city.name);
+                      
+                      // 필터 적용
+                      _applyFilters();
+                    });
+                    
+                    // 실제 상태 변수도 업데이트
+                    setState(() {
+                      _selectedCityId = city.id;
+                      _selectedDistrictIds.clear();
+                      
+                      // 기존 위치 관련 필터 제거
+                      _selectedFilters.removeWhere((filter) => 
+                        filter.contains('서울') || filter.contains('경기도') || 
+                        filter.contains('인천') || filter.contains('대전') || 
+                        filter.contains('세종') || filter.contains('충청남도') || 
+                        filter.contains('충청북도') || filter.contains('강원도') ||
+                        filter.contains('구') || filter.contains('시') || filter.contains('군'));
+                      
+                      // 도시 필터 추가
+                      _selectedFilters.add(city.name);
+                      
+                      // 필터 적용
+                      _applyFilters();
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
+                      border: Border(
+                        bottom: BorderSide(color: AppColors.cardBorder.withValues(alpha: 0.5)),
+                      ),
+                    ),
+                    child: Text(
+                      city.name,
+                      style: AppTextStyles.body.copyWith(
+                        color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        // 오른쪽: 구/군 목록
+        Expanded(
+          flex: 1,
+          child: _selectedCityId != null
+              ? ListView.builder(
+                  itemCount: _locationData
+                      .firstWhere(
+                        (city) => city.id == _selectedCityId,
+                        orElse: () => Location(id: '', name: '', subLocations: []),
+                      )
+                      .subLocations?.length ?? 0,
+                  itemBuilder: (context, index) {
+                    final city = _locationData.firstWhere(
+                      (city) => city.id == _selectedCityId,
+                      orElse: () => Location(id: '', name: '', subLocations: []),
+                    );
+                    final district = city.subLocations![index];
+                    final isSelected = _selectedDistrictIds.contains(district.id);
+                    
+                    return GestureDetector(
+                      onTap: () {
+                        setModalState(() {
+                          if (isSelected) {
+                            _selectedDistrictIds.remove(district.id);
+                            // 필터에서도 제거
+                            _selectedFilters.remove(district.name);
+                          } else {
+                            _selectedDistrictIds.add(district.id);
+                            // 필터에 추가
+                            if (!_selectedFilters.contains(district.name)) {
+                              _selectedFilters.add(district.name);
+                            }
+                          }
+                          
+                          // 필터 적용
+                          _applyFilters();
+                        });
+                        
+                        // 실제 상태 변수도 업데이트
+                        setState(() {
+                          if (isSelected) {
+                            _selectedDistrictIds.remove(district.id);
+                            // 필터에서도 제거
+                            _selectedFilters.remove(district.name);
+                          } else {
+                            _selectedDistrictIds.add(district.id);
+                            // 필터에 추가
+                            if (!_selectedFilters.contains(district.name)) {
+                              _selectedFilters.add(district.name);
+                            }
+                          }
+                          
+                          // 필터 적용
+                          _applyFilters();
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
+                          border: Border(
+                            bottom: BorderSide(color: AppColors.cardBorder.withValues(alpha: 0.5)),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                district.name,
+                                style: AppTextStyles.body.copyWith(
+                                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                            if (isSelected)
+                              Icon(
+                                Icons.check,
+                                color: AppColors.primary,
+                                size: 16,
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                )
+              : const Center(
+                  child: Text(
+                    '도시를 선택해주세요',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  // 게임 유형 필터 탭 위젯
+  Widget _buildGameTypeTab(List<String> selectedGameTypes, List<String> selectedFilters, bool showOnlyFollowing, StateSetter setModalState) {
+    return Column(
+      children: [
+        // 게임 유형 필터
+        Text(
+          '게임 유형',
+          style: AppTextStyles.h2.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 12),
+        
+        // 팔로우만 보기 체크박스
+        CheckboxListTile(
+          title: Text(
+            '팔로우한 사용자의 매칭만 보기',
+            style: AppTextStyles.body.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          subtitle: Text(
+            '팔로우한 사용자가 작성한 매칭만 표시됩니다',
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          value: showOnlyFollowing,
+          onChanged: (value) {
+                          setModalState(() {
+                showOnlyFollowing = value ?? false;
+              
+              // 기존 팔로우 관련 필터 제거
+              selectedFilters.removeWhere((filter) => filter.contains('팔로우만'));
+              
+              // 새로운 팔로우 필터 추가
+              if (value == true) {
+                if (!selectedFilters.contains('팔로우만')) {
+                  selectedFilters.add('팔로우만');
+                }
+              }
+            });
+            
+            // 실제 변수에도 즉시 반영
+            setState(() {
+              _showOnlyFollowing = value ?? false;
+            });
+            
+            // 필터 적용
+            _applyFilters();
+          },
+          activeColor: AppColors.primary,
+          checkColor: AppColors.surface,
+          contentPadding: EdgeInsets.zero,
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // 게임 유형 선택 안내
+        Text(
+          '게임 유형을 선택해 주세요',
+          style: AppTextStyles.body.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            'mixed', 'male_doubles', 'female_doubles', 'singles', 'rally'
+          ].map((type) {
+            final isSelected = selectedGameTypes.contains(type);
+            return GestureDetector(
+              onTap: () {
+                setModalState(() {
+                  if (isSelected) {
+                    selectedGameTypes.remove(type);
+                    selectedFilters.remove(_getGameTypeText(type));
+                  } else {
+                    selectedGameTypes.add(type);
+                    if (!selectedFilters.contains(_getGameTypeText(type))) {
+                      selectedFilters.add(_getGameTypeText(type));
+                    }
+                  }
+                });
+                
+                // 실제 변수에도 즉시 반영
+                setState(() {
+                  if (isSelected) {
+                    _selectedGameTypes.remove(type);
+                  } else {
+                    _selectedGameTypes.add(type);
+                  }
+                });
+                
+                // 필터 적용
+                _applyFilters();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : AppColors.surface,
+                  border: Border.all(
+                    color: isSelected ? AppColors.primary : AppColors.cardBorder,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _getGameTypeText(type),
+                  style: AppTextStyles.body.copyWith(
+                    color: isSelected ? AppColors.surface : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  // 게임 유형을 한글로 변환
+  String _getGameTypeText(String gameType) {
+    switch (gameType) {
+      case 'mixed':
+        return '혼복';
+      case 'male_doubles':
+        return '남복';
+      case 'female_doubles':
+        return '여복';
+      case 'singles':
+        return '단식';
+      case 'rally':
+        return '랠리';
+      default:
+        return gameType;
     }
   }
 
@@ -1518,6 +2795,547 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // 로딩 상태 표시 위젯
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '매칭을 불러오는 중...',
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 빈 상태 표시 위젯
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _searchQuery.isNotEmpty ? Icons.search_off : Icons.sports_tennis,
+            size: 60,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _searchQuery.isNotEmpty ? '검색 결과가 없습니다.' : '매칭이 없습니다.',
+            style: AppTextStyles.h2.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _searchQuery.isNotEmpty
+                ? '다른 검색어를 시도하거나 필터를 조정해보세요.'
+                : _selectedFilters.isNotEmpty
+                    ? '현재 필터 조건에 맞는 매칭이 없습니다.\n필터를 조정하거나 새로운 매칭을 만들어보세요!'
+                    : '새로운 매칭을 만들어보세요!',
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          if (_searchQuery.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {
+                      _searchQuery = '';
+                      _applyFilters();
+                    });
+                  },
+                  icon: const Icon(Icons.clear, size: 16),
+                  label: const Text('검색어 지우기'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.surface,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    _showFilterBottomSheet(context);
+                  },
+                  icon: const Icon(Icons.filter_list, size: 16),
+                  label: const Text('필터 조정'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.surface,
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: AppColors.primary),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // 검색 결과 텍스트 생성
+  String _getSearchResultText() {
+    int totalCount = _getFilteredMatchings().length;
+    String resultText = '';
+
+    if (_searchQuery.isNotEmpty) {
+      resultText += '검색어: "${_searchQuery}" - ${totalCount}개 매칭';
+      if (_showOnlyRecruiting) {
+        resultText += ' (모집중만)';
+      }
+      if (_selectedGameTypes.isNotEmpty) {
+        resultText += ' (게임 유형: ${_selectedGameTypes.map(_getGameTypeText).join(', ')})';
+      }
+      if (_selectedSkillLevel != null && _selectedEndSkillLevel != null) {
+        resultText += ' (구력: ${_selectedSkillLevel}부터 ${_selectedEndSkillLevel}까지)';
+      } else if (_selectedSkillLevel != null) {
+        resultText += ' (구력: ${_selectedSkillLevel} 이상)';
+      }
+      if (_startDate != null && _endDate != null) {
+        resultText += ' (날짜: ${_startDate!.month}월 ${_startDate!.day}일 ~ ${_endDate!.month}월 ${_endDate!.day}일)';
+      } else if (_startDate != null) {
+        resultText += ' (날짜: ${_startDate!.month}월 ${_startDate!.day}일부터)';
+      } else if (_endDate != null) {
+        resultText += ' (날짜: ${_endDate!.month}월 ${_endDate!.day}일까지)';
+      }
+      if (_startTime != null && _endTime != null) {
+        resultText += ' (시간: ${_startTime} ~ ${_endTime})';
+      } else if (_startTime != null) {
+        resultText += ' (시간: ${_startTime}부터)';
+      } else if (_endTime != null) {
+        resultText += ' (시간: ${_endTime}까지)';
+      }
+    } else if (_selectedFilters.isNotEmpty) {
+      resultText = '적용된 필터: ${_selectedFilters.map(_getFilterDisplayText).join(', ')} - ${totalCount}개 매칭';
+    }
+
+    return resultText;
+  }
+
+
+
+  // 도시명 가져오기
+  String _getCityName(String cityId) {
+    final city = _locationData.firstWhere(
+      (city) => city.id == cityId,
+      orElse: () => Location(id: '', name: ''),
+    );
+    return city.name;
+  }
+
+  // 구/군명 가져오기
+  String _getDistrictName(String districtId) {
+    for (final city in _locationData) {
+      if (city.subLocations != null) {
+        final district = city.subLocations!.firstWhere(
+          (district) => district.id == districtId,
+          orElse: () => Location(id: '', name: ''),
+        );
+        if (district.id.isNotEmpty) {
+          return district.name;
+        }
+      }
+    }
+    return '';
+  }
+
+  // 위치 필터 적용
+  void _applyLocationFilter(String cityId, String? districtId) {
+    setState(() {
+      if (districtId == null) {
+        // 도시 전체 선택
+        _selectedCityId = cityId;
+        _selectedDistrictIds.clear();
+        
+        // 도시 전체 선택 시에도 구/군은 선택하지 않음 (사용자가 직접 선택하도록)
+        // _selectedDistrictIds.addAll(
+        //   city.subLocations!.map((district) => district.id).toList()
+        // );
+      } else {
+        // 특정 구/군 선택
+        if (_selectedDistrictIds.contains(districtId)) {
+          _selectedDistrictIds.remove(districtId);
+        } else {
+          _selectedDistrictIds.add(districtId);
+        }
+        
+        // 도시 전체 선택 해제
+        final city = _locationData.firstWhere(
+          (city) => city.id == cityId,
+          orElse: () => Location(id: '', name: ''),
+        );
+        if (city.subLocations != null) {
+          final allDistrictIds = city.subLocations!.map((district) => district.id).toList();
+          if (_selectedDistrictIds.every((id) => allDistrictIds.contains(id))) {
+            // 모든 구/군이 선택된 경우 도시 전체 선택으로 변경
+            _selectedDistrictIds.clear();
+            _selectedDistrictIds.addAll(allDistrictIds);
+          }
+        }
+      }
+      
+      // 필터 적용
+      _applyFilters();
+    });
+  }
+
+  // 매칭별 위치 정보 반환
+  String _getMatchingLocationText(Matching matching) {
+    // 코트별 위치 정보 매핑
+    Map<String, String> courtLocations = {
+      '잠실종합운동장': '서울 송파구',
+      '양재시민의숲': '서울 강남구',
+      '올림픽공원 테니스장': '서울 송파구',
+      '한강공원 테니스장': '서울 영등포구',
+      '분당테니스장': '경기도 성남시',
+      '인천대공원 테니스장': '인천 미추홀구',
+    };
+    
+    return courtLocations[matching.courtName] ?? '위치 정보 없음';
+  }
+
+  // 필터 칩 위젯
+  Widget _buildFilterChip(String filter) {
+    IconData icon;
+    Color color;
+    
+    // 필터 타입에 따른 아이콘과 색상 설정 (더 부드러운 색상)
+    if (filter.contains('혼복') || filter.contains('남복') || filter.contains('여복') || 
+        filter.contains('단식') || filter.contains('랠리')) {
+      icon = Icons.sports_tennis;
+      color = const Color(0xFFE8B54A); // 부드러운 주황색
+    } else if (filter.contains('년') || filter.contains('개월')) {
+      icon = Icons.timeline;
+      color = const Color(0xFF6B9E78); // 부드러운 초록색
+    } else if (filter.contains('월') && filter.contains('일')) {
+      icon = Icons.calendar_today;
+      color = const Color(0xFFE8A87C); // 부드러운 주황색
+    } else if (filter.contains('시')) {
+      icon = Icons.access_time;
+      color = const Color(0xFFB8A9C9); // 부드러운 보라색
+    } else if (filter.contains('모집중')) {
+      icon = Icons.people;
+      color = const Color(0xFF7FB069); // 부드러운 초록색
+    } else if (filter.contains('팔로우만')) {
+      icon = Icons.favorite;
+      color = const Color(0xFFE57373); // 부드러운 빨간색
+    } else if (filter == '서울' || filter == '경기도' || filter == '인천') {
+      icon = Icons.location_city;
+      color = const Color(0xFF7BA7BC); // 부드러운 파란색
+    } else if (filter.contains('구') || filter.contains('시') || filter.contains('군')) {
+      icon = Icons.location_on;
+      color = const Color(0xFF9B8BB4); // 부드러운 인디고색
+    } else {
+      icon = Icons.filter_list;
+      color = AppColors.textSecondary;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        border: Border.all(color: color.withValues(alpha: 0.6), width: 1.2),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.15),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              filter,
+              style: AppTextStyles.body.copyWith(
+                color: color.withValues(alpha: 0.8),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedFilters.remove(filter);
+                
+                // 필터 제거 시 관련 변수도 초기화
+                if (filter == '서울') {
+                  _selectedCityId = null;
+                } else if (filter == '송파구') {
+                  _selectedDistrictIds.removeWhere((id) => _getDistrictName(id) == filter);
+                } else if (filter.contains('혼복') || filter.contains('남복') || filter.contains('여복') || 
+                    filter.contains('단식') || filter.contains('랠리')) {
+                  // 해당 게임 유형만 제거
+                  if (filter == '혼복') {
+                    _selectedGameTypes.remove('mixed');
+                  } else if (filter == '남복') {
+                    _selectedGameTypes.remove('male_doubles');
+                  } else if (filter == '여복') {
+                    _selectedGameTypes.remove('female_doubles');
+                  } else if (filter == '단식') {
+                    _selectedGameTypes.remove('singles');
+                  } else if (filter == '랠리') {
+                    _selectedGameTypes.remove('rally');
+                  }
+                } else if (filter.contains('년') || filter.contains('개월')) {
+                  _selectedSkillLevel = null;
+                  _selectedEndSkillLevel = null;
+                } else if (filter.contains('월') && filter.contains('일')) {
+                  _startDate = null;
+                  _endDate = null;
+                } else if (filter.contains('시')) {
+                  _startTime = null;
+                  _endTime = null;
+                } else if (filter.contains('모집중')) {
+                  _showOnlyRecruiting = false;
+                } else if (filter.contains('팔로우만')) {
+                  _showOnlyFollowing = false;
+                }
+                
+                // 필터 상태 동기화하여 요약 UI 업데이트
+                _syncFilterState();
+                
+                // 필터 적용
+                _applyFilters();
+              });
+            },
+            child: Icon(
+              Icons.close,
+              color: color.withValues(alpha: 0.7),
+              size: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // String 시간에서 hour와 minute 추출
+  int _getHourFromString(String timeString) {
+    try {
+      return int.parse(timeString.split(':')[0]);
+    } catch (e) {
+      return 0;
+    }
+  }
+  
+  int _getMinuteFromString(String timeString) {
+    try {
+      return int.parse(timeString.split(':')[1]);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  // 시간 비교 헬퍼 메서드
+  int _compareTime(String time1, String time2) {
+    final parts1 = time1.split(':');
+    final parts2 = time2.split(':');
+    
+    if (parts1.length == 2 && parts2.length == 2) {
+      final hour1 = int.parse(parts1[0]);
+      final minute1 = int.parse(parts1[1]);
+      final hour2 = int.parse(parts2[0]);
+      final minute2 = int.parse(parts2[1]);
+      
+      final totalMinutes1 = hour1 * 60 + minute1;
+      final totalMinutes2 = hour2 * 60 + minute2;
+      
+      if (totalMinutes1 < totalMinutes2) return -1;
+      if (totalMinutes1 > totalMinutes2) return 1;
+      return 0;
+    }
+    return 0;
+  }
+
+  // 구력 범위 필터 탭 위젯
+  Widget _buildSkillLevelTab(String? selectedSkillLevel, String? selectedEndSkillLevel, List<String> selectedFilters, StateSetter setModalState) {
+    final skillLevels = ['6개월', '1년', '2년', '3년', '4년', '5년', '6년', '7년', '8년', '9년', '10년+'];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '구력 범위',
+          style: AppTextStyles.h2.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 구력 선택 안내
+        Text(
+          '구력 범위를 선택해 주세요',
+          style: AppTextStyles.body.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // 선택된 구력 범위 표시 (모달 내에서도 실제 상태값을 사용)
+        if (_selectedSkillLevel != null || _selectedEndSkillLevel != null)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.timeline, color: AppColors.primary, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  _selectedSkillLevel != null && _selectedEndSkillLevel != null
+                      ? '${_selectedSkillLevel} ~ ${_selectedEndSkillLevel}'
+                      : _selectedSkillLevel != null
+                          ? '${_selectedSkillLevel} 이상'
+                          : '${_selectedEndSkillLevel} 이하',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: 16),
+
+        // 구력 선택 버튼들 (실제 상태값 기준으로 하이라이트)
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: skillLevels.map((level) {
+            final isSelected = _selectedSkillLevel == level || _selectedEndSkillLevel == level;
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  print('=== 구력 버튼 클릭: $level ===');
+
+                  String? newStart = _selectedSkillLevel;
+                  String? newEnd = _selectedEndSkillLevel;
+
+                  if (newStart == null) {
+                    // 첫 번째 선택: 시작 구력
+                    newStart = level;
+                    newEnd = null;
+                    print('첫 번째 선택: 시작 구력 = $level');
+                  } else if (newEnd == null) {
+                    // 두 번째 선택: 종료 구력
+                    final startValue = _getSkillLevelFromText(newStart);
+                    final endValue = _getSkillLevelFromText(level);
+
+                    if (startValue != null && endValue != null) {
+                      if (endValue > startValue) {
+                        newEnd = level;
+                        print('두 번째 선택: 범위 설정 = $newStart ~ $level');
+                      } else {
+                        // 종료 구력이 시작 구력보다 작으면 순서 변경
+                        newEnd = newStart;
+                        newStart = level;
+                        print('순서 변경: 범위 설정 = $newStart ~ $newEnd');
+                      }
+                    }
+                  } else {
+                    // 새로운 선택: 시작 구력으로 재설정
+                    newStart = level;
+                    newEnd = null;
+                    print('새로운 선택: 시작 구력 재설정 = $level');
+                  }
+
+                  // 실제 상태 업데이트 (모달/메인 동기화)
+                  setState(() {
+                    _selectedSkillLevel = newStart;
+                    _selectedEndSkillLevel = newEnd;
+                  });
+
+                  // 모달 내 필터 요약 리스트 갱신
+                  setModalState(() {
+                    selectedFilters.removeWhere((filter) =>
+                        filter.contains('년') && (filter.contains('-') || filter.contains('이상') || filter.contains('이하')));
+
+                    if (newStart != null && newEnd != null) {
+                      final text = '$newStart-$newEnd';
+                      if (!selectedFilters.contains(text)) selectedFilters.add(text);
+                    } else if (newStart != null) {
+                      final text = '$newStart 이상';
+                      if (!selectedFilters.contains(text)) selectedFilters.add(text);
+                    } else if (newEnd != null) {
+                      final text = '$newEnd 이하';
+                      if (!selectedFilters.contains(text)) selectedFilters.add(text);
+                    }
+                  });
+
+                  print('=== 구력 필터 선택 완료 ===');
+                  print('선택된 시작 구력: $_selectedSkillLevel');
+                  print('선택된 종료 구력: $_selectedEndSkillLevel');
+
+                  // 필터 상태 동기화하여 요약 UI 업데이트
+                  _syncFilterState();
+                  
+                  // 필터 적용
+                  _applyFilters();
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : AppColors.surface,
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : AppColors.cardBorder,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    level,
+                    style: AppTextStyles.body.copyWith(
+                      color: isSelected ? AppColors.surface : AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }

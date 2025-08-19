@@ -5,6 +5,8 @@
     <!-- Android 12 이하 호환 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <!-- 알림 권한 요청 차단 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" android:maxSdkVersion="32" />
     <application
         android:label="playmate_app"
         android:name="${applicationName}"

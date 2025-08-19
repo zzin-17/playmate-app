@@ -13,6 +13,7 @@ class MockAuthService {
       'birthYear': 1990,
       'region': '서울시 강남구',
       'skillLevel': 3,
+      'startYearMonth': '2021-05',
       'preferredCourt': '잠실종합운동장',
       'preferredTime': ['평일 저녁', '주말 오전'],
       'playStyle': '싱글스/복식 모두',
@@ -31,6 +32,7 @@ class MockAuthService {
       'birthYear': 1995,
       'region': '서울시 서초구',
       'skillLevel': 2,
+      'startYearMonth': '2022-03',
       'preferredCourt': '양재시민의숲',
       'preferredTime': ['주말 오후'],
       'playStyle': '싱글스',
@@ -42,6 +44,42 @@ class MockAuthService {
     },
   };
 
+  // 사용자 후기 데이터 (간단한 목업)
+  static final Map<int, List<Map<String, dynamic>>> _mockReviews = {
+    1: [
+      {
+        'reviewer': '테니스러버',
+        'rating': 4.5,
+        'date': DateTime.now().subtract(const Duration(days: 2)),
+        'content': '시간 약속 잘 지키시고 매너가 좋아요! 다음에 또 같이 쳐요.'
+      },
+      {
+        'reviewer': '스매시왕',
+        'rating': 4.8,
+        'date': DateTime.now().subtract(const Duration(days: 10)),
+        'content': '랠리 템포가 좋아서 재미있었습니다.'
+      },
+      {
+        'reviewer': '포핸드장인',
+        'rating': 4.2,
+        'date': DateTime.now().subtract(const Duration(days: 20)),
+        'content': '코트 예약을 잘 챙겨주셔서 편했어요.'
+      },
+      {
+        'reviewer': '더블스좋아',
+        'rating': 4.7,
+        'date': DateTime.now().subtract(const Duration(days: 30)),
+        'content': '더블스 호흡이 좋았습니다.'
+      },
+      {
+        'reviewer': '발리장인',
+        'rating': 4.6,
+        'date': DateTime.now().subtract(const Duration(days: 45)),
+        'content': '볼을 안정적으로 넘겨주셔서 게임이 수월했어요.'
+      },
+    ],
+  };
+
   // 로그인 시뮬레이션
   static Future<Map<String, dynamic>> login(String email, String password) async {
     // 네트워크 지연 시뮬레이션
@@ -49,7 +87,8 @@ class MockAuthService {
     
     if (_mockUsers.containsKey(email)) {
       final userData = _mockUsers[email]!;
-      if (userData['password'] == password) {
+      // 자동 로그인을 위한 특별 처리 (비밀번호 검증 생략)
+      if (password == 'auto_password' || userData['password'] == password) {
         return {
           'success': true,
           'token': 'mock_token_${userData['id']}',
@@ -61,6 +100,7 @@ class MockAuthService {
             birthYear: userData['birthYear'] as int?,
             region: userData['region'] as String?,
             skillLevel: userData['skillLevel'] as int?,
+            startYearMonth: userData['startYearMonth'] as String?,
             preferredCourt: userData['preferredCourt'] as String?,
             preferredTime: userData['preferredTime'] as List<String>?,
             playStyle: userData['playStyle'] as String?,
@@ -86,6 +126,7 @@ class MockAuthService {
     required String nickname,
     String? gender,
     int? birthYear,
+    String? startYearMonth,
   }) async {
     // 네트워크 지연 시뮬레이션
     await Future.delayed(const Duration(seconds: 1));
@@ -110,6 +151,7 @@ class MockAuthService {
       'hasLesson': false,
       'mannerScore': null,
       'profileImage': null,
+      'startYearMonth': startYearMonth,
       'createdAt': DateTime.now(),
       'updatedAt': DateTime.now(),
     };
@@ -160,6 +202,7 @@ class MockAuthService {
       birthYear: userData['birthYear'] as int?,
       region: userData['region'] as String?,
       skillLevel: userData['skillLevel'] as int?,
+        startYearMonth: userData['startYearMonth'] as String?,
       preferredCourt: userData['preferredCourt'] as String?,
       preferredTime: userData['preferredTime'] as List<String>?,
       playStyle: userData['playStyle'] as String?,
@@ -193,6 +236,7 @@ class MockAuthService {
       birthYear: userData['birthYear'] as int?,
       region: userData['region'] as String?,
       skillLevel: userData['skillLevel'] as int?,
+        startYearMonth: userData['startYearMonth'] as String?,
       preferredCourt: userData['preferredCourt'] as String?,
       preferredTime: userData['preferredTime'] as List<String>?,
       playStyle: userData['playStyle'] as String?,
@@ -202,6 +246,12 @@ class MockAuthService {
       createdAt: userData['createdAt'] as DateTime,
       updatedAt: userData['updatedAt'] as DateTime,
     );
+  }
+
+  // 사용자 후기 조회
+  static Future<List<Map<String, dynamic>>> getUserReviews(int userId) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    return List<Map<String, dynamic>>.from(_mockReviews[userId] ?? []);
   }
 
   // 카카오 로그인 시뮬레이션
@@ -219,6 +269,7 @@ class MockAuthService {
         birthYear: userData['birthYear'] as int?,
         region: userData['region'] as String?,
         skillLevel: userData['skillLevel'] as int?,
+        startYearMonth: userData['startYearMonth'] as String?,
         preferredCourt: userData['preferredCourt'] as String?,
         preferredTime: userData['preferredTime'] as List<String>?,
         playStyle: userData['playStyle'] as String?,
@@ -246,6 +297,7 @@ class MockAuthService {
         birthYear: userData['birthYear'] as int?,
         region: userData['region'] as String?,
         skillLevel: userData['skillLevel'] as int?,
+        startYearMonth: userData['startYearMonth'] as String?,
         preferredCourt: userData['preferredCourt'] as String?,
         preferredTime: userData['preferredTime'] as List<String>?,
         playStyle: userData['playStyle'] as String?,

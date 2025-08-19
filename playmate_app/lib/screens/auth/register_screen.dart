@@ -24,9 +24,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscureConfirmPassword = true;
   String? _selectedGender;
   int? _selectedBirthYear;
+  int? _startYear;
+  int? _startMonth;
 
   final List<String> _genderOptions = ['남성', '여성'];
   final List<int> _birthYearOptions = List.generate(50, (index) => 2024 - index);
+  final List<int> _years = List.generate(30, (i) => DateTime.now().year - i);
+  final List<int> _months = List.generate(12, (i) => i + 1);
 
   @override
   void dispose() {
@@ -47,6 +51,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       nickname: _nicknameController.text.trim(),
       gender: _selectedGender == '남성' ? 'male' : _selectedGender == '여성' ? 'female' : null,
       birthYear: _selectedBirthYear,
+      startYearMonth: _startYear != null && _startMonth != null
+          ? '${_startYear!}-${_startMonth!.toString().padLeft(2, '0')}'
+          : null,
     );
 
     if (success && mounted) {
@@ -294,6 +301,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 
                 const SizedBox(height: 32),
+
+                // 테니스 시작년/월 (구력 계산용) - 필수
+                Text('테니스 시작 시점', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        value: _startYear,
+                        decoration: const InputDecoration(labelText: '시작 년(YYYY) *'),
+                        items: _years.map((y) => DropdownMenuItem(value: y, child: Text(y.toString()))).toList(),
+                        onChanged: (v) => setState(() => _startYear = v),
+                        validator: (v) => v == null ? '시작 년도를 선택해주세요' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        value: _startMonth,
+                        decoration: const InputDecoration(labelText: '시작 월(MM) *'),
+                        items: _months.map((m) => DropdownMenuItem(value: m, child: Text(m.toString().padLeft(2, '0')))).toList(),
+                        onChanged: (v) => setState(() => _startMonth = v),
+                        validator: (v) => v == null ? '시작 월을 선택해주세요' : null,
+                      ),
+                    ),
+                  ],
+                ),
                 
                 // 회원가입 버튼
                 Consumer<AuthProvider>(
