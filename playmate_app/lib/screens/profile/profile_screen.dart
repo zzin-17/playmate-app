@@ -6,7 +6,9 @@ import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
 import 'my_hosted_matchings_screen.dart';
 import 'my_guest_matchings_screen.dart';
+import 'my_bookmarks_screen.dart';
 import '../review/my_reviews_screen.dart';
+import '../community/community_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -38,54 +40,40 @@ class ProfileScreen extends StatelessWidget {
             child: Column(
               children: [
                 // 프로필 헤더
-                _buildProfileHeader(user),
+                _buildProfileHeader(context, user),
                 
                 const SizedBox(height: 24),
                 
                 // 메뉴 목록
                 _buildMenuSection(
-                  title: '내 활동',
+                  title: '추가 기능',
                   items: [
                     MenuItem(
-                      icon: Icons.sports_tennis,
-                      title: '내가 모집한 일정',
-                      subtitle: '호스트로 등록한 매칭 일정 관리',
+                      icon: Icons.bookmark_outline,
+                      title: '내가 북마크한 게시글',
+                      subtitle: '북마크한 게시글 목록',
                       onTap: () {
-                        // 내가 모집한 일정 페이지로 이동
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => MyHostedMatchingsScreen(currentUser: user!),
+                            builder: (context) => const MyBookmarksScreen(),
                           ),
                         );
                       },
                     ),
                     MenuItem(
-                      icon: Icons.people,
-                      title: '게스트로 참여한 일정',
-                      subtitle: '참여한 매칭 일정 및 히스토리',
+                      icon: Icons.favorite,
+                      title: '내가 좋아요한 게시글',
+                      subtitle: '좋아요한 게시글 목록',
                       onTap: () {
-                        // 게스트로 참여한 일정 페이지로 이동
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => MyGuestMatchingsScreen(currentUser: user!),
-                          ),
-                        );
+                        // 내가 좋아요한 게시글 페이지로 이동
                       },
                     ),
                     MenuItem(
-                      icon: Icons.chat_bubble,
-                      title: '내 게시글',
-                      subtitle: '작성한 게시글',
+                      icon: Icons.comment,
+                      title: '내가 댓글단 게시글',
+                      subtitle: '댓글을 작성한 게시글 목록',
                       onTap: () {
-                        // 내 게시글 페이지로 이동
-                      },
-                    ),
-                    MenuItem(
-                      icon: Icons.shopping_bag,
-                      title: '내 거래',
-                      subtitle: '구매/판매 내역',
-                      onTap: () {
-                        // 내 거래 페이지로 이동
+                        // 내가 댓글단 게시글 페이지로 이동
                       },
                     ),
                   ],
@@ -235,7 +223,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileHeader(User? user) {
+  Widget _buildProfileHeader(BuildContext context, User? user) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -287,13 +275,38 @@ class ProfileScreen extends StatelessWidget {
           
           const SizedBox(height: 16),
           
-          // 통계 정보
+          const SizedBox(height: 16),
+          
+          // 통계 정보 (클릭 가능한 카드)
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildStatItem('매칭', '12'),
-              _buildStatItem('게시글', '8'),
-              _buildStatItem('거래', '5'),
+              Expanded(
+                child: _buildStatCard(
+                  icon: Icons.people,
+                  value: '12',
+                  label: '매칭',
+                  onTap: () => _navigateToMatching(context),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  icon: Icons.article,
+                  value: '8',
+                  label: '게시글',
+                  onTap: () => _navigateToPosts(context),
+                ),
+              ),
+              // TODO: 거래 기능 구현 완료 시 활성화
+              // const SizedBox(width: 12),
+              // Expanded(
+              //   child: _buildStatCard(
+              //     icon: Icons.shopping_bag,
+              //     value: '5',
+              //     label: '거래',
+              //     onTap: () => _navigateToTransactions(),
+              //   ),
+              // ),
             ],
           ),
         ],
@@ -301,23 +314,83 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(String label, String value) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: AppTextStyles.h2.copyWith(
-            color: AppColors.primary,
-            fontWeight: FontWeight.bold,
+  Widget _buildStatCard({
+    required IconData icon,
+    required String value,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.primary.withOpacity(0.2),
+            width: 1,
           ),
         ),
-        Text(
-          label,
-          style: AppTextStyles.caption.copyWith(
-            color: AppColors.textSecondary,
-          ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: AppColors.primary,
+              size: 24,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: AppTextStyles.h2.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              label,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  // 네비게이션 메서드들
+  void _navigateToMatching(BuildContext context) {
+    // 매칭 관련 페이지로 이동 (내가 모집한 일정)
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MyHostedMatchingsScreen(
+          currentUser: context.read<AuthProvider>().currentUser!,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToPosts(BuildContext context) {
+    // 내 게시글 페이지로 이동 (내가 작성한 글)
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const CommunityScreen(),
+      ),
+    );
+  }
+
+  void _navigateToTransactions(BuildContext context) {
+    // 내 거래 페이지로 이동
+    // TODO: 내 거래 페이지 구현
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('거래 기능은 곧 구현될 예정입니다! 💰'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Colors.orange,
+      ),
     );
   }
 

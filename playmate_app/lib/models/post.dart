@@ -1,4 +1,5 @@
 import 'package:json_annotation/json_annotation.dart';
+import 'comment.dart';
 
 part 'post.g.dart';
 
@@ -8,6 +9,7 @@ class Post {
   final int authorId;
   final String authorNickname;
   final String? authorProfileImage;
+  final String title; // 게시글 제목
   final String content;
   final List<String>? images;
   final String? videoUrl;
@@ -19,6 +21,8 @@ class Post {
   final int shareCount;
   final bool isLikedByCurrentUser;
   final bool isBookmarkedByCurrentUser;
+  final bool isSharedByCurrentUser; // 현재 사용자가 공유했는지
+  final List<Comment>? comments; // 댓글 목록
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -27,6 +31,7 @@ class Post {
     required this.authorId,
     required this.authorNickname,
     this.authorProfileImage,
+    required this.title,
     required this.content,
     this.images,
     this.videoUrl,
@@ -38,6 +43,8 @@ class Post {
     required this.shareCount,
     required this.isLikedByCurrentUser,
     required this.isBookmarkedByCurrentUser,
+    this.isSharedByCurrentUser = false,
+    this.comments,
     required this.createdAt,
     required this.updatedAt,
   });

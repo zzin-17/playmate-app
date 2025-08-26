@@ -16,6 +16,8 @@ Matching _$MatchingFromJson(Map<String, dynamic> json) => Matching(
   timeSlot: json['timeSlot'] as String,
   minLevel: (json['minLevel'] as num?)?.toInt(),
   maxLevel: (json['maxLevel'] as num?)?.toInt(),
+  minAge: (json['minAge'] as num?)?.toInt(),
+  maxAge: (json['maxAge'] as num?)?.toInt(),
   gameType: json['gameType'] as String,
   maleRecruitCount: (json['maleRecruitCount'] as num).toInt(),
   femaleRecruitCount: (json['femaleRecruitCount'] as num).toInt(),
@@ -29,6 +31,19 @@ Matching _$MatchingFromJson(Map<String, dynamic> json) => Matching(
       .toList(),
   createdAt: DateTime.parse(json['createdAt'] as String),
   updatedAt: DateTime.parse(json['updatedAt'] as String),
+  recoveryCount: (json['recoveryCount'] as num?)?.toInt(),
+  appliedUserIds: (json['appliedUserIds'] as List<dynamic>?)
+      ?.map((e) => (e as num).toInt())
+      .toList(),
+  confirmedUserIds: (json['confirmedUserIds'] as List<dynamic>?)
+      ?.map((e) => (e as num).toInt())
+      .toList(),
+  completedAt: json['completedAt'] == null
+      ? null
+      : DateTime.parse(json['completedAt'] as String),
+  cancelledAt: json['cancelledAt'] == null
+      ? null
+      : DateTime.parse(json['cancelledAt'] as String),
 );
 
 Map<String, dynamic> _$MatchingToJson(Matching instance) => <String, dynamic>{
@@ -41,6 +56,8 @@ Map<String, dynamic> _$MatchingToJson(Matching instance) => <String, dynamic>{
   'timeSlot': instance.timeSlot,
   'minLevel': instance.minLevel,
   'maxLevel': instance.maxLevel,
+  'minAge': instance.minAge,
+  'maxAge': instance.maxAge,
   'gameType': instance.gameType,
   'maleRecruitCount': instance.maleRecruitCount,
   'femaleRecruitCount': instance.femaleRecruitCount,
@@ -52,4 +69,9 @@ Map<String, dynamic> _$MatchingToJson(Matching instance) => <String, dynamic>{
   'guests': instance.guests,
   'createdAt': instance.createdAt.toIso8601String(),
   'updatedAt': instance.updatedAt.toIso8601String(),
+  'recoveryCount': instance.recoveryCount,
+  'appliedUserIds': instance.appliedUserIds,
+  'confirmedUserIds': instance.confirmedUserIds,
+  'completedAt': instance.completedAt?.toIso8601String(),
+  'cancelledAt': instance.cancelledAt?.toIso8601String(),
 };

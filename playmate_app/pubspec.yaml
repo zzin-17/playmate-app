@@ -65,6 +65,9 @@ dependencies:
   url_launcher: ^6.2.5
   permission_handler: ^11.3.1
   
+  # 실시간 통신
+  web_socket_channel: ^2.4.0
+  
   # 알림 시스템
   firebase_core: ^3.6.0
   firebase_messaging: ^15.1.3

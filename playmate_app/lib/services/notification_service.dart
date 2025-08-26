@@ -1,203 +1,103 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
-import 'dart:convert';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
-
-  // 알림 권한 상태
+  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   bool _isInitialized = false;
-  String? _fcmToken;
-
-  // 알림 타입별 ID 관리
-  static const int _matchingRequestId = 1000;
-  static const int _matchingConfirmedId = 1001;
-  static const int _chatMessageId = 1002;
-  static const int _reviewCompletedId = 1003;
 
   /// 알림 서비스 초기화
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
-      // 로컬 알림 초기화 (Firebase와 무관하게 항상 시도)
-      await _initializeLocalNotifications();
+      // Android 설정
+      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
       
-      // Firebase 초기화 시도
-      try {
-        await Firebase.initializeApp();
-        await _initializeFirebaseMessaging();
-        print('Firebase 알림 서비스 초기화 완료');
-      } catch (e) {
-        print('Firebase 알림 서비스 초기화 실패: $e');
-        print('로컬 알림만 사용합니다.');
-      }
-      
+      // iOS 설정
+      const iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
+
+      // 초기화 설정
+      const initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
+
+      await _notifications.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: _onNotificationTapped,
+      );
+
       _isInitialized = true;
       print('알림 서비스 초기화 완료');
     } catch (e) {
       print('알림 서비스 초기화 실패: $e');
-      // 로컬 알림 초기화라도 시도
-      try {
-        await _initializeLocalNotifications();
-        _isInitialized = true;
-        print('로컬 알림 서비스만 초기화 완료');
-      } catch (e2) {
-        print('로컬 알림 서비스 초기화도 실패: $e2');
-      }
     }
-  }
-
-  /// 로컬 알림 초기화
-  Future<void> _initializeLocalNotifications() async {
-    const AndroidInitializationSettings androidSettings = 
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    
-    const DarwinInitializationSettings iosSettings = 
-        DarwinInitializationSettings(
-      requestAlertPermission: false,  // iOS 알림 권한 요청 비활성화
-      requestBadgePermission: false,  // iOS 배지 권한 요청 비활성화
-      requestSoundPermission: false,  // iOS 소리 권한 요청 비활성화
-    );
-
-    const InitializationSettings initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-
-    await _localNotifications.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
-    );
-  }
-
-    /// Firebase Cloud Messaging 초기화
-  Future<void> _initializeFirebaseMessaging() async {
-    // 권한 요청 완전 차단
-    print('알림 권한 요청 완전 차단됨 - 로컬 알림만 사용');
-    
-    // 로컬 알림은 권한 없이도 작동
-    print('로컬 알림 서비스 활성화됨');
-    
-    // 앱이 종료된 상태에서 알림을 탭했을 때
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleBackgroundMessage);
-  }
-
-  /// 포그라운드 메시지 처리
-  void _handleForegroundMessage(RemoteMessage message) {
-    print('포그라운드 메시지 수신: ${message.notification?.title}');
-    // 포그라운드에서는 로컬 알림으로 표시
-    _showLocalNotification(
-      id: _getNotificationId(message.data['type']),
-      title: message.notification?.title ?? '새 알림',
-      body: message.notification?.body ?? '',
-      payload: json.encode(message.data),
-    );
-  }
-
-  /// 백그라운드 메시지 처리
-  void _handleBackgroundMessage(RemoteMessage message) {
-    print('백그라운드 메시지 수신: ${message.notification?.title}');
-    // 백그라운드에서는 네비게이션 처리
-    _handleNotificationNavigation(message.data);
   }
 
   /// 알림 탭 처리
   void _onNotificationTapped(NotificationResponse response) {
+    // TODO: 알림 탭 시 해당 화면으로 이동
     print('알림 탭됨: ${response.payload}');
-    if (response.payload != null) {
-      final data = json.decode(response.payload!);
-      _handleNotificationNavigation(data);
-    }
   }
 
-  /// 알림 네비게이션 처리
-  void _handleNotificationNavigation(Map<String, dynamic> data) {
-    final type = data['type'];
-    switch (type) {
-      case 'matching_request':
-      case 'matching_confirmed':
-        final matchingId = data['matchingId'] as int;
-        _navigateToMatchingDetail(matchingId);
-        break;
-      case 'chat_message':
-        final matchingId = data['matchingId'] as int;
-        _navigateToChat(matchingId);
-        break;
-      case 'review_completed':
-        final userId = data['userId'] as int;
-        _navigateToProfile(userId);
-        break;
-    }
-  }
-
-  /// 로컬 알림 표시
-  Future<void> _showLocalNotification({
-    required int id,
-    required String title,
-    required String body,
-    String? payload,
+  /// 댓글 알림
+  Future<void> showCommentNotification({
+    required String postTitle,
+    required String commenterName,
+    required String comment,
   }) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'playmate_channel',
-      'Playmate 알림',
-      channelDescription: '테니스 매칭 관련 알림',
-      importance: Importance.high,
-      priority: Priority.high,
+    await _showNotification(
+      id: DateTime.now().millisecondsSinceEpoch,
+      title: '새로운 댓글',
+      body: '$commenterName님이 "$postTitle"에 댓글을 남겼습니다: $comment',
+      payload: 'comment',
     );
-
-    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const NotificationDetails details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    await _localNotifications.show(id, title, body, details, payload: payload);
   }
 
-  /// 알림 타입별 ID 반환
-  int _getNotificationId(String? type) {
-    switch (type) {
-      case 'matching_request':
-        return _matchingRequestId;
-      case 'matching_confirmed':
-        return _matchingConfirmedId;
-      case 'chat_message':
-        return _chatMessageId;
-      case 'review_completed':
-        return _reviewCompletedId;
-      default:
-        return DateTime.now().millisecondsSinceEpoch.remainder(100000);
-    }
-  }
-
-  /// 매칭 신청 알림
-  Future<void> showMatchingRequestNotification({
-    required String hostName,
-    required String courtName,
-    required String date,
-    required int matchingId,
+  /// 좋아요 알림
+  Future<void> showLikeNotification({
+    required String postTitle,
+    required String likerName,
   }) async {
-    await _showLocalNotification(
-      id: _matchingRequestId,
-      title: '새로운 매칭 신청',
-      body: '$hostName님이 $courtName $date 매칭에 신청했습니다',
-      payload: json.encode({
-        'type': 'matching_request',
-        'matchingId': matchingId,
-      }),
+    await _showNotification(
+      id: DateTime.now().millisecondsSinceEpoch,
+      title: '좋아요',
+      body: '$likerName님이 "$postTitle"을 좋아합니다',
+      payload: 'like',
+    );
+  }
+
+  /// 팔로우 알림
+  Future<void> showFollowNotification({
+    required String followerName,
+  }) async {
+    await _showNotification(
+      id: DateTime.now().millisecondsSinceEpoch,
+      title: '새로운 팔로워',
+      body: '$followerName님이 회원님을 팔로우하기 시작했습니다',
+      payload: 'follow',
+    );
+  }
+
+  /// 공유 알림
+  Future<void> showShareNotification({
+    required String postTitle,
+    required String sharerName,
+  }) async {
+    await _showNotification(
+      id: DateTime.now().millisecondsSinceEpoch,
+      title: '게시글 공유',
+      body: '$sharerName님이 "$postTitle"을 공유했습니다',
+      payload: 'share',
     );
   }
 
@@ -208,92 +108,177 @@ class NotificationService {
     required String date,
     required int matchingId,
   }) async {
-    await _showLocalNotification(
-      id: _matchingConfirmedId,
+    await _showNotification(
+      id: DateTime.now().millisecondsSinceEpoch,
       title: '매칭이 확정되었습니다',
       body: '$hostName님의 $courtName $date 매칭이 확정되었습니다',
-      payload: json.encode({
-        'type': 'matching_confirmed',
-        'matchingId': matchingId,
-      }),
+      payload: 'matching_confirmed',
     );
   }
 
-  /// 채팅 메시지 알림
-  Future<void> showChatMessageNotification({
-    required String senderName,
-    required String message,
-    required int matchingId,
+  /// 일반 알림 표시
+  Future<void> _showNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
   }) async {
-    await _showLocalNotification(
-      id: _chatMessageId,
-      title: '$senderName님의 메시지',
-      body: message,
-      payload: json.encode({
-        'type': 'chat_message',
-        'matchingId': matchingId,
-      }),
-    );
-  }
+    if (!_isInitialized) {
+      await initialize();
+    }
 
-  /// 후기 작성 완료 알림
-  Future<void> showReviewCompletedNotification({
-    required String reviewerName,
-    required String targetName,
-    required int userId,
-  }) async {
-    await _showLocalNotification(
-      id: _reviewCompletedId,
-      title: '후기 작성 완료',
-      body: '$reviewerName님이 $targetName님에 대한 후기를 작성했습니다',
-      payload: json.encode({
-        'type': 'review_completed',
-        'userId': userId,
-      }),
-    );
-  }
-
-  /// FCM 토큰 반환
-  String? get fcmToken => _fcmToken;
-
-  /// 알림 권한 상태 확인
-  Future<bool> isNotificationEnabled() async {
     try {
-      final settings = await _firebaseMessaging.getNotificationSettings();
-      return settings.authorizationStatus == AuthorizationStatus.authorized;
+      // Android 알림 설정
+      const androidDetails = AndroidNotificationDetails(
+        'community_channel',
+        '커뮤니티 알림',
+        channelDescription: '커뮤니티 활동 관련 알림',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+      );
+
+      // iOS 알림 설정
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      // 알림 상세 설정
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      // 알림 표시
+      await _notifications.show(id, title, body, details, payload: payload);
+      
+      // 알림 히스토리에 저장
+      await _saveNotificationHistory(title, body, payload);
+      
     } catch (e) {
-      print('Firebase 알림 권한 확인 실패: $e');
-      // Firebase가 없으면 로컬 알림 권한만 확인
-      return true;
+      print('알림 표시 실패: $e');
+    }
+  }
+
+  /// 알림 히스토리 저장
+  Future<void> _saveNotificationHistory(String title, String body, String? payload) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final history = prefs.getStringList('notification_history') ?? [];
+      
+      final notification = {
+        'title': title,
+        'body': body,
+        'payload': payload,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+      
+      history.insert(0, notification.toString());
+      
+      // 최근 50개만 유지
+      if (history.length > 50) {
+        history.removeRange(50, history.length);
+      }
+      
+      await prefs.setStringList('notification_history', history);
+    } catch (e) {
+      print('알림 히스토리 저장 실패: $e');
+    }
+  }
+
+  /// 알림 히스토리 가져오기
+  Future<List<Map<String, dynamic>>> getNotificationHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final history = prefs.getStringList('notification_history') ?? [];
+      
+      return history.map((item) {
+        // 간단한 파싱 (실제로는 JSON 사용 권장)
+        final cleanItem = item.replaceAll('{', '').replaceAll('}', '');
+        final parts = cleanItem.split(', ');
+        
+        final Map<String, dynamic> notification = {};
+        for (final part in parts) {
+          final keyValue = part.split(': ');
+          if (keyValue.length == 2) {
+            final key = keyValue[0].replaceAll("'", '');
+            final value = keyValue[1].replaceAll("'", '');
+            notification[key] = value;
+          }
+        }
+        
+        return notification;
+      }).toList();
+    } catch (e) {
+      print('알림 히스토리 가져오기 실패: $e');
+      return [];
+    }
+  }
+
+  /// 알림 히스토리 삭제
+  Future<void> clearNotificationHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('notification_history');
+    } catch (e) {
+      print('알림 히스토리 삭제 실패: $e');
     }
   }
 
   /// 알림 권한 요청
-  Future<bool> requestNotificationPermission() async {
+  Future<bool> requestPermissions() async {
     try {
-      final settings = await _firebaseMessaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-      return settings.authorizationStatus == AuthorizationStatus.authorized;
+      // Android는 권한이 필요하지 않음 (로컬 알림)
+      bool androidGranted = true;
+      
+      // iOS 권한 요청
+      final iosGranted = await _notifications
+          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+      
+      return androidGranted || (iosGranted ?? false);
     } catch (e) {
-      print('Firebase 알림 권한 요청 실패: $e');
-      // Firebase가 없으면 로컬 알림 권한만 요청
-      return true;
+      print('알림 권한 요청 실패: $e');
+      return false;
     }
   }
 
-  // TODO: 실제 네비게이션 구현
-  void _navigateToMatchingDetail(int matchingId) {
-    print('매칭 상세 화면으로 이동: $matchingId');
+  /// 알림 설정 가져오기
+  Future<Map<String, bool>> getNotificationSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return {
+        'comments': prefs.getBool('notify_comments') ?? true,
+        'likes': prefs.getBool('notify_likes') ?? true,
+        'follows': prefs.getBool('notify_follows') ?? true,
+        'shares': prefs.getBool('notify_shares') ?? true,
+      };
+    } catch (e) {
+      print('알림 설정 가져오기 실패: $e');
+      return {
+        'comments': true,
+        'likes': true,
+        'follows': true,
+        'shares': true,
+      };
+    }
   }
 
-  void _navigateToChat(int matchingId) {
-    print('채팅 화면으로 이동: $matchingId');
-  }
-
-  void _navigateToProfile(int userId) {
-    print('프로필 화면으로 이동: $userId');
+  /// 알림 설정 저장
+  Future<void> saveNotificationSettings(Map<String, bool> settings) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final entry in settings.entries) {
+        await prefs.setBool('notify_${entry.key}', entry.value);
+      }
+    } catch (e) {
+      print('알림 설정 저장 실패: $e');
+    }
   }
 }

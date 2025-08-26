@@ -11,6 +11,7 @@ Post _$PostFromJson(Map<String, dynamic> json) => Post(
   authorId: (json['authorId'] as num).toInt(),
   authorNickname: json['authorNickname'] as String,
   authorProfileImage: json['authorProfileImage'] as String?,
+  title: json['title'] as String,
   content: json['content'] as String,
   images: (json['images'] as List<dynamic>?)?.map((e) => e as String).toList(),
   videoUrl: json['videoUrl'] as String?,
@@ -24,6 +25,10 @@ Post _$PostFromJson(Map<String, dynamic> json) => Post(
   shareCount: (json['shareCount'] as num).toInt(),
   isLikedByCurrentUser: json['isLikedByCurrentUser'] as bool,
   isBookmarkedByCurrentUser: json['isBookmarkedByCurrentUser'] as bool,
+  isSharedByCurrentUser: json['isSharedByCurrentUser'] as bool? ?? false,
+  comments: (json['comments'] as List<dynamic>?)
+      ?.map((e) => Comment.fromJson(e as Map<String, dynamic>))
+      .toList(),
   createdAt: DateTime.parse(json['createdAt'] as String),
   updatedAt: DateTime.parse(json['updatedAt'] as String),
 );
@@ -33,6 +38,7 @@ Map<String, dynamic> _$PostToJson(Post instance) => <String, dynamic>{
   'authorId': instance.authorId,
   'authorNickname': instance.authorNickname,
   'authorProfileImage': instance.authorProfileImage,
+  'title': instance.title,
   'content': instance.content,
   'images': instance.images,
   'videoUrl': instance.videoUrl,
@@ -44,6 +50,8 @@ Map<String, dynamic> _$PostToJson(Post instance) => <String, dynamic>{
   'shareCount': instance.shareCount,
   'isLikedByCurrentUser': instance.isLikedByCurrentUser,
   'isBookmarkedByCurrentUser': instance.isBookmarkedByCurrentUser,
+  'isSharedByCurrentUser': instance.isSharedByCurrentUser,
+  'comments': instance.comments,
   'createdAt': instance.createdAt.toIso8601String(),
   'updatedAt': instance.updatedAt.toIso8601String(),
 };

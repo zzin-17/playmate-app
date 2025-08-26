@@ -33,19 +33,17 @@ class _MainScreenState extends State<MainScreen> {
   }
   
   final List<Widget> _pages = [
-    const CourtScreen(),
+    // const CourtScreen(), // TODO: 코트 상세내용 구성 완료 시 활성화
     const CommunityScreen(),
-    const TradeScreen(),
+    // const TradeScreen(), // TODO: 중고거래 상세내용 구성 완료 시 활성화
     const ProfileScreen(),
   ];
 
   String _getTabName(int index) {
     switch (index) {
       case 0: return '홈';
-      case 1: return '코트';
-      case 2: return '커뮤니티';
-      case 3: return '중고거래';
-      case 4: return '마이페이지';
+      case 1: return '커뮤니티';
+      case 2: return '마이페이지';
       default: return '알 수 없음';
     }
   }
@@ -76,15 +74,8 @@ class _MainScreenState extends State<MainScreen> {
             style: TextStyle(color: Colors.white),
           ),
         );
-      case 2: // 커뮤니티
-        return FloatingActionButton(
-          onPressed: () {
-            // 글쓰기 페이지로 이동
-            Navigator.pushNamed(context, '/write-post');
-          },
-          backgroundColor: Theme.of(context).primaryColor,
-          child: const Icon(Icons.add, color: Colors.white),
-        );
+      case 1: // 커뮤니티 (코트 탭 제거로 인덱스 변경)
+        return null; // CommunityScreen에서 직접 처리
       default:
         return null; // 다른 탭에서는 플로팅 액션 버튼 숨김
     }
@@ -109,18 +100,18 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.home),
             label: '홈',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: '코트',
-          ),
+          // BottomNavigationBarItem(
+          //   icon: Icon(Icons.map),
+          //   label: '코트',
+          // ),
           BottomNavigationBarItem(
             icon: Icon(Icons.chat_bubble),
             label: '커뮤니티',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_bag),
-            label: '중고거래',
-          ),
+          // BottomNavigationBarItem(
+          //   icon: Icon(Icons.shopping_bag),
+          //   label: '중고거래',
+          // ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: '마이페이지',

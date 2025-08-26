@@ -6,6 +6,7 @@ import '../../constants/app_text_styles.dart';
 import '../../widgets/common/app_button.dart';
 import '../chat/chat_screen.dart';
 import '../profile/user_profile_screen.dart';
+import '../review/write_review_screen.dart';
 
 class MatchingDetailScreen extends StatefulWidget {
   final Matching matching;
@@ -34,7 +35,11 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
         nickname: '테니스러버',
         skillLevel: 3,
         gender: 'male',
+        birthYear: 1992,
+        startYearMonth: '2020-03',
         mannerScore: 4.2,
+        ntrpScore: 3.8,
+        reviewCount: 15,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       ),
@@ -49,7 +54,11 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
         nickname: '테니스초보',
         skillLevel: 2,
         gender: 'female',
+        birthYear: 1995,
+        startYearMonth: '2023-01',
         mannerScore: 4.5,
+        ntrpScore: 2.5,
+        reviewCount: 8,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       ),
@@ -103,44 +112,349 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           
           _buildInfoRow('날짜', _formatDate(widget.matching.date)),
           _buildInfoRow('시간', widget.matching.timeSlot),
           _buildInfoRow('구력', widget.matching.skillRangeText),
+          _buildInfoRow('연령대', widget.matching.ageRangeText),
           _buildInfoRow('게임유형', widget.matching.gameTypeText),
           _buildInfoRow('모집인원', widget.matching.recruitCountText),
-          _buildInfoRow('1인당 게스트비용', '${widget.matching.guestCost?.toString() ?? '0'}원'),
+          if (_shouldShowConfirmedInfo()) _buildConfirmedInfoRow(),
+          _buildInfoRow('게스트비용', '${widget.matching.guestCost?.toString() ?? '0'}원'),
           
           if (widget.matching.message != null && widget.matching.message!.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.accent.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.2),
+                  width: 1,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '호스트 메시지',
-                    style: AppTextStyles.body.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimary,
-                    ),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.chat_bubble_outline,
+                        color: AppColors.accent,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '호스트 메시지',
+                        style: AppTextStyles.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Text(
                     widget.matching.message!,
                     style: AppTextStyles.body.copyWith(
-                      color: AppColors.textSecondary,
+                      color: AppColors.textPrimary,
+                      height: 1.4,
+                      fontSize: 14,
                     ),
                   ),
                 ],
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  // 확정 정보를 표시할지 결정하는 함수
+  bool _shouldShowConfirmedInfo() {
+    final matching = widget.matching;
+    return matching.confirmedCount > 0; // 확정된 인원이 있으면 표시
+  }
+
+  // 확정 인원 정보를 별도 행으로 표시하는 위젯
+  Widget _buildConfirmedInfoRow() {
+    final matching = widget.matching;
+    final confirmedCount = matching.confirmedCount;
+    final confirmedGenderText = matching.confirmedGenderCountText;
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '확정인원',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: AppColors.success.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Text(
+                    '${confirmedCount}명',
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                if (confirmedGenderText.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      confirmedGenderText,
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 호스트 정보 섹션
+  Widget _buildHostInfo() {
+    final host = widget.matching.host;
+    
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.person,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '호스트 정보',
+                style: AppTextStyles.h3.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // 호스트 기본 정보
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                child: Text(
+                  host.nickname.isNotEmpty ? host.nickname.substring(0, 1) : '사',
+                  style: AppTextStyles.h3.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      host.nickname.isNotEmpty ? host.nickname : '사용자',
+                      style: AppTextStyles.h3.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '구력 ${host.experienceText}',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // 프로필 보기 버튼
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => UserProfileScreen(
+                        user: host,
+                        isHost: true,
+                      ),
+                    ),
+                  );
+                },
+                child: Text(
+                  '프로필 보기',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // 호스트 점수 정보
+          Row(
+            children: [
+              // NTRP 점수
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'NTRP',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${host.ntrpScore?.toStringAsFixed(1) ?? '-'}',
+                        style: AppTextStyles.h2.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(width: 12),
+              
+              // 매너 점수
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.accent.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '매너',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${host.mannerScore?.toStringAsFixed(1) ?? '-'}',
+                        style: AppTextStyles.h2.copyWith(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              
+              const SizedBox(width: 12),
+              
+              // 후기 개수
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.success.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '후기',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${host.reviewCount ?? 0}',
+                        style: AppTextStyles.h2.copyWith(
+                          color: AppColors.success,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -430,25 +744,386 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+  // 확정된 게스트 목록 섹션
+  Widget _buildConfirmedGuestsSection() {
+    // 호스트인지 확인
+    final isHost = widget.currentUser.id == widget.matching.host.id;
+    
+    // 호스트가 아니거나 확정된 게스트가 없으면 빈 컨테이너 반환
+    if (!isHost || widget.matching.confirmedCount == 0) {
+      return const SizedBox.shrink();
+    }
+    
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: AppColors.success,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '확정된 참여자',
+                style: AppTextStyles.h3.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${widget.matching.confirmedCount}명 확정',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.success,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // 확정된 게스트 목록
+          _buildConfirmedGuestsList(),
+          
+          const SizedBox(height: 16),
+          
+          // 안내 메시지
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.success.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: AppColors.success,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '개별 참여자의 확정을 취소하면 해당 자리를 다시 모집할 수 있습니다',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 확정된 게스트 목록 위젯
+  Widget _buildConfirmedGuestsList() {
+    // 실제로는 API에서 확정된 게스트 정보를 가져와야 함
+    // 현재는 mock 데이터 사용
+    final confirmedGuests = _getMockConfirmedGuests();
+    
+    if (confirmedGuests.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(32),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                Icons.check_circle_outline,
+                size: 48,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '확정된 참여자가 없습니다',
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    return Column(
+      children: confirmedGuests.map((guest) => _buildConfirmedGuestCard(guest)).toList(),
+    );
+  }
+
+  // 확정된 게스트 카드 위젯
+  Widget _buildConfirmedGuestCard(Map<String, dynamic> guest) {
+    final user = guest['user'] as User;
+    final confirmedAt = guest['confirmedAt'] as DateTime;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.success.withValues(alpha: 0.2),
+        ),
+      ),
       child: Row(
         children: [
+          // 프로필 아바타
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: AppColors.success.withValues(alpha: 0.1),
+            child: Text(
+              user.nickname.isNotEmpty ? user.nickname.substring(0, 1) : '사',
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.success,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          
+          // 게스트 정보
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.nickname,
+                  style: AppTextStyles.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '확정: ${_formatDateTime(confirmedAt)}',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // 확정 취소 버튼
+          IconButton(
+            onPressed: () => _showUnconfirmDialog(user),
+            icon: Icon(
+              Icons.cancel_outlined,
+              color: AppColors.error,
+              size: 20,
+            ),
+            tooltip: '확정 취소',
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 확정 취소 확인 다이얼로그
+  void _showUnconfirmDialog(User guest) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                Icons.warning_amber,
+                color: AppColors.error,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              const Text('확정 취소 확인'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${guest.nickname}님의 참여 확정을 취소하시겠습니까?'),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: AppColors.error,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '확정 취소 후 해당 자리를 다시 모집할 수 있습니다',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.error,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('아니오'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _unconfirmGuest(guest);
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.error,
+              ),
+              child: const Text('확정 취소'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 게스트 확정 취소 처리
+  void _unconfirmGuest(User guest) {
+    // TODO: 실제 API 호출로 확정 취소 처리
+    // 현재는 UI만 업데이트
+    
+    setState(() {
+      // mock 데이터에서 해당 게스트 제거
+      // 실제로는 matching.confirmedUserIds에서 제거
+    });
+    
+    // 성공 메시지 표시
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${guest.nickname}님의 참여 확정이 취소되었습니다'),
+        backgroundColor: AppColors.success,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    
+    // 매칭 상태 재계산 필요
+    // TODO: 매칭 상태를 다시 계산하여 UI 업데이트
+  }
+
+  // Mock 확정된 게스트 데이터
+  List<Map<String, dynamic>> _getMockConfirmedGuests() {
+    // 실제로는 API에서 가져와야 함
+    return [
+      {
+        'user': User(
+          id: 5,
+          email: 'guest1@example.com',
+          nickname: '테니스러버',
+          gender: 'male',
+          birthYear: 1992,
+          startYearMonth: '2020-03',
+          skillLevel: 3,
+          mannerScore: 4.2,
+          ntrpScore: 3.8,
+          reviewCount: 15,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+        'confirmedAt': DateTime.now().subtract(const Duration(hours: 2)),
+      },
+      {
+        'user': User(
+          id: 6,
+          email: 'guest2@example.com',
+          nickname: '테니스초보',
+          gender: 'female',
+          birthYear: 1995,
+          startYearMonth: '2023-01',
+          skillLevel: 2,
+          mannerScore: 4.5,
+          ntrpScore: 2.5,
+          reviewCount: 8,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+        'confirmedAt': DateTime.now().subtract(const Duration(hours: 1)),
+      },
+    ];
+  }
+
+  // 날짜/시간 포맷팅
+  String _formatDateTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays}일 전';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}시간 전';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}분 전';
+    } else {
+      return '방금 전';
+    }
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           SizedBox(
-            width: 60,
+            width: 80,
             child: Text(
               label,
               style: AppTextStyles.body.copyWith(
                 color: AppColors.textSecondary,
+                fontSize: 14,
               ),
             ),
           ),
-          Text(
-            value,
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w500,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
             ),
           ),
         ],
@@ -464,10 +1139,16 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     switch (status) {
       case 'recruiting':
         return AppColors.primary;
-      case 'full':
-        return AppColors.warning;
+      case 'confirmed':
+        return AppColors.success;
       case 'completed':
         return AppColors.success;
+      case 'cancelled':
+        return AppColors.error;
+      case 'deleted':
+        return AppColors.textSecondary;
+      case 'full':
+        return AppColors.warning;
       default:
         return AppColors.textSecondary;
     }
@@ -477,10 +1158,16 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     switch (status) {
       case 'recruiting':
         return '모집중';
-      case 'full':
-        return '마감';
+      case 'confirmed':
+        return '확정';
       case 'completed':
         return '완료';
+      case 'cancelled':
+        return '취소';
+      case 'deleted':
+        return '삭제됨';
+      case 'full':
+        return '마감';
       default:
         return '알 수 없음';
     }
@@ -579,18 +1266,28 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildMatchingInfo(),
-            const SizedBox(height: 24),
-            if (isHost && widget.matching.status == 'recruiting')
-              _buildHostGuidance(),
-            _buildApplicantsSection(),
-          ],
-        ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildMatchingInfo(),
+                  _buildHostInfo(),
+                  const SizedBox(height: 24),
+                  if (isHost && widget.matching.status == 'recruiting')
+                    _buildHostGuidance(),
+                  _buildApplicantsSection(),
+                  _buildConfirmedGuestsSection(),
+                ],
+              ),
+            ),
+          ),
+          // 하단 고정 버튼 (게스트만 표시)
+          if (!isHost) _buildBottomButtons(),
+        ],
       ),
 
     );
@@ -635,6 +1332,385 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 하단 버튼들 위젯
+  Widget _buildBottomButtons() {
+    final isHost = widget.currentUser.id == widget.matching.host.id;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+              child: Column(
+          children: [
+            // 상태별 안내 메시지
+            _buildStatusMessage(),
+            const SizedBox(height: 16),
+            
+            // 상태별 버튼
+            Row(
+              children: _buildActionButtons(),
+            ),
+          ],
+        ),
+    );
+  }
+
+  // 채팅 시작 함수
+  void _startChat() {
+    // 채팅 화면으로 이동
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ChatScreen(
+          matching: widget.matching,
+          currentUser: widget.currentUser,
+        ),
+      ),
+    );
+  }
+
+
+
+
+
+  // 상태별 안내 메시지 생성
+  Widget _buildStatusMessage() {
+    final status = widget.matching.status;
+    final isHost = widget.matching.host.id == widget.currentUser.id;
+    
+    switch (status) {
+      case 'recruiting':
+        if (isHost) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: AppColors.accent, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '게스트를 모집 중입니다. 채팅을 통해 참여자를 확정해주세요.',
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.accent,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.person_add, color: AppColors.primary, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '이 매칭에 참여하고 싶으시다면 채팅을 시작해보세요!',
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.primary,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        
+      case 'confirmed':
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.success.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColors.success.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle, color: AppColors.success, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '매칭이 확정되었습니다! 게임을 즐기세요.',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.success,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        
+      case 'completed':
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.textSecondary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColors.textSecondary.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.sports_tennis, color: AppColors.textSecondary, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '게임이 완료되었습니다. 후기를 작성해보세요!',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        
+      case 'cancelled':
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.error.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: AppColors.error.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.cancel, color: AppColors.error, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '이 매칭은 취소되었습니다.',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.error,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+        
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  // 상태별 액션 버튼 생성
+  List<Widget> _buildActionButtons() {
+    final status = widget.matching.status;
+    final isHost = widget.matching.host.id == widget.currentUser.id;
+    
+    switch (status) {
+      case 'recruiting':
+        // 모집중: 게스트는 참여 신청, 호스트는 채팅
+        if (isHost) {
+          return [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _startChat(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.buttonChat,
+                  foregroundColor: AppColors.textSurface,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.chat, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      '채팅하기',
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ];
+        } else {
+          return [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _startChat(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.buttonChat,
+                  foregroundColor: AppColors.textSurface,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.chat, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      '참여 신청',
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ];
+        }
+        
+      case 'confirmed':
+        // 확정: 호스트는 완료 처리, 게스트는 채팅
+        if (isHost) {
+          return [
+            Expanded(
+              child: AppButton(
+                onPressed: () => _completeMatching(),
+                text: '매칭 완료',
+                type: ButtonType.primary,
+              ),
+            ),
+          ];
+        } else {
+          return [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _startChat(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.buttonChat,
+                  foregroundColor: AppColors.textSurface,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.chat, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      '채팅하기',
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ];
+        }
+        
+      case 'completed':
+        // 완료: 후기 작성 버튼
+        return [
+          Expanded(
+            child: AppButton(
+              onPressed: () => _writeReview(),
+              text: '후기 작성',
+              type: ButtonType.secondary,
+            ),
+          ),
+        ];
+        
+      case 'cancelled':
+        // 취소: 버튼 없음
+        return [];
+        
+      default:
+        return [];
+    }
+  }
+
+  // 후기 작성 함수
+  void _writeReview() {
+    // 후기 작성 화면으로 이동
+    // 현재 사용자가 호스트인지 게스트인지에 따라 대상자 결정
+    final isHost = widget.matching.host.id == widget.currentUser.id;
+    final targetUser = isHost 
+        ? (widget.matching.guests?.isNotEmpty == true ? widget.matching.guests!.first : widget.currentUser)
+        : widget.matching.host;
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => WriteReviewScreen(
+          matching: widget.matching,
+          targetUser: targetUser,
+        ),
+      ),
+    );
+  }
+
+  // 매칭 완료 함수
+  void _completeMatching() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('매칭 완료'),
+        content: const Text('이 매칭을 완료 상태로 변경하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // TODO: 매칭 상태를 'completed'로 변경하는 로직 구현
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('매칭이 완료되었습니다.'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            },
+            child: const Text('완료'),
           ),
         ],
       ),

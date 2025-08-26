@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Primary Colors
-  static const Color primary = Color(0xFF1D9A6C); // 테니스 코트 그린
-  static const Color accent = Color(0xFFF5D547); // 테니스볼 옐로우
+  // Energetic Mint Palette (기획문서 v1.4 기준)
+  static const Color primary = Color(0xFF00C49A); // Mint Green - 메인 컬러
+  static const Color secondary = Color(0xFFFFB347); // Light Orange - 강조 버튼
+  static const Color accent = Color(0xFFFFF3B0); // Cream Yellow - 배경 강조
+  static const Color textSurface = Color(0xFF2F3E46); // Charcoal Navy - 기본 텍스트
   
   // Background Colors
   static const Color background = Color(0xFFF8F8F8);
   static const Color surface = Color(0xFFFFFFFF);
   
   // Text Colors
-  static const Color textPrimary = Color(0xFF333333);
+  static const Color textPrimary = textSurface; // Charcoal Navy 사용
   static const Color textSecondary = Color(0xFF777777);
   
   // Status Colors
@@ -20,9 +22,10 @@ class AppColors {
   static const Color info = Color(0xFF1890FF);
   
   // Button Colors
-  static const Color buttonPrimary = primary;
-  static const Color buttonSecondary = surface;
-  static const Color buttonDisabled = Color(0xFFD9D9D9);
+  static const Color buttonPrimary = primary; // Mint Green
+  static const Color buttonSecondary = surface; // White
+  static const Color buttonChat = secondary; // Light Orange - 채팅하기 버튼
+  static const Color buttonDisabled = Color(0xFFE0E0E0); // Gray 300
   
   // Card Colors
   static const Color cardBackground = surface;

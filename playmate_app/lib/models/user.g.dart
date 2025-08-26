@@ -15,6 +15,7 @@ User _$UserFromJson(Map<String, dynamic> json) => User(
   region: json['region'] as String?,
   skillLevel: (json['skillLevel'] as num?)?.toInt(),
   startYearMonth: json['startYearMonth'] as String?,
+  ntrpScore: (json['ntrpScore'] as num?)?.toDouble(),
   preferredCourt: json['preferredCourt'] as String?,
   preferredTime: (json['preferredTime'] as List<dynamic>?)
       ?.map((e) => e as String)
@@ -30,6 +31,7 @@ User _$UserFromJson(Map<String, dynamic> json) => User(
       ?.map((e) => (e as num).toInt())
       .toList(),
   bio: json['bio'] as String?,
+  reviewCount: (json['reviewCount'] as num?)?.toInt(),
   createdAt: DateTime.parse(json['createdAt'] as String),
   updatedAt: DateTime.parse(json['updatedAt'] as String),
 );
@@ -43,6 +45,7 @@ Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
   'region': instance.region,
   'skillLevel': instance.skillLevel,
   'startYearMonth': instance.startYearMonth,
+  'ntrpScore': instance.ntrpScore,
   'preferredCourt': instance.preferredCourt,
   'preferredTime': instance.preferredTime,
   'playStyle': instance.playStyle,
@@ -52,6 +55,7 @@ Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
   'followingIds': instance.followingIds,
   'followerIds': instance.followerIds,
   'bio': instance.bio,
+  'reviewCount': instance.reviewCount,
   'createdAt': instance.createdAt.toIso8601String(),
   'updatedAt': instance.updatedAt.toIso8601String(),
 };

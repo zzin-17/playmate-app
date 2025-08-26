@@ -22,6 +22,7 @@ class User {
   List<int>? followingIds; // 팔로우하는 사용자 ID 목록
   List<int>? followerIds;  // 팔로워 ID 목록
   final String? bio;             // 자기소개
+  final int? reviewCount;        // 받은 후기 개수
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -44,12 +45,62 @@ class User {
     this.followingIds,
     this.followerIds,
     this.bio,
+    this.reviewCount,
     required this.createdAt,
     required this.updatedAt,
   });
 
   factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);
   Map<String, dynamic> toJson() => _$UserToJson(this);
+
+  // copyWith 메서드
+  User copyWith({
+    int? id,
+    String? email,
+    String? nickname,
+    String? gender,
+    int? birthYear,
+    String? region,
+    int? skillLevel,
+    String? startYearMonth,
+    double? ntrpScore,
+    String? preferredCourt,
+    List<String>? preferredTime,
+    String? playStyle,
+    bool? hasLesson,
+    double? mannerScore,
+    String? profileImage,
+    List<int>? followingIds,
+    List<int>? followerIds,
+    String? bio,
+    int? reviewCount,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return User(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      nickname: nickname ?? this.nickname,
+      gender: gender ?? this.gender,
+      birthYear: birthYear ?? this.birthYear,
+      region: region ?? this.region,
+      skillLevel: skillLevel ?? this.skillLevel,
+      startYearMonth: startYearMonth ?? this.startYearMonth,
+      ntrpScore: ntrpScore ?? this.ntrpScore,
+      preferredCourt: preferredCourt ?? this.preferredCourt,
+      preferredTime: preferredTime ?? this.preferredTime,
+      playStyle: playStyle ?? this.playStyle,
+      hasLesson: hasLesson ?? this.hasLesson,
+      mannerScore: mannerScore ?? this.mannerScore,
+      profileImage: profileImage ?? this.profileImage,
+      followingIds: followingIds ?? this.followingIds,
+      followerIds: followerIds ?? this.followerIds,
+      bio: bio ?? this.bio,
+      reviewCount: reviewCount ?? this.reviewCount,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 
   // 스킬 레벨 텍스트 변환
   String get skillLevelText {

@@ -6,7 +6,8 @@ import 'providers/auth_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/main_screen.dart';
 import 'screens/home/home_screen.dart';
-import 'screens/community/write_post_screen.dart';
+import 'screens/community/create_post_screen.dart';
+
 import 'constants/app_colors.dart';
 import 'constants/app_text_styles.dart';
 import 'services/notification_service.dart';
@@ -129,7 +130,7 @@ class PlayMateApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/main': (context) => const MainScreen(),
           '/home': (context) => const HomeScreen(),
-          '/write-post': (context) => const WritePostScreen(),
+          '/write-post': (context) => const CreatePostScreen(),
         },
       ),
     );

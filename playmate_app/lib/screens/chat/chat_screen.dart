@@ -9,6 +9,9 @@ import '../../widgets/common/app_text_field.dart';
 import '../review/write_review_screen.dart';
 import '../review/review_list_screen.dart';
 import '../../services/notification_service.dart';
+import '../../services/websocket_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class ChatScreen extends StatefulWidget {
   final Matching matching;
@@ -32,18 +35,24 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isHost = false;
   bool _hasApplied = false;
   bool _isMatchingConfirmed = false;
+  
+  // WebSocket 관련 상태
+  bool _isWebSocketConnected = false;
+  String _connectionStatus = '연결 중...';
 
   @override
   void initState() {
     super.initState();
     _isHost = widget.currentUser.id == widget.matching.host.id;
     _loadInitialMessages();
+    _connectWebSocket();
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _disconnectWebSocket();
     super.dispose();
   }
 
@@ -82,61 +91,120 @@ class _ChatScreenState extends State<ChatScreen> {
     ]);
   }
 
-  void _confirmMatching() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('매칭 확정'),
-          content: const Text('정말로 이 매칭을 확정하시겠습니까?\n확정 후에는 수정할 수 없습니다.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('취소'),
+  // WebSocket 연결
+  void _connectWebSocket() {
+    try {
+      final wsService = WebSocketService.instance;
+      
+      // 연결 상태 리스너
+      wsService.statusStream.listen((status) {
+        setState(() {
+          switch (status) {
+            case 'connected':
+              _isWebSocketConnected = true;
+              _connectionStatus = '연결됨';
+              break;
+            case 'disconnected':
+              _isWebSocketConnected = false;
+              _connectionStatus = '연결 끊김';
+              break;
+            case 'error':
+              _isWebSocketConnected = false;
+              _connectionStatus = '연결 오류';
+              break;
+          }
+        });
+      });
+      
+      // 메시지 리스너
+      wsService.messageStream.listen((message) {
+        setState(() {
+          _messages.add(message);
+        });
+        
+        // 스크롤을 맨 아래로
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              _scrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      });
+      
+      // WebSocket 연결
+      wsService.connect(widget.matching.id.toString(), widget.currentUser.id.toString());
+      
+    } catch (e) {
+      print('WebSocket 연결 실패: $e');
+      setState(() {
+        _isWebSocketConnected = false;
+        _connectionStatus = '연결 실패';
+      });
+    }
+  }
+  
+  // WebSocket 연결 해제
+  void _disconnectWebSocket() {
+    try {
+      WebSocketService.instance.disconnect();
+    } catch (e) {
+      print('WebSocket 연결 해제 실패: $e');
+    }
+  }
+
+  // 연결 상태 표시 위젯
+  Widget _buildConnectionStatus() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: _isWebSocketConnected 
+            ? AppColors.success.withValues(alpha: 0.1)
+            : AppColors.error.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _isWebSocketConnected 
+              ? AppColors.success.withValues(alpha: 0.3)
+              : AppColors.error.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            _isWebSocketConnected ? Icons.wifi : Icons.wifi_off,
+            size: 16,
+            color: _isWebSocketConnected ? AppColors.success : AppColors.error,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _connectionStatus,
+            style: AppTextStyles.caption.copyWith(
+              color: _isWebSocketConnected ? AppColors.success : AppColors.error,
+              fontWeight: FontWeight.w500,
             ),
+          ),
+          const Spacer(),
+          if (!_isWebSocketConnected)
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _processMatchingConfirmation();
-              },
-              child: const Text(
-                '확정',
-                style: TextStyle(color: AppColors.primary),
+              onPressed: _connectWebSocket,
+              child: Text(
+                '재연결',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _processMatchingConfirmation() {
-    // 매칭 상태를 'confirmed'로 변경
-    setState(() {
-      _isMatchingConfirmed = true;
-      // TODO: 실제 API 호출로 매칭 상태 업데이트
-    });
-
-    // 시스템 메시지 추가
-    _messages.add(
-      ChatMessage.systemMessage(
-        matchingId: widget.matching.id,
-        message: '매칭이 확정되었습니다! 🎾',
-        createdAt: DateTime.now(),
-      ),
-    );
-
-    // 매칭 확정 알림 보내기
-    _sendMatchingConfirmedNotification();
-
-    // 성공 메시지 표시
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('매칭이 확정되었습니다!'),
-        backgroundColor: AppColors.success,
+        ],
       ),
     );
   }
+
+
 
   /// 매칭 확정 알림 전송
   void _sendMatchingConfirmedNotification() {
@@ -301,6 +369,12 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          // WebSocket 연결 상태 표시
+          _buildConnectionStatus(),
+          
+          // 참여자 온라인 상태 표시
+          _buildParticipantsStatus(),
+          
           // 매칭 상태 표시
           _buildMatchingStatus(),
           
@@ -321,22 +395,26 @@ class _ChatScreenState extends State<ChatScreen> {
           
           // 메시지 입력 영역
           _buildMessageInput(),
+
         ],
       ),
     );
   }
 
   Widget _buildMatchingStatus() {
-    if (!_isHost || widget.matching.status != 'recruiting') {
+    if (!_isHost) {
       return const SizedBox.shrink();
     }
+
+    // 매칭 상태에 따라 버튼 표시 결정
+    final isConfirmed = widget.matching.status == 'confirmed' || _isMatchingConfirmed;
 
     return Container(
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.all(16),
       child: Column(
         children: [
-          if (!_isMatchingConfirmed) ...[
+          if (!isConfirmed) ...[
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -367,28 +445,90 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             const SizedBox(height: 12),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  text: '매칭확정',
-                  icon: Icons.check_circle,
-                  type: ButtonType.primary,
+            Row(
+              children: [
+                Expanded(
+                                  child: ElevatedButton(
                   onPressed: _confirmMatching,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        '매칭확정',
+                        style: AppTextStyles.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ),
+              ],
+            ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.success.withValues(alpha: 0.2),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AppButton(
-                  text: '후기작성',
-                  icon: Icons.rate_review,
-                  type: ButtonType.secondary,
-                  onPressed: _isMatchingConfirmed ? _writeReview : null,
-                ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: AppColors.success,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '매칭이 확정되었습니다!',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    text: '확정 취소',
+                    icon: Icons.cancel,
+                    type: ButtonType.secondary,
+                    onPressed: _cancelMatchingConfirmation,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppButton(
+                    text: '후기작성',
+                    icon: Icons.rate_review,
+                    type: ButtonType.primary,
+                    onPressed: _writeReview,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -476,19 +616,23 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     border: !isMyMessage ? Border.all(color: AppColors.cardBorder) : null,
                   ),
-                  child: Text(
-                    message.message,
-                    style: AppTextStyles.body.copyWith(
-                      color: isMyMessage ? AppColors.surface : AppColors.textPrimary,
-                    ),
-                  ),
+                  child: _buildMessageContent(message),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  _formatTime(message.createdAt),
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _formatTime(message.createdAt),
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    if (isMyMessage) ...[
+                      const SizedBox(width: 8),
+                      _buildMessageStatus(message),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -509,6 +653,265 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  // 메시지 내용 표시 (텍스트, 이미지, 위치 등)
+  Widget _buildMessageContent(ChatMessage message) {
+    switch (message.messageType) {
+      case 'image':
+        return _buildImageMessage(message);
+      case 'location':
+        return _buildLocationMessage(message);
+      default:
+        return Text(
+          message.message,
+          style: AppTextStyles.body.copyWith(
+            color: message.senderId == widget.currentUser.id 
+                ? AppColors.surface 
+                : AppColors.textPrimary,
+          ),
+        );
+    }
+  }
+
+  // 이미지 메시지 표시
+  Widget _buildImageMessage(ChatMessage message) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (message.imageUrl != null)
+          Container(
+            width: 200,
+            height: 150,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.cardBorder),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                File(message.imageUrl!),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: AppColors.background,
+                    child: Icon(
+                      Icons.image_not_supported,
+                      color: AppColors.textSecondary,
+                      size: 32,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        Text(
+          message.message,
+          style: AppTextStyles.body.copyWith(
+            color: message.senderId == widget.currentUser.id 
+                ? AppColors.surface 
+                : AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 위치 메시지 표시
+  Widget _buildLocationMessage(ChatMessage message) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 200,
+          height: 120,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.cardBorder),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              color: AppColors.background,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.location_on,
+                    color: AppColors.primary,
+                    size: 32,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message.locationName ?? '위치',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (message.latitude != null && message.longitude != null)
+                    Text(
+                      '${message.latitude!.toStringAsFixed(4)}, ${message.longitude!.toStringAsFixed(4)}',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 10,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          message.message,
+          style: AppTextStyles.body.copyWith(
+            color: message.senderId == widget.currentUser.id 
+                ? AppColors.surface 
+                : AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 메시지 상태 표시 (읽음 확인)
+  Widget _buildMessageStatus(ChatMessage message) {
+    switch (message.status) {
+      case 'sent':
+        return Icon(
+          Icons.check,
+          size: 12,
+          color: AppColors.textSecondary.withValues(alpha: 0.6),
+        );
+      case 'delivered':
+        return Icon(
+          Icons.done_all,
+          size: 12,
+          color: AppColors.textSecondary.withValues(alpha: 0.6),
+        );
+      case 'read':
+        return Icon(
+          Icons.done_all,
+          size: 12,
+          color: AppColors.primary,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  // 참여자 온라인 상태 표시
+  Widget _buildParticipantsStatus() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '참여자',
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              // 호스트
+              _buildParticipantStatus(
+                widget.matching.host,
+                isOnline: _isWebSocketConnected,
+                isHost: true,
+              ),
+              const SizedBox(width: 16),
+              // 게스트들
+              if (widget.matching.guests != null)
+                ...widget.matching.guests!.map((guest) => 
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: _buildParticipantStatus(
+                      guest,
+                      isOnline: _isWebSocketConnected,
+                      isHost: false,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 개별 참여자 상태 표시
+  Widget _buildParticipantStatus(User user, {required bool isOnline, required bool isHost}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Stack(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+              child: Text(
+                user.nickname.substring(0, 1),
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            // 온라인 상태 표시
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: isOnline ? AppColors.success : AppColors.textSecondary,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.surface,
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              user.nickname,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Text(
+              isHost ? '호스트' : '게스트',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -546,6 +949,32 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Row(
         children: [
+          // 이미지 첨부 버튼
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.image, color: AppColors.textPrimary),
+              onPressed: _isLoading ? null : _pickImage,
+              tooltip: '이미지 첨부',
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 위치 공유 버튼
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.secondary,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.location_on, color: Colors.white),
+              onPressed: _isLoading ? null : _shareLocation,
+              tooltip: '위치 공유',
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: AppTextField(
               controller: _messageController,
@@ -578,7 +1007,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _isLoading = true;
     });
 
-    // 새 메시지 추가
+    // 새 메시지 추가 (초기 상태: sent)
     final newMessage = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch,
       matchingId: widget.matching.id,
@@ -586,6 +1015,7 @@ class _ChatScreenState extends State<ChatScreen> {
       senderName: widget.currentUser.nickname,
       message: message,
       createdAt: DateTime.now(),
+      status: 'sent',
     );
 
     setState(() {
@@ -596,7 +1026,31 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
     _scrollToBottom();
 
-    // TODO: 실제 API 호출로 변경
+    // WebSocket을 통해 메시지 전송
+    _sendMessageViaWebSocket(newMessage);
+  }
+
+  // WebSocket을 통한 메시지 전송 및 상태 업데이트
+  Future<void> _sendMessageViaWebSocket(ChatMessage message) async {
+    try {
+      // WebSocket으로 메시지 전송
+      await WebSocketService.instance.sendMessage(message);
+      
+      // 전송 성공 시 상태를 'delivered'로 업데이트
+      setState(() {
+        final index = _messages.indexWhere((m) => m.id == message.id);
+        if (index != -1) {
+          _messages[index] = message.copyWith(
+            status: 'delivered',
+            deliveredAt: DateTime.now(),
+          );
+        }
+      });
+      
+    } catch (e) {
+      print('WebSocket 메시지 전송 실패: $e');
+      // 전송 실패 시 상태를 'sent'로 유지
+    }
   }
 
   void _scrollToBottom() {
@@ -609,6 +1063,118 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     });
+  }
+
+  // 이미지 선택
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
+      );
+
+      if (image != null) {
+        // 이미지 메시지 생성 및 전송
+        await _sendImageMessage(image);
+      }
+    } catch (e) {
+      print('이미지 선택 오류: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('이미지 선택 중 오류가 발생했습니다: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  // 이미지 메시지 전송
+  Future<void> _sendImageMessage(XFile imageFile) async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // 이미지 메시지 생성
+      final imageMessage = ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch,
+        matchingId: widget.matching.id,
+        senderId: widget.currentUser.id,
+        senderName: widget.currentUser.nickname,
+        message: '이미지를 공유했습니다.',
+        messageType: 'image',
+        imageUrl: imageFile.path, // 실제로는 서버에 업로드 후 URL 사용
+        createdAt: DateTime.now(),
+        status: 'sent',
+      );
+
+      setState(() {
+        _messages.add(imageMessage);
+        _isLoading = false;
+      });
+
+      _scrollToBottom();
+
+      // WebSocket을 통해 이미지 메시지 전송
+      _sendMessageViaWebSocket(imageMessage);
+
+    } catch (e) {
+      print('이미지 메시지 생성 오류: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // 위치 공유
+  Future<void> _shareLocation() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // 현재 위치 가져오기 (실제로는 geolocator 패키지 사용)
+      // 여기서는 임시로 매칭 코트 위치 사용
+      final locationMessage = ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch,
+        matchingId: widget.matching.id,
+        senderId: widget.currentUser.id,
+        senderName: widget.currentUser.nickname,
+        message: '위치를 공유했습니다.',
+        messageType: 'location',
+        latitude: widget.matching.courtLat,
+        longitude: widget.matching.courtLng,
+        locationName: widget.matching.courtName,
+        createdAt: DateTime.now(),
+        status: 'sent',
+      );
+
+      setState(() {
+        _messages.add(locationMessage);
+        _isLoading = false;
+      });
+
+      _scrollToBottom();
+
+      // WebSocket을 통해 위치 메시지 전송
+      _sendMessageViaWebSocket(locationMessage);
+
+    } catch (e) {
+      print('위치 공유 오류: $e');
+      setState(() {
+        _isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('위치 공유 중 오류가 발생했습니다: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   void _showMatchingInfo() {
@@ -709,5 +1275,166 @@ class _ChatScreenState extends State<ChatScreen> {
       default:
         return '알 수 없음';
     }
+  }
+
+  // 매칭 확정 버튼 위젯
+  Widget _buildMatchingConfirmationButton() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: AppButton(
+              onPressed: _confirmMatching,
+              text: '매칭 확정',
+              type: ButtonType.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 매칭 확정 함수
+  void _confirmMatching() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('매칭 확정'),
+          content: const Text('정말로 이 매칭을 확정하시겠습니까?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _processMatchingConfirmation();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.success,
+              ),
+              child: const Text('확정'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 매칭 확정 처리
+  void _processMatchingConfirmation() {
+    setState(() {
+      _isMatchingConfirmed = true;
+    });
+
+    // 시스템 메시지 추가
+    _messages.add(
+      ChatMessage.systemMessage(
+        matchingId: widget.matching.id,
+        message: '${widget.matching.host.nickname}님이 매칭을 확정했습니다.',
+        createdAt: DateTime.now(),
+      ),
+    );
+
+    // 매칭 상태를 'confirmed'로 변경
+    // 실제 앱에서는 API 호출을 통해 서버에 상태 변경 요청
+    // widget.matching.status = 'confirmed';
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('매칭이 확정되었습니다!'),
+        backgroundColor: AppColors.success,
+      ),
+    );
+
+    // 스크롤을 맨 아래로
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  // 매칭 확정 취소 함수
+  void _cancelMatchingConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('확정 취소'),
+          content: const Text('정말로 매칭 확정을 취소하시겠습니까?\n\n확정 취소 후에는 다시 모집 상태로 돌아갑니다.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('아니오'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _processMatchingCancellation();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+              ),
+              child: const Text('취소'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 매칭 확정 취소 처리
+  void _processMatchingCancellation() {
+    setState(() {
+      _isMatchingConfirmed = false;
+    });
+
+    // 시스템 메시지 추가
+    _messages.add(
+      ChatMessage.systemMessage(
+        matchingId: widget.matching.id,
+        message: '${widget.matching.host.nickname}님이 매칭 확정을 취소했습니다.',
+        createdAt: DateTime.now(),
+      ),
+    );
+
+    // TODO: 실제 매칭 상태를 'recruiting'으로 변경하는 로직 구현
+    // widget.matching.status = 'recruiting';
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('매칭 확정이 취소되었습니다.'),
+        backgroundColor: AppColors.warning,
+      ),
+    );
+
+    // 스크롤을 맨 아래로
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 } 

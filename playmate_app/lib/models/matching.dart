@@ -17,6 +17,8 @@ class Matching {
   final String timeSlot;
   final int? minLevel;
   final int? maxLevel;
+  final int? minAge; // 최소 연령대 (10, 20, 30, 40, 50, 60)
+  final int? maxAge; // 최대 연령대 (10, 20, 30, 40, 50, 60)
 
   final String gameType; // 'mixed', 'male_doubles', 'female_doubles', 'singles', 'rally'
   final int maleRecruitCount;
@@ -30,6 +32,14 @@ class Matching {
   final DateTime createdAt;
   final DateTime updatedAt;
   final int? recoveryCount; // 취소된 매칭을 모집중으로 복구한 횟수
+  
+  // 신청 상태 관련 필드들 추가
+  final List<int>? appliedUserIds; // 신청한 사용자 ID 목록
+  final List<int>? confirmedUserIds; // 확정된 사용자 ID 목록
+  
+  // 상태 변경 시간 기록
+  final DateTime? completedAt; // 완료된 시간
+  final DateTime? cancelledAt; // 취소된 시간
 
   Matching({
     required this.id,
@@ -41,6 +51,8 @@ class Matching {
     required this.timeSlot,
     this.minLevel,
     this.maxLevel,
+    this.minAge,
+    this.maxAge,
 
     required this.gameType,
     required this.maleRecruitCount,
@@ -54,6 +66,10 @@ class Matching {
     required this.createdAt,
     required this.updatedAt,
     this.recoveryCount,
+    this.appliedUserIds, // 신청한 사용자 ID 목록
+    this.confirmedUserIds, // 확정된 사용자 ID 목록
+    this.completedAt, // 완료된 시간
+    this.cancelledAt, // 취소된 시간
   });
 
   factory Matching.fromJson(Map<String, dynamic> json) => _$MatchingFromJson(json);
@@ -70,6 +86,8 @@ class Matching {
     String? timeSlot,
     int? minLevel,
     int? maxLevel,
+    int? minAge,
+    int? maxAge,
     String? gameType,
     int? maleRecruitCount,
     int? femaleRecruitCount,
@@ -82,6 +100,10 @@ class Matching {
     DateTime? createdAt,
     DateTime? updatedAt,
     int? recoveryCount,
+    List<int>? appliedUserIds, // 신청한 사용자 ID 목록
+    List<int>? confirmedUserIds, // 확정된 사용자 ID 목록
+    DateTime? completedAt, // 완료된 시간
+    DateTime? cancelledAt, // 취소된 시간
   }) {
     return Matching(
       id: id ?? this.id,
@@ -105,6 +127,10 @@ class Matching {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       recoveryCount: recoveryCount ?? this.recoveryCount,
+      appliedUserIds: appliedUserIds ?? this.appliedUserIds, // 신청한 사용자 ID 목록
+      confirmedUserIds: confirmedUserIds ?? this.confirmedUserIds, // 확정된 사용자 ID 목록
+      completedAt: completedAt ?? this.completedAt, // 완료된 시간
+      cancelledAt: cancelledAt ?? this.cancelledAt, // 취소된 시간
     );
   }
 
@@ -115,6 +141,15 @@ class Matching {
     if (maxLevel == null) return '$minLevel년~';
     if (minLevel == maxLevel) return '$minLevel년';
     return '$minLevel년-$maxLevel년';
+  }
+
+  // 연령대 범위 텍스트
+  String get ageRangeText {
+    if (minAge == null && maxAge == null) return '연령대 제한없음';
+    if (minAge == null) return '~${maxAge}대';
+    if (maxAge == null) return '${minAge}대~';
+    if (minAge == maxAge) return '${minAge}대';
+    return '${minAge}대-${maxAge}대';
   }
 
   // 게임 유형 텍스트
@@ -182,6 +217,113 @@ class Matching {
       return '${total}명 (여$femaleRecruitCount)';
     } else {
       return '${total}명';
+    }
+  }
+
+  // 신청 상태 관련 getter 메서드들
+  
+  // 특정 사용자가 신청했는지 확인
+  bool isAppliedBy(int userId) {
+    return appliedUserIds?.contains(userId) ?? false;
+  }
+  
+  // 특정 사용자가 확정되었는지 확인
+  bool isConfirmedBy(int userId) {
+    return confirmedUserIds?.contains(userId) ?? false;
+  }
+  
+  // 신청 가능한지 확인 (모집중 상태이고 신청하지 않은 경우)
+  bool get canApply {
+    return status == 'recruiting';
+  }
+  
+  // 신청 취소 가능한지 확인 (신청한 상태인 경우)
+  bool canCancel(int userId) {
+    return isAppliedBy(userId) && !isConfirmedBy(userId);
+  }
+  
+  // 신청자 수
+  int get appliedCount {
+    return appliedUserIds?.length ?? 0;
+  }
+  
+  // 확정된 신청자 수
+  int get confirmedCount {
+    return confirmedUserIds?.length ?? 0;
+  }
+  
+  // 남은 모집 인원
+  int get remainingCount {
+    final total = maleRecruitCount + femaleRecruitCount;
+    return total - confirmedCount;
+  }
+  
+  // 모집 완료 여부
+  bool get isFullyBooked {
+    return remainingCount <= 0;
+  }
+
+  // 실제 매칭 상태 (모집 완료 여부에 따라 동적 계산)
+  String get actualStatus {
+    if (isFullyBooked) {
+      return 'confirmed'; // 모든 인원이 확정되면 '확정' 상태
+    } else {
+      return 'recruiting'; // 아직 모집 가능하면 '모집중' 상태
+    }
+  }
+
+  // 실제 상태 텍스트 (동적 계산된 상태 기반)
+  String get actualStatusText {
+    switch (actualStatus) {
+      case 'recruiting':
+        return '모집중';
+      case 'confirmed':
+        return '확정';
+      case 'completed':
+        return '완료';
+      case 'cancelled':
+        return '취소';
+      case 'deleted':
+        return '삭제됨';
+      default:
+        return '알 수 없음';
+    }
+  }
+
+  // 확정된 사용자들의 성별별 인원 수 (guests 리스트에서 계산)
+  Map<String, int> get confirmedGenderCount {
+    if (guests == null || guests!.isEmpty) {
+      return {'male': 0, 'female': 0};
+    }
+    
+    int maleCount = 0;
+    int femaleCount = 0;
+    
+    for (final guest in guests!) {
+      if (guest.gender == 'male') {
+        maleCount++;
+      } else if (guest.gender == 'female') {
+        femaleCount++;
+      }
+    }
+    
+    return {'male': maleCount, 'female': femaleCount};
+  }
+
+  // 확정된 사용자들의 성별별 인원 수 텍스트
+  String get confirmedGenderCountText {
+    final genderCount = confirmedGenderCount;
+    final maleCount = genderCount['male'] ?? 0;
+    final femaleCount = genderCount['female'] ?? 0;
+    
+    if (maleCount > 0 && femaleCount > 0) {
+      return '남$maleCount, 여$femaleCount';
+    } else if (maleCount > 0) {
+      return '남$maleCount';
+    } else if (femaleCount > 0) {
+      return '여$femaleCount';
+    } else {
+      return '';
     }
   }
 } 

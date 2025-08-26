@@ -70,7 +70,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             title: '기본 정보',
             child: Column(
               children: [
-                _buildInfoRow('닉네임', widget.user.nickname),
+
                 _buildInfoRow('성별', widget.user.genderText),
                 if (widget.user.birthYear != null)
                   _buildInfoRow('연령대', widget.user.ageDecadeText),
@@ -85,6 +85,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             child: Column(
               children: [
                 _buildInfoRow('구력', widget.user.experienceText),
+                _buildInfoRow('NTRP 점수', widget.user.ntrpScoreText),
+                _buildInfoRow('NTRP 레벨', widget.user.skillLevelText),
                 if (widget.user.preferredCourt != null)
                   _buildInfoRow('선호 코트', widget.user.preferredCourt!),
                 if (widget.user.preferredTime != null && widget.user.preferredTime!.isNotEmpty)
@@ -97,47 +99,85 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
           const SizedBox(height: 16),
           _buildSection(
-            title: '매너 점수',
+            title: '리뷰',
             child: Column(
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.star_rounded,
-                      color: AppColors.primary,
-                      size: 24,
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.accent.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              '매너',
+                              style: AppTextStyles.body.copyWith(
+                                color: AppColors.accent,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: 20,
+                              height: 2,
+                              decoration: BoxDecoration(
+                                color: AppColors.accent,
+                                borderRadius: BorderRadius.circular(1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      widget.user.mannerScoreText,
-                      style: AppTextStyles.h2.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              'NTRP',
+                              style: AppTextStyles.body.copyWith(
+                                color: AppColors.primary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: 20,
+                              height: 2,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(1),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '매칭 참여 시 상대방의 매너를 평가할 수 있습니다.',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
+                const SizedBox(height: 16),
+                _buildReviewsPreview(),
               ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          _buildSection(
-            title: '후기',
-            child: _buildReviewsPreview(),
-          ),
-          const SizedBox(height: 16),
-          _buildSection(
-            title: '가입일',
-            child: Text(
-              '${widget.user.createdAt.year}년 ${widget.user.createdAt.month}월 ${widget.user.createdAt.day}일',
-              style: AppTextStyles.body,
             ),
           ),
         ],
@@ -213,14 +253,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 widget.user.nickname,
                 style: AppTextStyles.h2.copyWith(
                   fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                widget.isHost ? '매칭 호스트' : '게스트',
-                style: AppTextStyles.body.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],

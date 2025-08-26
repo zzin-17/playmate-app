@@ -9,7 +9,7 @@ import '../../models/user.dart';
 import '../../models/location.dart';
 import '../matching/create_matching_screen.dart';
 import '../matching/matching_detail_screen.dart';
-import '../profile/my_profile_screen.dart';
+
 
 import '../../widgets/common/app_logo.dart';
 import '../../widgets/common/date_range_calendar.dart';
@@ -36,7 +36,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _filterTabController = TabController(length: 5, vsync: this);
-    _filteredMatchings = List.from(_mockMatchings);
+    
+    // 매칭 데이터 초기화
+    _createMockMatchings();
     
     // 위치 데이터 초기화 (디폴트로 선택 안됨)
     _locationData = LocationData.cities;
@@ -50,6 +52,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     // 자동 완료 처리 타이머 시작
     _startAutoCompletionTimer();
+    
+    // 실시간 업데이트 타이머 시작
+    _startAutoRefreshTimer();
   }
 
   @override
@@ -66,6 +71,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void dispose() {
     _filterTabController.dispose();
     _searchController.dispose();
+    _autoRefreshTimer?.cancel(); // 실시간 업데이트 타이머 정리
+    _autoCompleteTimer?.cancel(); // 자동 완료 타이머 정리
     super.dispose();
   }
   
@@ -74,6 +81,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<String> _selectedGameTypes = [];
   String? _selectedSkillLevel;
   String? _selectedEndSkillLevel;
+  String? _selectedMinAge;
+  String? _selectedMaxAge;
   bool _showOnlyRecruiting = false;
   bool _showOnlyFollowing = false; // 팔로우만 보기 추가
   DateTime? _startDate;
@@ -96,7 +105,297 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // UI 상태 변수들
   bool _isLoading = false;
   String? _errorMessage;
+  
+  // 실시간 업데이트 관련 변수들
+  Timer? _autoRefreshTimer;
+  Timer? _autoCompleteTimer; // 자동 완료 타이머 추가
+  static const Duration _refreshInterval = Duration(seconds: 30); // 30초마다 새로고침
+  static const Duration _completeCheckInterval = Duration(minutes: 1); // 1분마다 완료 체크
 
+  // 연령대 옵션들
+  static const List<String> _ageOptions = [
+    '10대', '20대', '30대', '40대', '50대', '60대~'
+  ];
+
+
+  // 매칭 데이터 초기화 함수
+  void _createMockMatchings() {
+    _mockMatchings = [
+      _createMockMatching(
+        id: 1,
+        courtName: '잠실종합운동장',
+        courtLat: 37.512,
+        courtLng: 127.102,
+        date: DateTime.now().add(const Duration(days: 1)),
+        timeSlot: '18:00~20:00',
+        minLevel: 2,
+        maxLevel: 4,
+        minAge: 20,
+        maxAge: 30,
+        gameType: 'mixed',
+        maleRecruitCount: 1,
+        femaleRecruitCount: 1,
+        status: 'confirmed',
+        host: User(
+          id: 1,
+          email: 'host@example.com',
+          nickname: '테린이',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ),
+      _createMockMatching(
+        id: 2,
+        courtName: '양재시민의숲',
+        courtLat: 37.469,
+        courtLng: 127.038,
+        date: DateTime.now().add(const Duration(days: 2)),
+        timeSlot: '20:00~22:00',
+        minLevel: 3,
+        maxLevel: 5,
+        minAge: 25,
+        maxAge: 40,
+        gameType: 'male_doubles',
+        maleRecruitCount: 2,
+        femaleRecruitCount: 0,
+        status: 'recruiting',
+        isFollowersOnly: true, // 팔로워 전용 공개
+        host: User(
+          id: 2,
+          email: 'player@example.com',
+          nickname: '테니스마스터',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ),
+      // 추가 매칭 데이터 (위치 필터 테스트용)
+      _createMockMatching(
+        id: 3,
+        courtName: '올림픽공원 테니스장',
+        courtLat: 37.521,
+        courtLng: 127.128,
+        date: DateTime.now().add(const Duration(days: 3)),
+        timeSlot: '14:00~16:00',
+        minLevel: 1,
+        maxLevel: 3,
+        minAge: 18,
+        maxAge: 35,
+        gameType: 'mixed',
+        maleRecruitCount: 1,
+        femaleRecruitCount: 1,
+        status: 'recruiting',
+        host: User(
+          id: 3,
+          email: 'tennis@example.com',
+          nickname: '테니스초보',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ),
+      _createMockMatching(
+        id: 4,
+        courtName: '한강공원 테니스장',
+        courtLat: 37.528,
+        courtLng: 126.933,
+        date: DateTime.now().add(const Duration(days: 4)),
+        timeSlot: '16:00~18:00',
+        minLevel: 4,
+        maxLevel: 6,
+        minAge: 30,
+        maxAge: 50,
+        gameType: 'singles',
+        maleRecruitCount: 0,
+        femaleRecruitCount: 1,
+        status: 'recruiting',
+        host: User(
+          id: 4,
+          email: 'pro@example.com',
+          nickname: '테니스프로',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ),
+      // 다양한 지역의 매칭 추가 (위치 필터 테스트용)
+      _createMockMatching(
+        id: 5,
+        courtName: '분당테니스장',
+        courtLat: 37.350,
+        courtLng: 127.108,
+        date: DateTime.now().add(const Duration(days: 5)),
+        timeSlot: '10:00~12:00',
+        minLevel: 2,
+        maxLevel: 4,
+        minAge: 20,
+        maxAge: 45,
+        gameType: 'female_doubles',
+        maleRecruitCount: 0,
+        femaleRecruitCount: 2,
+        status: 'recruiting',
+        host: User(
+          id: 5,
+          email: 'bundang@example.com',
+          nickname: '분당테니스',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ),
+      _createMockMatching(
+        id: 6,
+        courtName: '인천대공원 테니스장',
+        courtLat: 37.448,
+        courtLng: 126.752,
+        date: DateTime.now().add(const Duration(days: 6)),
+        timeSlot: '19:00~21:00',
+        minLevel: 3,
+        maxLevel: 5,
+        minAge: 25,
+        maxAge: 55,
+        gameType: 'mixed',
+        maleRecruitCount: 1,
+        femaleRecruitCount: 1,
+        status: 'recruiting',
+        host: User(
+          id: 6,
+          email: 'incheon@example.com',
+          nickname: '인천테니스',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      ),
+    ];
+    
+    // 필터링된 목록 초기화
+    _filteredMatchings = List.from(_mockMatchings);
+  }
+
+  // 매칭 데이터 자동 생성 함수
+  Matching _createMockMatching({
+    required int id,
+    required String courtName,
+    required double courtLat,
+    required double courtLng,
+    required DateTime date,
+    required String timeSlot,
+    required int minLevel,
+    required int maxLevel,
+    int? minAge,
+    int? maxAge,
+    required String gameType,
+    required int maleRecruitCount,
+    required int femaleRecruitCount,
+    required String status,
+    required User host,
+    bool isFollowersOnly = false,
+  }) {
+    final totalRecruitCount = maleRecruitCount + femaleRecruitCount;
+    
+    // 자동으로 게스트와 확정 인원 생성
+    List<User> guests = [];
+    List<int> confirmedUserIds = [];
+    
+    if (status == 'recruiting' || status == 'confirmed') {
+      // 모집중/확정 상태면 자동으로 게스트 생성
+      int guestId = id * 10; // 고유한 게스트 ID 생성
+      
+      // 확정 인원 수를 다양하게 설정 (테스트용)
+      int confirmedCount = 0;
+      
+      // ID별로 다른 확정 인원 수 설정
+      switch (id) {
+        case 1: // 잠실종합운동장 - 100% 확정 (2명)
+          confirmedCount = totalRecruitCount;
+          break;
+        case 2: // 양재시민의숲 - 50% 확정 (1명)
+          confirmedCount = totalRecruitCount ~/ 2;
+          break;
+        case 3: // 올림픽공원 - 0% 확정 (0명)
+          confirmedCount = 0;
+          break;
+        case 4: // 한강공원 - 100% 확정 (1명)
+          confirmedCount = totalRecruitCount;
+          break;
+        case 5: // 분당 - 50% 확정 (1명)
+          confirmedCount = totalRecruitCount ~/ 2;
+          break;
+        case 6: // 인천 - 100% 확정 (2명)
+          confirmedCount = totalRecruitCount;
+          break;
+        default:
+          confirmedCount = 0;
+      }
+      
+      // 확정된 인원만큼 게스트 생성 및 확정 처리
+      int confirmedMale = 0;
+      int confirmedFemale = 0;
+      
+      // 남성 모집 인원 중 확정된 수만큼 생성
+      for (int i = 0; i < maleRecruitCount && confirmedMale < confirmedCount; i++) {
+        guests.add(User(
+          id: guestId + i,
+          email: 'guest${guestId + i}@example.com',
+          nickname: '게스트${guestId + i}',
+          gender: 'male',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ));
+        confirmedUserIds.add(guestId + i);
+        confirmedMale++;
+        confirmedCount--;
+      }
+      
+      // 여성 모집 인원 중 확정된 수만큼 생성
+      for (int i = 0; i < femaleRecruitCount && confirmedCount > 0; i++) {
+        guests.add(User(
+          id: guestId + maleRecruitCount + i,
+          email: 'guest${guestId + maleRecruitCount + i}@example.com',
+          nickname: '게스트${guestId + maleRecruitCount + i}',
+          gender: 'female',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ));
+        confirmedUserIds.add(guestId + maleRecruitCount + i);
+        confirmedFemale++;
+        confirmedCount--;
+      }
+    }
+    
+    // 상태를 동적으로 결정 (확정 인원에 따라)
+    String actualStatus = status;
+    if (status == 'recruiting' || status == 'confirmed') {
+      if (confirmedUserIds.length == totalRecruitCount) {
+        actualStatus = 'confirmed'; // 100% 확정 완료
+      } else if (confirmedUserIds.length > 0) {
+        actualStatus = 'recruiting'; // 일부만 확정
+      } else {
+        actualStatus = 'recruiting'; // 미확정
+      }
+    }
+    
+    return Matching(
+      id: id,
+      type: 'host',
+      courtName: courtName,
+      courtLat: courtLat,
+      courtLng: courtLng,
+      date: date,
+      timeSlot: timeSlot,
+              minLevel: minLevel,
+        maxLevel: maxLevel,
+        minAge: minAge,
+        maxAge: maxAge,
+        gameType: gameType,
+      maleRecruitCount: maleRecruitCount,
+      femaleRecruitCount: femaleRecruitCount,
+      status: actualStatus, // 동적으로 결정된 상태 사용
+      host: host,
+      guests: guests,
+      confirmedUserIds: confirmedUserIds,
+      isFollowersOnly: isFollowersOnly,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      recoveryCount: 0,
+    );
+  }
 
   // 새 매칭 추가 메서드
   void _addNewMatching(Matching newMatching) {
@@ -277,7 +576,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
       
       // 모집중만 보기 필터
-      if (_showOnlyRecruiting && matching.status != 'recruiting') {
+      if (_showOnlyRecruiting && matching.actualStatus != 'recruiting') {
         print('  - 모집중이 아니므로 제외');
         return false;
       }
@@ -342,6 +641,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
         
         print('  - 구력 필터 통과');
+      }
+      
+      // 연령대 범위 필터
+      if (_selectedMinAge != null || _selectedMaxAge != null) {
+        final startAge = _getAgeFromText(_selectedMinAge);
+        final endAge = _getAgeFromText(_selectedMaxAge);
+        
+        print('  - 연령대 필터 확인');
+        print('  - 선택된 시작 연령대: $_selectedMinAge (값: $startAge)');
+        print('  - 선택된 종료 연령대: $_selectedMaxAge (값: $endAge)');
+        print('  - 매칭 연령대: ${matching.minAge}대-${matching.maxAge}대');
+        
+        if (startAge != null && endAge != null) {
+          // 시작 연령대와 종료 연령대가 모두 선택된 경우
+          final minAge = matching.minAge ?? 10;
+          final maxAge = matching.maxAge ?? 60;
+          if (maxAge < startAge || minAge > endAge) {
+            print('  - 연령대 범위 불일치로 제외');
+            return false;
+          }
+        } else if (startAge != null) {
+          // 시작 연령대만 선택된 경우
+          final maxAge = matching.maxAge ?? 60;
+          if (maxAge < startAge) {
+            print('  - 시작 연령대보다 낮아서 제외');
+            return false;
+          }
+        } else if (endAge != null) {
+          // 종료 연령대만 선택된 경우
+          final minAge = matching.minAge ?? 10;
+          if (minAge > endAge) {
+            print('  - 종료 연령대보다 높아서 제외');
+            return false;
+          }
+        }
+        
+        print('  - 연령대 필터 통과');
       }
       
       // 날짜 범위 필터
@@ -571,171 +907,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // 임시 데이터 (실제로는 API에서 가져올 예정)
-  final List<Matching> _mockMatchings = [
-    Matching(
-      id: 1,
-      type: 'host',
-      courtName: '잠실종합운동장',
-      courtLat: 37.512,
-      courtLng: 127.102,
-      date: DateTime.now().add(const Duration(days: 1)),
-      timeSlot: '18:00~20:00',
-      minLevel: 2,
-      maxLevel: 4,
-      gameType: 'mixed',
-      maleRecruitCount: 1,
-      femaleRecruitCount: 1,
-      status: 'recruiting',
-      host: User(
-        id: 1,
-        email: 'host@example.com',
-        nickname: '테린이',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      recoveryCount: 0,
-    ),
-    Matching(
-      id: 2,
-      type: 'host',
-      courtName: '양재시민의숲',
-      courtLat: 37.469,
-      courtLng: 127.038,
-      date: DateTime.now().add(const Duration(days: 2)),
-      timeSlot: '20:00~22:00',
-      minLevel: 3,
-      maxLevel: 5,
-      gameType: 'male_doubles',
-      maleRecruitCount: 2,
-      femaleRecruitCount: 0,
-      status: 'recruiting',
-      isFollowersOnly: true, // 팔로워 전용 공개
-      host: User(
-        id: 2,
-        email: 'player@example.com',
-        nickname: '테니스마스터',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      recoveryCount: 0,
-    ),
-    // 추가 매칭 데이터 (위치 필터 테스트용)
-    Matching(
-      id: 3,
-      type: 'host',
-      courtName: '올림픽공원 테니스장',
-      courtLat: 37.521,
-      courtLng: 127.128,
-      date: DateTime.now().add(const Duration(days: 3)),
-      timeSlot: '14:00~16:00',
-      minLevel: 1,
-      maxLevel: 3,
-      gameType: 'mixed',
-      maleRecruitCount: 1,
-      femaleRecruitCount: 1,
-      status: 'recruiting',
-      host: User(
-        id: 3,
-        email: 'tennis@example.com',
-        nickname: '테니스초보',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      recoveryCount: 0,
-    ),
-    Matching(
-      id: 4,
-      type: 'host',
-      courtName: '한강공원 테니스장',
-      courtLat: 37.528,
-      courtLng: 126.933,
-      date: DateTime.now().add(const Duration(days: 4)),
-      timeSlot: '16:00~18:00',
-      minLevel: 4,
-      maxLevel: 6,
-      gameType: 'singles',
-      maleRecruitCount: 0,
-      femaleRecruitCount: 1,
-      status: 'recruiting',
-      host: User(
-        id: 4,
-        email: 'pro@example.com',
-        nickname: '테니스프로',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      recoveryCount: 0,
-    ),
-    // 다양한 지역의 매칭 추가 (위치 필터 테스트용)
-    Matching(
-      id: 5,
-      type: 'host',
-      courtName: '분당테니스장',
-      courtLat: 37.350,
-      courtLng: 127.108,
-      date: DateTime.now().add(const Duration(days: 5)),
-      timeSlot: '10:00~12:00',
-      minLevel: 2,
-      maxLevel: 4,
-      gameType: 'female_doubles',
-      maleRecruitCount: 0,
-      femaleRecruitCount: 2,
-      status: 'recruiting',
-      host: User(
-        id: 5,
-        email: 'bundang@example.com',
-        nickname: '분당테니스',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      recoveryCount: 0,
-    ),
-    Matching(
-      id: 6,
-      type: 'host',
-      courtName: '인천대공원 테니스장',
-      courtLat: 37.448,
-      courtLng: 126.752,
-      date: DateTime.now().add(const Duration(days: 6)),
-      timeSlot: '19:00~21:00',
-      minLevel: 3,
-      maxLevel: 5,
-      gameType: 'mixed',
-      maleRecruitCount: 1,
-      femaleRecruitCount: 1,
-      status: 'recruiting',
-      host: User(
-        id: 6,
-        email: 'incheon@example.com',
-        nickname: '인천테니스',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      recoveryCount: 0,
-    ),
-  ];
+  List<Matching> _mockMatchings = [];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const AppLogo(height: 28),
+        title: const AppLogo(height: 31), // 10% 증가 (28 → 31)
         centerTitle: true,
+        leading: IconButton(
+          icon: _isLoading 
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                ),
+              )
+            : const Icon(Icons.refresh),
+          onPressed: _isLoading ? null : _manualRefresh,
+          tooltip: '새로고침',
+        ),
         actions: [
-          // 프로필/로그아웃 메뉴
-          // 상단 프로필 아이콘 제거: 하단바 마이페이지를 사용
           // 필터 버튼
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -873,37 +1067,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
           
-                          // "적용된 필터" 섹션 복원 (필터 칩들과 초기화 버튼)
+                          // "적용된 필터" 섹션 (개선된 디자인)
                 if (_selectedFilters.isNotEmpty)
                   Container(
-                    margin: const EdgeInsets.only(left: 16, right: 16), // top margin 완전 제거
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), // 8 → 4 (50% 추가 감소)
+                    margin: const EdgeInsets.only(left: 16, right: 16, top: 6), // top: 8 → 6 (20% 축소)
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), // vertical: 12 → 10 (20% 축소)
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(12),
+                      color: AppColors.primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.2),
-                  width: 1,
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                        width: 1,
                       ),
                     ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                  // 헤더
+                        // 헤더
                         Row(
                           children: [
-                      Icon(
-                        Icons.filter_list,
-                        color: AppColors.primary,
-                        size: 16, // 18 → 16 (11% 감소)
-                      ),
-                      const SizedBox(width: 6), // 8 → 6 (25% 감소)
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.filter_list,
+                                color: AppColors.primary,
+                                size: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             Text(
                               '적용된 필터',
                               style: AppTextStyles.body.copyWith(
                                 color: AppColors.primary,
-                          fontSize: 12, // 14 → 12 (14% 감소)
-                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
                               ),
                         ),
                         const Spacer(),
@@ -918,111 +1119,101 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               _endDate = null;
                               _startTime = null;
                               _endTime = null;
-                            // 모집중만 보기는 전용 체크박스로 관리하므로 여기서는 제거하지 않음
-                            // _showOnlyRecruiting = false;
-                            // 팔로우만 보기는 전용 체크박스로 관리하므로 여기서는 제거하지 않음
-                            // _showOnlyFollowing = false;
-                            _selectedCityId = null;
-                            _selectedDistrictIds.clear();
-                            _applyFilters();
+                                  _selectedCityId = null;
+                                  _selectedDistrictIds.clear();
+                                  _applyFilters();
                             });
                           },
                           style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // 12,6 → 10,4 (17%,33% 감소)
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                             shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(8),
                             ),
                           ),
                           child: Text(
-                          '초기화',
+                                '초기화',
                             style: AppTextStyles.body.copyWith(
                               color: AppColors.primary,
-                            fontSize: 11, // 12 → 11 (8% 감소)
+                                  fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
                       ],
                     ),
-                  if (_selectedFilters.isNotEmpty) ...[
-                    const SizedBox(height: 4), // 8 → 4 (50% 추가 감소)
-                    // 필터 칩들
-                    Wrap(
-                      spacing: 4, // 6 → 4 (33% 추가 감소)
-                      runSpacing: 2, // 4 → 2 (50% 추가 감소)
-                      children: _selectedFilters.map((filter) => _buildFilterChip(filter)).toList(),
-                    ),
-                  ],
+                        if (_selectedFilters.isNotEmpty) ...[
+                          const SizedBox(height: 6), // height: 8 → 6 (20% 축소)
+                          // 필터 칩들
+                          Wrap(
+                            spacing: 5, // spacing: 6 → 5 (20% 축소)
+                            runSpacing: 3, // runSpacing: 4 → 3 (20% 축소)
+                            children: _selectedFilters.map((filter) => _buildFilterChip(filter)).toList(),
+                          ),
+                        ],
                 ],
               ),
             ),
-                                                      // 모집중만 보기 & 팔로우만 보기 체크박스 (좌우로 나란히 배치)
-                            Row(
-                              children: [
+                  
+                  // 모집중만 보기 & 팔로우만 보기 체크박스 (좌우로 나란히 배치)
+                  Row(
+                    children: [
           Expanded(
-                                  child: _buildRecruitingOnlyCheckbox(),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildFollowOnlyCheckbox(),
+                        child: _buildRecruitingOnlyCheckbox(),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildFollowOnlyCheckbox(),
           ),
         ],
       ),
-                            // 검색 결과 개수 표시
-                            Container(
-                              margin: const EdgeInsets.only(left: 16, right: 16, top: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.cardBorder),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.search,
-                                    color: AppColors.primary,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _getSearchResultText(),
-                                    style: AppTextStyles.body.copyWith(
-                                      color: AppColors.textPrimary,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
+                  
+
+                  
+                  // 검색 결과 개수 표시 (작은 텍스트 형태)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16, right: 16, top: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          _getSearchResultText(),
+                          style: AppTextStyles.body.copyWith(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // 필터 버튼들 (카테고리별 그룹화)
+                  if (_selectedFilters.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.2),
+                                width: 0.5,
                               ),
                             ),
-                            // 필터 버튼들 (카테고리별 그룹화)
-                            if (_selectedFilters.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.2),
-                        width: 0.5,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        // 중복 제목 제거 - 상단에 이미 "적용된 필터" 섹션이 있음
-                        const SizedBox.shrink(),
-                        // 하단 중복 초기화 버튼 제거 - 상단에 이미 초기화 버튼이 있음
-                        const SizedBox.shrink(),
+                            child: Row(
+                              children: [
+                                // 중복 제목 제거 - 상단에 이미 "적용된 필터" 섹션이 있음
+                                const SizedBox.shrink(),
+                                // 하단 중복 초기화 버튼 제거 - 상단에 이미 초기화 버튼이 있음
+                                const SizedBox.shrink(),
                       ],
                     ),
                   ),
@@ -1030,24 +1221,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ],
               ),
             ),
+                  
           // 매칭 목록
           Expanded(
-            child: _isLoading
-                ? _buildLoadingState()
-                : _filteredMatchings.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.builder(
-                        padding: const EdgeInsets.only(
-                          left: 16,
+                    child: _isLoading
+                        ? _buildLoadingState()
+                        : _filteredMatchings.isEmpty
+                            ? _buildEmptyState()
+                            : ListView.builder(
+                                padding: const EdgeInsets.only(
+                                  left: 16,
                           right: 16,
-                          bottom: 100, // 플로팅 버튼 높이(56) + 하단 네비게이션(56) + 여유 공간(20)
+                          bottom: 120, // 플로팅 버튼 높이(56) + 하단 네비게이션(56) + 여유 공간(40) + 카드 간격(16)
                         ),
                         itemCount: _filteredMatchings.length,
-                        itemBuilder: (context, index) {
+              itemBuilder: (context, index) {
                           final matching = _filteredMatchings[index];
-                          return _buildMatchingCard(matching);
-                        },
-                      ),
+                return _buildMatchingCard(matching);
+              },
+            ),
           ),
         ],
       ),
@@ -1070,32 +1262,111 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('${matching.courtName} 상태 변경'),
+          title: Row(
+            children: [
+              Icon(
+                Icons.sports_tennis,
+                color: AppColors.primary,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('${matching.courtName} 상태 변경'),
+              ),
+            ],
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('현재 상태: ${matching.statusText}'),
+              // 현재 상태 표시
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _getStatusColor(matching.actualStatus).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _getStatusColor(matching.actualStatus).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _getStatusIcon(matching.actualStatus),
+                      color: _getStatusColor(matching.actualStatus),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '현재 상태: ${matching.actualStatusText}',
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: _getStatusColor(matching.actualStatus),
+                      ),
+          ),
+        ],
+      ),
+              ),
               const SizedBox(height: 16),
-              Text('변경할 상태를 선택하세요:'),
-              const SizedBox(height: 8),
-              // 상태 옵션들 (완료는 시스템이 자동 처리)
-              // 취소된 매칭을 모집중으로 복구할 수 있는지 확인
-              if (matching.status == 'cancelled' && (matching.recoveryCount ?? 0) < 1)
-                _buildStatusOption(context, matching, 'recruiting', '모집중으로 복구', Colors.blue),
-              if (matching.status == 'recruiting')
-                _buildStatusOption(context, matching, 'confirmed', '확정', Colors.green),
-              if (matching.status == 'recruiting')
-                _buildStatusOption(context, matching, 'cancelled', '취소', Colors.red, requiresConfirmation: true),
-              if (matching.status != 'deleted')
-                _buildStatusOption(context, matching, 'deleted', '삭제됨', Colors.grey, requiresConfirmation: true),
-              const SizedBox(height: 12),
+              
+              // 매칭 정보 요약
+              _buildMatchingSummary(matching),
+              const SizedBox(height: 16),
+              
               Text(
-                '• 취소된 매칭은 1회에 한해서 모집중으로 복구할 수 있습니다.\n• 완료 상태는 게임 시간 종료 시 시스템이 자동으로 처리합니다.',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  height: 1.4,
+                '변경할 상태를 선택하세요:',
+                style: AppTextStyles.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              
+              // 상태 옵션들
+              _buildStatusOptions(context, matching),
+              
+              const SizedBox(height: 16),
+              
+              // 안내 메시지
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: AppColors.accent,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '상태 변경 안내',
+                          style: AppTextStyles.caption.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '• 취소된 매칭은 1회에 한해서 모집중으로 복구할 수 있습니다\n• 완료 상태는 게임 시간 종료 시 자동으로 처리됩니다\n• 확정 상태에서는 참여자와의 채팅이 가능합니다',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -1103,7 +1374,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('취소'),
+              child: const Text('닫기'),
             ),
           ],
         );
@@ -1152,6 +1423,98 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ],
         );
       },
+    );
+  }
+
+  // 매칭 정보 요약 위젯
+  Widget _buildMatchingSummary(Matching matching) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.calendar_today,
+                color: AppColors.primary,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${matching.formattedDate} ${matching.timeSlot}',
+                style: AppTextStyles.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                Icons.people,
+                color: AppColors.accent,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${matching.recruitCountText}',
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              if (matching.confirmedCount > 0) ...[
+                const SizedBox(width: 16),
+                Icon(
+                  Icons.check_circle,
+                  color: AppColors.success,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '확정: ${matching.confirmedCount}명',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.success,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 상태 옵션들 위젯
+  Widget _buildStatusOptions(BuildContext context, Matching matching) {
+    return Column(
+      children: [
+        // 모집중 → 확정
+        if (matching.actualStatus == 'recruiting' && matching.confirmedCount > 0)
+          _buildStatusOption(context, matching, 'confirmed', '확정', Colors.green),
+        
+        // 모집중 → 취소
+        if (matching.actualStatus == 'recruiting')
+          _buildStatusOption(context, matching, 'cancelled', '취소', Colors.red, requiresConfirmation: true),
+        
+        // 확정 → 완료는 자동으로 처리되므로 수동 옵션 제거
+        
+        // 취소 → 모집중 (복구)
+        if (matching.status == 'cancelled' && (matching.recoveryCount ?? 0) < 1)
+          _buildStatusOption(context, matching, 'recruiting', '모집중으로 복구', Colors.orange),
+        
+        // 삭제
+        if (matching.actualStatus != 'deleted')
+          _buildStatusOption(context, matching, 'deleted', '삭제', Colors.grey, requiresConfirmation: true),
+      ],
     );
   }
 
@@ -1206,10 +1569,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ? (matching.recoveryCount ?? 0) + 1 
             : matching.recoveryCount;
         
+        // 상태별 추가 처리
+        Map<String, dynamic> updateData = {
+          'status': newStatus,
+          'recoveryCount': newRecoveryCount,
+          'updatedAt': DateTime.now(),
+        };
+        
+        // 확정 상태로 변경할 때 신청자들을 확정자로 이동
+        if (newStatus == 'confirmed' && matching.appliedUserIds != null && matching.appliedUserIds!.isNotEmpty) {
+          updateData['confirmedUserIds'] = matching.appliedUserIds;
+          updateData['appliedUserIds'] = []; // 신청자 목록 비우기
+        }
+        
+        // 완료 상태는 자동으로 처리되므로 수동 변경 불가
+        // if (newStatus == 'completed') {
+        //   updateData['completedAt'] = DateTime.now();
+        // }
+        
+        // 취소 상태로 변경할 때 취소 시간 기록
+        if (newStatus == 'cancelled') {
+          updateData['cancelledAt'] = DateTime.now();
+        }
+        
         _mockMatchings[index] = matching.copyWith(
           status: newStatus,
           recoveryCount: newRecoveryCount,
           updatedAt: DateTime.now(),
+          confirmedUserIds: updateData['confirmedUserIds'],
+          appliedUserIds: updateData['appliedUserIds'],
+          completedAt: updateData['completedAt'],
+          cancelledAt: updateData['cancelledAt'],
         );
       }
     });
@@ -1220,16 +1610,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // 성공 메시지 표시
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('매칭 상태가 "${_getStatusText(newStatus)}"로 변경되었습니다.'),
+        content: Text('매칭 상태가 "${_getStatusText(matching)}"로 변경되었습니다.'),
         backgroundColor: _getStatusColor(newStatus),
         duration: const Duration(seconds: 2),
       ),
     );
+    
+    // 상태 변경 로그
+    print('매칭 상태 변경: ${matching.courtName} (${matching.id}) ${matching.actualStatus} → $newStatus');
   }
 
-  // 상태 텍스트 반환 메서드
-  String _getStatusText(String status) {
-    switch (status) {
+  // 상태 텍스트 반환 메서드 (동적 상태 기반)
+  String _getStatusText(Matching matching) {
+    // 실제 상태에 따라 동적으로 결정
+    final actualStatus = matching.actualStatus;
+    
+    switch (actualStatus) {
       case 'recruiting':
         return '모집중';
       case 'confirmed':
@@ -1259,7 +1655,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     
     // 상태가 모집중이 아닌 경우 (확정, 완료 등)
-    if (matching.status != 'recruiting') {
+    if (matching.actualStatus != 'recruiting') {
       return true;
     }
     
@@ -1276,8 +1672,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     
     // 상태가 모집중이 아닌 경우
-    if (matching.status != 'recruiting') {
-      warnings.add('매칭이 ${matching.statusText} 상태입니다');
+    if (matching.actualStatus != 'recruiting') {
+      warnings.add('매칭이 ${matching.actualStatusText} 상태입니다');
     }
     
     // 채팅 이력이 있을 가능성이 있는 경우
@@ -1300,7 +1696,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     
     // 상태별 배경색
-    switch (matching.status) {
+    switch (matching.actualStatus) {
       case 'recruiting':
         return AppColors.surface; // 모집중: 기본 배경색
       case 'confirmed':
@@ -1397,10 +1793,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(matching.status).withValues(alpha: 0.15),
+                          color: _getStatusColor(matching.actualStatus).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: _getStatusColor(matching.status).withValues(alpha: 0.6),
+                            color: _getStatusColor(matching.actualStatus).withValues(alpha: 0.6),
                             width: 1.2,
                           ),
                         ),
@@ -1408,15 +1804,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              _getStatusIcon(matching.status),
+                              _getStatusIcon(matching.actualStatus),
                               size: 12,
-                              color: _getStatusColor(matching.status),
+                              color: _getStatusColor(matching.actualStatus),
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              matching.statusText + matching.recoveryCountText,
+                              matching.actualStatusText + matching.recoveryCountText,
                           style: AppTextStyles.caption.copyWith(
-                                color: _getStatusColor(matching.status),
+                                color: _getStatusColor(matching.actualStatus),
                                 fontWeight: FontWeight.w600,
                                 fontSize: 11,
                               ),
@@ -1513,37 +1909,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 왼쪽 열
+                  // 왼쪽 열 (위치, 날짜, 시간)
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 위치 정보
+                        // 위치
                         Row(
                           children: [
-                            Icon(Icons.location_on, color: AppColors.textSecondary, size: 18), // 16 → 18 (아이콘 크기 증가로 가독성 향상)
+                            Icon(Icons.location_on, color: AppColors.textSecondary, size: 16),
                             const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                _getMatchingLocationText(matching),
-                                style: AppTextStyles.body,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                            Text(
+                              _getMatchingLocationText(matching),
+                              style: AppTextStyles.body.copyWith(fontSize: 13),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 8),
                         // 날짜
                         Row(
                           children: [
-                            Icon(Icons.calendar_today, color: AppColors.textSecondary, size: 18), // 16 → 18 (아이콘 크기 증가로 가독성 향상)
+                            Icon(Icons.calendar_today, color: AppColors.textSecondary, size: 16),
                             const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
+                            Text(
                                 matching.formattedDate,
-                                style: AppTextStyles.body,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              style: AppTextStyles.body.copyWith(fontSize: 13),
                             ),
                           ],
                         ),
@@ -1551,78 +1941,86 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         // 시간
                         Row(
                           children: [
-                            Icon(Icons.access_time, color: AppColors.textSecondary, size: 18), // 16 → 18 (아이콘 크기 증가로 가독성 향상)
+                            Icon(Icons.access_time, color: AppColors.textSecondary, size: 16),
                             const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
+                            Text(
                                 matching.formattedTime,
-                                style: AppTextStyles.body,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              style: AppTextStyles.body.copyWith(fontSize: 13),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
                       ],
                     ),
                   ),
                   
-                  const SizedBox(width: 24),
+                  const SizedBox(width: 20),
                   
-                  // 오른쪽 열
+                  // 오른쪽 열 (게임유형, 구력, 연령대, 모집인원)
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        const SizedBox(height: 34),
-                        // 게임 유형과 구력
+                        // 게임유형과 구력을 한 줄에 (오른쪽 정렬)
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.sports_tennis, color: AppColors.primary, size: 18), // 16 → 18 (아이콘 크기 증가로 가독성 향상)
+                            Icon(Icons.sports_tennis, color: AppColors.primary, size: 16),
                             const SizedBox(width: 4),
                             Text(
                               matching.gameTypeText,
                               style: AppTextStyles.body.copyWith(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.w500,
+                                fontSize: 13,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '|',
-                              style: AppTextStyles.body.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 12),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // 6,2 → 8,4 (구력 배지 크기 증가로 가독성 향상)
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: AppColors.accent.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 matching.skillRangeText,
                                 style: AppTextStyles.caption.copyWith(
                                   color: AppColors.textPrimary,
                                   fontWeight: FontWeight.w600,
+                                  fontSize: 12,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        // 모집인원
+                        const SizedBox(height: 8),
+                        // 연령대 (오른쪽 정렬)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            matching.ageRangeText,
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // 모집인원 (오른쪽 정렬)
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.people, color: AppColors.textSecondary, size: 18), // 16 → 18 (아이콘 크기 증가로 가독성 향상)
+                            Icon(Icons.people, color: AppColors.textSecondary, size: 16),
                             const SizedBox(width: 4),
                             Text(
                               matching.recruitCountText,
                               style: AppTextStyles.body.copyWith(
                                 color: AppColors.textSecondary,
+                                fontSize: 13,
                               ),
                             ),
                           ],
@@ -1707,6 +2105,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     List<String> localSelectedGameTypes = List.from(_selectedGameTypes);
     String? localSelectedSkillLevel = _selectedSkillLevel;
     String? localSelectedEndSkillLevel = _selectedEndSkillLevel;
+    String? localSelectedMinAge = _selectedMinAge;
+    String? localSelectedMaxAge = _selectedMaxAge;
     DateTime? localStartDate = _startDate;
     DateTime? localEndDate = _endDate;
     String? localStartTime = _startTime;
@@ -1779,6 +2179,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               localSelectedGameTypes.clear();
                               localSelectedSkillLevel = null;
                               localSelectedEndSkillLevel = null;
+                              localSelectedMinAge = null;
+                              localSelectedMaxAge = null;
                               localStartDate = null;
                               localEndDate = null;
                               localStartTime = null;
@@ -1815,6 +2217,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             localSelectedDistrictIds = List.from(_selectedDistrictIds);
                             localSelectedSkillLevel = _selectedSkillLevel;
                             localSelectedEndSkillLevel = _selectedEndSkillLevel;
+                            localSelectedMinAge = _selectedMinAge;
+                            localSelectedMaxAge = _selectedMaxAge;
                             
                             print('=== 모달 닫기 전 local 변수 업데이트 ===');
                             print('localStartDate: $localStartDate');
@@ -1831,6 +2235,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               _selectedGameTypes = List.from(localSelectedGameTypes);
                               _selectedSkillLevel = localSelectedSkillLevel;
                               _selectedEndSkillLevel = localSelectedEndSkillLevel;
+                              _selectedMinAge = localSelectedMinAge;
+                              _selectedMaxAge = localSelectedMaxAge;
                               _startDate = localStartDate;
                               _endDate = localEndDate;
                               _startTime = localStartTime;
@@ -1899,6 +2305,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           Tab(text: '위치'),
                           Tab(text: '게임 유형'),
                           Tab(text: '구력'),
+                          Tab(text: '연령대'),
                         ],
                       ),
                     ),
@@ -1928,6 +2335,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           SingleChildScrollView(
                             padding: const EdgeInsets.all(16),
                             child: _buildSkillLevelTab(localSelectedSkillLevel, localSelectedEndSkillLevel, localSelectedFilters, setModalState),
+                            ),
+                          // 연령대 탭
+                          SingleChildScrollView(
+                            padding: const EdgeInsets.all(16),
+                            child: _buildAgeRangeTab(localSelectedMinAge, localSelectedMaxAge, localSelectedFilters, setModalState),
                             ),
                           ],
                         ),
@@ -2580,6 +2992,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return null;
   }
 
+  // 연령대 텍스트에서 숫자 값 추출
+  int? _getAgeFromText(String? ageText) {
+    if (ageText == null) return null;
+    
+    if (ageText == '60대~') return 60;
+    
+    // "X대" 형태에서 숫자 추출
+    final match = RegExp(r'(\d+)대').firstMatch(ageText);
+    if (match != null) {
+      return int.tryParse(match.group(1)!);
+    }
+    
+    return null;
+  }
+
   // 구력 텍스트의 숫자 값 반환
   int _getSkillLevelValue(String skillText) {
     if (skillText == '6개월') return 0;
@@ -2656,6 +3083,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       '모집중': [],
       '게임 유형': [],
       '구력': [],
+      '연령대': [],
       '날짜': [],
       '시간': [],
     };
@@ -2769,6 +3197,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             } else if (category == '구력') {
               _selectedSkillLevel = null;
               _selectedEndSkillLevel = null;
+            } else if (category == '연령대') {
+              _selectedMinAge = null;
+              _selectedMaxAge = null;
             } else if (category == '날짜') {
               _startDate = null;
               _endDate = null;
@@ -2828,6 +3259,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (filter.contains('혼복') || filter.contains('남복') || filter.contains('여복') || 
         filter.contains('단식') || filter.contains('랠리')) return '게임 유형';
     if (filter.contains('년') || filter.contains('개월')) return '구력';
+    if (filter.contains('대')) return '연령대';
     if (filter.contains('월') && filter.contains('일')) return '날짜';
     if (filter.contains('시')) return '시간';
     return '기타';
@@ -3346,6 +3778,175 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return 0;
   }
 
+  // 연령대 범위 필터 탭 위젯
+  Widget _buildAgeRangeTab(String? selectedMinAge, String? selectedMaxAge, List<String> selectedFilters, StateSetter setModalState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 연령대 선택 안내
+        Text(
+          '연령대 범위',
+          style: AppTextStyles.h3.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '연령대 범위를 선택해 주세요',
+          style: AppTextStyles.body.copyWith(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 20),
+        
+        // 선택된 연령대 범위 표시
+        if (selectedMinAge != null || selectedMaxAge != null) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.people,
+                  color: AppColors.primary,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  selectedMinAge != null && selectedMaxAge != null
+                      ? '$selectedMinAge ~ $selectedMaxAge'
+                      : selectedMinAge != null
+                          ? '$selectedMinAge 이상'
+                          : '$selectedMaxAge 이하',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+        
+        // 연령대 선택 버튼들
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _ageOptions.map((age) {
+            final isSelected = selectedMinAge == age || selectedMaxAge == age;
+            final isInRange = selectedMinAge != null && selectedMaxAge != null &&
+                _ageOptions.indexOf(age) >= _ageOptions.indexOf(selectedMinAge!) &&
+                _ageOptions.indexOf(age) <= _ageOptions.indexOf(selectedMaxAge!);
+            
+            return GestureDetector(
+              onTap: () {
+                print('=== 연령대 버튼 클릭: $age ===');
+                setModalState(() {
+                  if (selectedMinAge == null) {
+                    // 첫 번째 선택: 시작 연령대
+                    selectedMinAge = age;
+                    print('첫 번째 선택: 시작 연령대 = $age');
+                  } else if (selectedMaxAge == null) {
+                    // 두 번째 선택: 종료 연령대
+                    selectedMaxAge = age;
+                    print('두 번째 선택: 종료 연령대 = $age');
+                    
+                    // 종료 연령대가 시작 연령대보다 작으면 순서 변경
+                    if (_ageOptions.indexOf(selectedMaxAge!) < _ageOptions.indexOf(selectedMinAge!)) {
+                      final temp = selectedMinAge;
+                      selectedMinAge = selectedMaxAge;
+                      selectedMaxAge = temp;
+                    }
+                  } else {
+                    // 새로운 선택: 시작 연령대로 재설정
+                    selectedMinAge = age;
+                    selectedMaxAge = null;
+                    print('새로운 선택: 시작 연령대 재설정 = $age');
+                  }
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected || isInRange
+                      ? AppColors.primary
+                      : AppColors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isSelected || isInRange
+                        ? AppColors.primary
+                        : AppColors.cardBorder,
+                  ),
+                ),
+                child: Text(
+                  age,
+                  style: AppTextStyles.body.copyWith(
+                    color: isSelected || isInRange
+                        ? Colors.white
+                        : AppColors.textPrimary,
+                    fontWeight: isSelected || isInRange
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        
+        const SizedBox(height: 20),
+        
+        // 선택 완료 버튼
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () {
+              print('=== 연령대 필터 선택 완료 ===');
+              print('선택된 시작 연령대: $selectedMinAge');
+              print('선택된 종료 연령대: $selectedMaxAge');
+              
+              // 필터 텍스트 생성
+              if (selectedMinAge != null && selectedMaxAge != null) {
+                final filterText = '$selectedMinAge-$selectedMaxAge';
+                if (!selectedFilters.contains(filterText)) {
+                  selectedFilters.add(filterText);
+                }
+              } else if (selectedMinAge != null) {
+                final filterText = '$selectedMinAge 이상';
+                if (!selectedFilters.contains(filterText)) {
+                  selectedFilters.add(filterText);
+                }
+              } else if (selectedMaxAge != null) {
+                final filterText = '$selectedMaxAge 이하';
+                if (!selectedFilters.contains(filterText)) {
+                  selectedFilters.add(filterText);
+                }
+              }
+              
+              Navigator.of(context).pop();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('선택 완료'),
+          ),
+        ),
+      ],
+    );
+  }
+
   // 구력 범위 필터 탭 위젯
   Widget _buildSkillLevelTab(String? selectedSkillLevel, String? selectedEndSkillLevel, List<String> selectedFilters, StateSetter setModalState) {
     final skillLevels = ['6개월', '1년', '2년', '3년', '4년', '5년', '6년', '7년', '8년', '9년', '10년+'];
@@ -3513,7 +4114,132 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
-  // 완료된 매칭 체크 및 업데이트
+  // 실시간 업데이트 타이머 시작
+  void _startAutoRefreshTimer() {
+    _autoRefreshTimer = Timer.periodic(_refreshInterval, (timer) {
+      if (mounted) {
+        _refreshMatchingData();
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  // 매칭 데이터 새로고침
+  void _refreshMatchingData() {
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    // 실제로는 API 호출을 통해 최신 데이터를 가져옴
+    // 현재는 mock 데이터를 사용하므로 시뮬레이션
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        // 새로운 매칭이 추가되었는지 시뮬레이션 (10% 확률)
+        if (DateTime.now().millisecondsSinceEpoch % 10 == 0) {
+          _simulateNewMatching();
+        }
+        
+        // 기존 매칭 상태 변경 시뮬레이션 (5% 확률)
+        if (DateTime.now().millisecondsSinceEpoch % 20 == 0) {
+          _simulateStatusChange();
+        }
+        
+        // 자동 완료 상태 변경 체크
+        _checkAndUpdateCompletedMatchings();
+        
+        setState(() {
+          _isLoading = false;
+        });
+        
+        // 필터 재적용
+        _applyFilters();
+        
+        print('매칭 데이터 새로고침 완료: ${DateTime.now()}');
+      }
+    });
+  }
+
+  // 새로운 매칭 추가 시뮬레이션
+  void _simulateNewMatching() {
+    final newMatching = Matching(
+      id: DateTime.now().millisecondsSinceEpoch,
+      type: 'host',
+      courtName: '새로운 테니스장',
+      courtLat: 37.5 + (DateTime.now().millisecondsSinceEpoch % 100) / 1000,
+      courtLng: 127.0 + (DateTime.now().millisecondsSinceEpoch % 100) / 1000,
+      date: DateTime.now().add(Duration(days: DateTime.now().millisecondsSinceEpoch % 7 + 1)),
+      timeSlot: '${18 + (DateTime.now().millisecondsSinceEpoch % 6)}:00~${20 + (DateTime.now().millisecondsSinceEpoch % 6)}:00',
+      minLevel: 1 + (DateTime.now().millisecondsSinceEpoch % 3),
+      maxLevel: 3 + (DateTime.now().millisecondsSinceEpoch % 3),
+      gameType: ['mixed', 'male_doubles', 'female_doubles'][DateTime.now().millisecondsSinceEpoch % 3],
+      maleRecruitCount: 1 + (DateTime.now().millisecondsSinceEpoch % 2),
+      femaleRecruitCount: DateTime.now().millisecondsSinceEpoch % 2,
+      status: 'recruiting',
+      host: User(
+        id: 999,
+        email: 'new@example.com',
+        nickname: '새로운호스트',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      recoveryCount: 0,
+    );
+    
+    _mockMatchings.insert(0, newMatching);
+    print('새로운 매칭 추가 시뮬레이션: ${newMatching.courtName}');
+  }
+
+  // 매칭 상태 변경 시뮬레이션
+  void _simulateStatusChange() {
+    if (_mockMatchings.isEmpty) return;
+    
+    final randomIndex = DateTime.now().millisecondsSinceEpoch % _mockMatchings.length;
+    final matching = _mockMatchings[randomIndex];
+    
+    // 모집중인 매칭을 확정으로 변경
+    if (matching.actualStatus == 'recruiting' && matching.appliedUserIds != null && matching.appliedUserIds!.isNotEmpty) {
+      final updatedMatching = matching.copyWith(
+        status: 'confirmed',
+        confirmedUserIds: matching.appliedUserIds,
+        updatedAt: DateTime.now(),
+      );
+      
+      _mockMatchings[randomIndex] = updatedMatching;
+      print('매칭 상태 변경 시뮬레이션: ${matching.courtName} → 확정');
+    }
+  }
+
+  // 수동 새로고침
+  void _manualRefresh() {
+    if (_isLoading) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    // 새로고침 애니메이션 효과
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        _refreshMatchingData();
+        
+        // 새로고침 완료 메시지
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('새로고침이 완료되었습니다'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    });
+  }
+
+  // 완료된 매칭 체크 및 업데이트 + 자동 확정
   void _checkAndUpdateCompletedMatchings() {
     final now = DateTime.now();
     bool hasUpdates = false;
@@ -3521,7 +4247,41 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     for (int i = 0; i < _mockMatchings.length; i++) {
       final matching = _mockMatchings[i];
       
-      // 확정 상태이고 게임 시간이 종료된 경우
+      // 1. 자동 확정 체크: 모집중 상태이고 모집 인원이 다 찬 경우
+      if (matching.status == 'recruiting' && _shouldAutoConfirm(matching)) {
+        final autoConfirmedMatching = Matching(
+          id: matching.id,
+          type: matching.type,
+          courtName: matching.courtName,
+          courtLat: matching.courtLat,
+          courtLng: matching.courtLng,
+          date: matching.date,
+          timeSlot: matching.timeSlot,
+          minLevel: matching.minLevel,
+          maxLevel: matching.maxLevel,
+          gameType: matching.gameType,
+          maleRecruitCount: matching.maleRecruitCount,
+          femaleRecruitCount: matching.femaleRecruitCount,
+          status: 'confirmed', // 자동 확정 상태로 변경
+          message: matching.message,
+          guestCost: matching.guestCost,
+          isFollowersOnly: matching.isFollowersOnly,
+          host: matching.host,
+          guests: matching.guests,
+          createdAt: matching.createdAt,
+          updatedAt: now,
+        );
+        
+        _mockMatchings[i] = autoConfirmedMatching.copyWith(recoveryCount: matching.recoveryCount);
+        hasUpdates = true;
+        
+        print('자동 확정 처리: ${matching.courtName} (${matching.timeSlot})');
+        
+        // 자동 확정 알림 표시
+        _showAutoConfirmationNotification(matching);
+      }
+      
+      // 2. 확정 상태이고 게임 시간이 종료된 경우 (기존 로직)
       if (matching.status == 'confirmed' && _isGameTimeEnded(matching, now)) {
         // 새로운 Matching 객체 생성 (불변성 유지)
         final updatedMatching = Matching(
@@ -3560,6 +4320,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  // 자동 확정 조건 확인
+  bool _shouldAutoConfirm(Matching matching) {
+    // 모집 인원 수 계산
+    final totalRecruitCount = matching.maleRecruitCount + matching.femaleRecruitCount;
+    
+    // 확정된 참여자 수 계산
+    final confirmedCount = matching.confirmedUserIds?.length ?? 0;
+    
+    // 모집 인원이 다 찬 경우 자동 확정
+    return confirmedCount >= totalRecruitCount;
+  }
+
   // 게임 시간이 종료되었는지 확인
   bool _isGameTimeEnded(Matching matching, DateTime now) {
     // 매칭 날짜가 오늘이 아니면 false
@@ -3574,22 +4346,62 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (timeParts.length != 2) return false;
     
     try {
-      final endTimeParts = timeParts[1].split(':');
+      final startTimeParts = timeParts[0].trim().split(':');
+      final endTimeParts = timeParts[1].trim().split(':');
+      
+      if (startTimeParts.length != 2 || endTimeParts.length != 2) return false;
+      
+      final startHour = int.parse(startTimeParts[0]);
+      final startMinute = int.parse(startTimeParts[1]);
       final endHour = int.parse(endTimeParts[0]);
       final endMinute = int.parse(endTimeParts[1]);
       
-      // 종료 시간 + 30분 (정리 시간 포함)
+      // 게임 종료 시간 계산
       final gameEndTime = DateTime(
-        now.year, 
-        now.month, 
-        now.day, 
-        endHour, 
+        now.year,
+        now.month,
+        now.day,
+        endHour,
         endMinute,
-      ).add(const Duration(minutes: 30));
+      );
       
+      // 현재 시간이 게임 종료 시간을 지났으면 true
       return now.isAfter(gameEndTime);
     } catch (e) {
+      print('시간 파싱 오류: $e');
       return false;
+    }
+  }
+
+  // 자동 확정 알림 표시
+  void _showAutoConfirmationNotification(Matching matching) {
+    // 현재 화면이 활성화되어 있을 때만 알림 표시
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '${matching.courtName} 매칭이 자동으로 확정되었습니다!',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: '확인',
+            textColor: Colors.white,
+            onPressed: () {
+              // 스낵바 닫기
+            },
+          ),
+        ),
+      );
     }
   }
 
@@ -3634,7 +4446,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // 모집중만 보기 체크박스
   Widget _buildRecruitingOnlyCheckbox() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3), // vertical: 4 → 3 (20% 축소)
       decoration: BoxDecoration(
         color: AppColors.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
@@ -3685,8 +4497,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // 팔로우만 보기 체크박스
   Widget _buildFollowOnlyCheckbox() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2), // 4 → 2 (50% 추가 감소)
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), // 6 → 4 (33% 추가 감소)
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 1), // vertical: 2 → 1 (20% 축소)
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3), // vertical: 4 → 3 (20% 축소)
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
@@ -3702,44 +4514,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             onChanged: (value) {
               setState(() {
                 _showOnlyFollowing = value ?? false;
-                
-                // 팔로우만 보기는 전용 체크박스로 관리하므로 _selectedFilters에 추가하지 않음
-                // 기존 팔로우 관련 필터 제거
-                // _selectedFilters.removeWhere((filter) => filter.contains('팔로우만'));
-                
-                // 새로운 팔로우 필터 추가하지 않음
-                // if (value == true) {
-                //   if (!_selectedFilters.contains('팔로우만')) {
-                //     _selectedFilters.add('팔로우만');
-                //   }
-                // }
               });
-              
-              // 필터 적용
               _applyFilters();
             },
             activeColor: AppColors.accent,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          const SizedBox(width: 6), // 8 → 6 (25% 감소)
+          const SizedBox(width: 6),
           GestureDetector(
             onTap: () {
               setState(() {
                 _showOnlyFollowing = !_showOnlyFollowing;
-                
-                // 팔로우만 보기는 전용 체크박스로 관리하므로 _selectedFilters에 추가하지 않음
-                // 기존 팔로우 관련 필터 제거
-                // _selectedFilters.removeWhere((filter) => filter.contains('팔로우만'));
-                
-                // 새로운 팔로우 필터 추가하지 않음
-                // if (value == true) {
-                //   if (!_selectedFilters.contains('팔로우만')) {
-                //         _selectedFilters.add('팔로우만');
-                //       }
-                //   }
               });
-              
-              // 필터 적용
               _applyFilters();
             },
             child: Text(
@@ -3755,4 +4541,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
+
+
 }
