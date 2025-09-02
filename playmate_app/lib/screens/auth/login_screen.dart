@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     } catch (e) {
-      print('저장된 자격 증명 로드 실패: $e');
+
     }
   }
 
@@ -73,10 +73,10 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('playmate_lastError', error);
-      print('에러 메시지 저장됨: $error');
-    } catch (e) {
-      print('에러 메시지 저장 실패: $e');
-    }
+      
+      } catch (e) {
+
+      }
   }
   
   // 저장된 에러 메시지 로드
@@ -101,67 +101,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _saveCredentials() async {
     try {
-      print('=== 자격 증명 저장 시작 ===');
-      print('_rememberMe: $_rememberMe');
-      
       final prefs = await SharedPreferences.getInstance();
       
       if (_rememberMe) {
         await prefs.setString('playmate_savedEmail', _emailController.text.trim());
         await prefs.setString('playmate_savedPassword', _passwordController.text);
         await prefs.setBool('playmate_rememberMe', true);
-        print('자격 증명 저장됨: ${_emailController.text.trim()}');
-        print('비밀번호 저장됨: ${_passwordController.text}');
-        print('rememberMe 저장됨: true');
-        
-        // 저장 확인
-        final savedRememberMe = prefs.getBool('playmate_rememberMe');
-        final savedEmail = prefs.getString('playmate_savedEmail');
-        print('저장 확인 - rememberMe: $savedRememberMe, email: $savedEmail');
-        
-        // 즉시 다시 읽어서 확인
-        await Future.delayed(Duration(milliseconds: 100));
-        final verifyRememberMe = prefs.getBool('playmate_rememberMe');
-        final verifyEmail = prefs.getString('playmate_savedEmail');
-        print('즉시 재확인 - rememberMe: $verifyRememberMe, email: $verifyEmail');
-        
-        // SharedPreferences 경로 확인
-        print('SharedPreferences 경로: ${prefs.toString()}');
-        
-        // 모든 키 확인
-        final allKeys = prefs.getKeys();
-        print('모든 SharedPreferences 키: $allKeys');
-        
-        // 에러 메시지 확인
-        final lastError = prefs.getString('playmate_lastError');
-        if (lastError != null) {
-          print('저장된 에러 메시지: $lastError');
-        }
-        
-        // 각 키의 값 확인
-        for (final key in allKeys) {
-          if (key.startsWith('playmate_')) {
-            final value = prefs.get(key);
-            print('키: $key, 값: $value');
-          }
-        }
       } else {
         await prefs.remove('playmate_savedEmail');
         await prefs.setBool('playmate_rememberMe', false);
-        print('자격 증명 제거됨');
       }
-      print('=== 자격 증명 저장 완료 ===');
     } catch (e) {
-      print('자격 증명 저장 실패: $e');
+      // 자격 증명 저장 실패
     }
   }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    print('=== 로그인 시작 ===');
-    print('이메일: ${_emailController.text.trim()}');
-    print('비밀번호: ${_passwordController.text}');
+
 
     // 로딩 상태 설정
     setState(() {
@@ -173,22 +131,18 @@ class _LoginScreenState extends State<LoginScreen> {
       await _saveCredentials();
 
       final authProvider = context.read<AuthProvider>();
-      print('AuthProvider 로그인 호출 전');
+
       
       final success = await authProvider.login(
         _emailController.text.trim(),
         _passwordController.text,
       );
 
-      print('AuthProvider 로그인 결과: $success');
-      print('AuthProvider 에러: ${authProvider.error}');
+
 
       if (success && mounted) {
-        print('로그인 성공! 홈 화면으로 이동');
-        
         // 자격 증명 저장 (자동 로그인을 위해)
         await _saveCredentials();
-        print('자동 로그인을 위한 자격 증명 저장 완료');
         
         // 성공 메시지 표시
         ScaffoldMessenger.of(context).showSnackBar(
@@ -223,8 +177,6 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.of(context).pushReplacementNamed('/main');
         }
                     } else {
-        print('로그인 실패! 에러 메시지 표시');
-        
         // 로컬 에러 상태 설정 (안전하게)
         if (mounted) {
           setState(() {
@@ -232,26 +184,17 @@ class _LoginScreenState extends State<LoginScreen> {
             // 비밀번호만 초기화 (아이디는 유지)
             _passwordController.clear();
           });
-          print('로컬 에러 메시지 설정 완료: $_errorMessage');
-          print('비밀번호 필드만 초기화됨');
-          print('이메일 필드 유지: ${_emailController.text}');
         } else {
-          print('Widget이 dispose되었습니다. 에러 상태 설정 불가');
           // 에러 메시지를 SharedPreferences에 저장하여 다음 화면 로드 시 표시
           _saveErrorForNextScreen(authProvider.error ?? '로그인에 실패했습니다.');
         }
-        
-        // 에러 메시지는 상단 빨간색 박스로만 표시 (SnackBar 제거)
-        print('에러 메시지 표시 완료 (빨간색 박스)');
       }
     } catch (e) {
-      print('로그인 중 예외 발생: $e');
       if (mounted) {
         // 예외 발생 시에도 에러 메시지를 로컬 상태로 설정
         setState(() {
           _errorMessage = '로그인 중 오류가 발생했습니다: $e';
         });
-        print('예외 에러 메시지 설정: $_errorMessage');
       }
     } finally {
       // 로딩 상태 해제
@@ -388,7 +331,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             setState(() {
                               _rememberMe = value ?? false;
                             });
-                            print('체크박스 상태 변경: $_rememberMe');
+                        
                           },
                           title: Text(
                             '아이디/비밀번호 저장',
@@ -427,7 +370,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 );
                               } catch (e) {
-                                print('저장된 정보 삭제 실패: $e');
+                        
                               }
                             },
                             style: TextButton.styleFrom(
@@ -456,9 +399,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.all(12),
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
-                        color: AppColors.error.withOpacity(0.1),
+                        color: AppColors.error.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
@@ -483,8 +426,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 // 에러 메시지 닫기 시에도 비밀번호만 초기화
                                 _passwordController.clear();
                               });
-                              print('에러 메시지 닫기 - 비밀번호 필드 초기화됨');
-                              print('이메일 필드 유지: ${_emailController.text}');
+                              
                             },
                             child: Icon(
                               Icons.close,

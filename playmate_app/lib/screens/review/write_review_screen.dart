@@ -94,7 +94,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: AppColors.primary.withOpacity(0.1),
+            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
             child: Text(
               widget.targetUser.nickname.isNotEmpty 
                   ? widget.targetUser.nickname[0] 
@@ -168,7 +168,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isFollowing 
-            ? AppColors.primary.withOpacity(0.1)
+            ? AppColors.primary.withValues(alpha: 0.1)
             : AppColors.primary,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
@@ -282,7 +282,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
@@ -380,7 +380,7 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: _getMannerScoreColor(_mannerScore).withOpacity(0.1),
+            color: _getMannerScoreColor(_mannerScore).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(

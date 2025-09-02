@@ -108,9 +108,9 @@ class _GuestReviewListScreenState extends State<GuestReviewListScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
             ),
             child: Text(
               '게스트 ${widget.matching.guests?.length ?? 0}명',
@@ -182,7 +182,7 @@ class _GuestReviewListScreenState extends State<GuestReviewListScreen> {
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
           radius: 24,
-          backgroundColor: AppColors.primary.withOpacity(0.1),
+          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
           child: Text(
             guest.nickname.isNotEmpty ? guest.nickname[0] : '?',
             style: AppTextStyles.h3.copyWith(
@@ -226,7 +226,7 @@ class _GuestReviewListScreenState extends State<GuestReviewListScreen> {
             ? Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
+                  color: AppColors.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppColors.success),
                 ),

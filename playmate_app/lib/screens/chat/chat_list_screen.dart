@@ -111,7 +111,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           return ListTile(
             onTap: () => _openChat(r),
             leading: CircleAvatar(
-              backgroundColor: roleColor.withOpacity(0.15),
+              backgroundColor: roleColor.withValues(alpha: 0.15),
               child: Icon(
                 Icons.forum,
                 color: roleColor,
@@ -130,7 +130,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: roleColor.withOpacity(0.15),
+                    color: roleColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(

@@ -294,7 +294,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen>
         border: Border.all(color: AppColors.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03), // 0.05 → 0.03으로 감소
+            color: Colors.black.withValues(alpha: 0.03), // 0.05 → 0.03으로 감소
             blurRadius: 6, // 10 → 6으로 감소
             offset: const Offset(0, 1), // 2 → 1로 감소
           ),
@@ -323,7 +323,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // 12,6 → 10,4로 감소
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16), // 20 → 16으로 감소
                 ),
                 child: Text(
@@ -393,9 +393,9 @@ class _MyReviewsScreenState extends State<MyReviewsScreen>
     return Container(
       padding: const EdgeInsets.all(12), // 16 → 12로 감소
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8), // 12 → 8로 감소
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -640,7 +640,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen>
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   child: Text(
                     review.reviewer?.nickname.isNotEmpty == true 
                         ? review.reviewer!.nickname[0] 
@@ -675,7 +675,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -710,7 +710,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen>
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
@@ -748,7 +748,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen>
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: _getMannerScoreColor(review.mannerScore).withOpacity(0.1),
+                      color: _getMannerScoreColor(review.mannerScore).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(

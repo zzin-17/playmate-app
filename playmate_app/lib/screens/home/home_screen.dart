@@ -561,32 +561,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
   
   void _performFiltering() {
-    print('=== 필터 적용 시작 ===');
-    print('검색어: $_searchQuery');
-    print('선택된 도시: $_selectedCityId');
-    print('선택된 구/군: $_selectedDistrictIds');
-    print('선택된 게임 유형: $_selectedGameTypes');
-    print('구력 범위: $_selectedSkillLevel ~ $_selectedEndSkillLevel');
-    print('날짜 범위: $_startDate ~ $_endDate');
-    print('시간 범위: $_startTime ~ $_endTime');
-    print('모집중만 보기: $_showOnlyRecruiting');
-    print('팔로우만 보기: $_showOnlyFollowing');
+
     
     _filteredMatchings = _mockMatchings.where((matching) {
-      print('매칭 필터링: ${matching.courtName}');
+      
       
       // 검색어 필터링
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
         if (!matching.courtName.toLowerCase().contains(query)) {
-          print('  - 검색어 불일치로 제외');
+
           return false;
         }
       }
       
       // 모집중만 보기 필터
       if (_showOnlyRecruiting && matching.actualStatus != 'recruiting') {
-        print('  - 모집중이 아니므로 제외');
+        
         return false;
       }
       
@@ -599,12 +590,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           final followingIds = currentUser.followingIds ?? [];
           // 매칭 호스트가 팔로우 목록에 있는지 확인
           if (!followingIds.contains(matching.host.id)) {
-            print('  - 팔로우하지 않는 사용자의 매칭이므로 제외');
+  
             return false;
           }
         } else {
           // 로그인하지 않은 경우 팔로우 필터 적용 안함
-          print('  - 로그인하지 않아 팔로우 필터 무시');
+
         }
       }
       

@@ -112,16 +112,16 @@ class AuthProvider extends ChangeNotifier {
       await _incrementLoginAttempts(email);
       
       final errorMessage = '로그인 실패: $e';
-      print('에러 메시지 설정: $errorMessage');
+
       _setError(errorMessage);
       _setLoading(false);
       
       // 로그인 실패 시에는 notifyListeners() 호출하지 않음
       // (화면이 새로 로드되는 것을 방지)
-      print('로그인 실패 - notifyListeners() 호출하지 않음');
+
       
       // 로그인 실패 시에도 현재 사용자 상태 유지 (화면 재로드 방지)
-      print('현재 사용자 상태 유지: ${_currentUser?.email ?? "null"}');
+
       
       return false;
     }
@@ -250,22 +250,15 @@ class AuthProvider extends ChangeNotifier {
 
   // 앱 시작 시 토큰 확인
   Future<void> checkAuthStatus() async {
-    print('=== AuthProvider.checkAuthStatus 시작 ===');
     final token = await _getToken();
-    print('토큰 확인: ${token != null ? "있음" : "없음"}');
     
     if (token != null) {
-      print('토큰으로 사용자 정보 로드 시도');
       _apiService.setAuthToken(token);
       await _loadCurrentUser();
-      print('토큰으로 사용자 정보 로드 완료: ${_currentUser?.email}');
     } else {
-      print('토큰이 없음 - 자동 로그인 시도');
       // 토큰이 없으면 저장된 자격 증명으로 자동 로그인 시도
       await _tryAutoLogin();
-      print('자동 로그인 시도 완료: ${_currentUser?.email}');
     }
-    print('=== AuthProvider.checkAuthStatus 완료 ===');
   }
 
   // 자동로그인 보안 검증 (개발/테스트 환경에서는 완화)
@@ -305,48 +298,30 @@ class AuthProvider extends ChangeNotifier {
     await prefs.setInt('${autoLoginCountKey}_$today', autoLoginCount + 1);
     */
     
-    print('개발 환경: 자동 로그인 보안 검증 완화됨');
+
     return true;
   }
 
   // 저장된 자격 증명으로 자동 로그인 시도 (보안 강화)
   Future<void> _tryAutoLogin() async {
     try {
-      print('=== 자동 로그인 시작 ===');
       final prefs = await SharedPreferences.getInstance();
       
-      // SharedPreferences 디버깅
-      print('=== SharedPreferences 디버깅 ===');
-      final allKeys = prefs.getKeys();
-      print('모든 키: $allKeys');
-      
-      for (final key in allKeys) {
-        if (key.startsWith('playmate_')) {
-          final value = prefs.get(key);
-          print('키: $key, 값: $value');
-        }
-      }
-      
       final rememberMe = prefs.getBool('playmate_rememberMe') ?? false;
-      print('rememberMe: $rememberMe');
       
       if (rememberMe) {
         final savedEmail = prefs.getString('playmate_savedEmail');
-        print('savedEmail: $savedEmail');
         
         if (savedEmail != null) {
           // 자동로그인 보안 체크
           if (!await _isAutoLoginSecure(savedEmail)) {
-            print('자동로그인 보안 검증 실패');
             return;
           }
           
-          print('자동 로그인 시도: $savedEmail');
           // Mock 서비스로 자동 로그인 (실제 저장된 비밀번호 사용)
           final savedPassword = prefs.getString('playmate_savedPassword');
           if (savedPassword != null) {
             final res = await MockAuthService.login(savedEmail, savedPassword);
-            print('Mock 서비스 응답: $res');
             
             if (res['success'] == true) {
               await _saveToken(res['token'] as String);
@@ -424,7 +399,7 @@ class AuthProvider extends ChangeNotifier {
     if (expiresAt != null) {
       final expiryDate = DateTime.parse(expiresAt);
       if (DateTime.now().isAfter(expiryDate)) {
-        print('토큰이 만료되었습니다. 자동 로그아웃 처리');
+
         await _clearToken();
         _currentUser = null;
         notifyListeners();
@@ -449,7 +424,7 @@ class AuthProvider extends ChangeNotifier {
     _error = error;
     // 에러 설정 시에는 notifyListeners() 호출하지 않음
     // (화면이 새로 로드되는 것을 방지)
-    print('에러 설정: $error (notifyListeners() 호출하지 않음)');
+
   }
 
   void _clearError() {

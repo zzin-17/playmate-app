@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
+
+
 import 'home/home_screen.dart';
-import 'court/court_screen.dart';
+
 import 'community/community_screen.dart';
-import 'trade/trade_screen.dart';
+
 import 'profile/profile_screen.dart';
 import 'chat/chat_list_screen.dart';
 import 'matching/create_matching_screen.dart';
-import '../models/matching.dart';
+
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -67,7 +67,7 @@ class _MainScreenState extends State<MainScreen> {
               setState(() {
                 _newMatching = result; // 새 매칭 상태 업데이트
               });
-              print('새 매칭 생성됨: ${result.courtName}');
+
             }
           },
           backgroundColor: Theme.of(context).primaryColor,

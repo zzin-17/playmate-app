@@ -108,7 +108,7 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -124,7 +124,7 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
                   children: [
                     CircleAvatar(
                       radius: 20,
-                      backgroundColor: AppColors.primary.withOpacity(0.1),
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                       child: Text(
                         post.author[0],
                         style: TextStyle(
@@ -186,10 +186,10 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
                     children: post.hashtags.map((tag) => Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: AppColors.primary.withOpacity(0.3),
+                          color: AppColors.primary.withValues(alpha: 0.3),
                           width: 1,
                         ),
                       ),

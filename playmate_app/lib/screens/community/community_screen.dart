@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
-import '../../widgets/common/app_logo.dart';
+
 import 'follow_list_screen.dart';
 import 'comment_screen.dart';
 import 'create_post_screen.dart';
@@ -107,10 +107,10 @@ class _CommunityScreenState extends State<CommunityScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: AppColors.primary.withOpacity(0.3),
+                    color: AppColors.primary.withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
@@ -397,12 +397,12 @@ class _CommunityScreenState extends State<CommunityScreen>
         color: AppColors.accent, // 디자인시스템의 Cream Yellow 사용
         borderRadius: BorderRadius.circular(18), // 더 둥근 모서리
         border: Border.all(
-          color: AppColors.secondary.withOpacity(0.4), // Light Orange 테두리
+          color: AppColors.secondary.withValues(alpha: 0.4), // Light Orange 테두리
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 2,
             offset: const Offset(0, 1),
           ),
@@ -753,7 +753,7 @@ class _CommunityScreenState extends State<CommunityScreen>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -772,7 +772,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                   backgroundImage: post.authorProfileImage != null
                       ? NetworkImage(post.authorProfileImage!)
                       : null,
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   child: post.authorProfileImage == null
                       ? Text(
                           post.author[0],
@@ -916,7 +916,7 @@ class _CommunityScreenState extends State<CommunityScreen>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -933,7 +933,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                 // 프로필 사진
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   backgroundImage: post.authorProfileImage != null 
                     ? NetworkImage(post.authorProfileImage!) 
                     : null,

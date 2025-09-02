@@ -8,7 +8,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_text_field.dart';
-import '../review/write_review_screen.dart';
+
 import '../review/review_list_screen.dart';
 import '../../services/notification_service.dart';
 import '../../services/websocket_service.dart';
@@ -19,7 +19,7 @@ import '../../services/chat_local_store.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
-import 'dart:typed_data';
+
 import '../../services/chat_event_bus.dart';
 
 class ChatScreen extends StatefulWidget {
