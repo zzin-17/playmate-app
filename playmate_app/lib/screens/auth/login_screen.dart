@@ -366,7 +366,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 );
                               } catch (e) {
-                        
+                                // 에러 처리 로직 추가 (빈 catch 블록 방지)
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('저장된 정보 삭제 중 오류가 발생했습니다: $e'),
+                                      backgroundColor: AppColors.error,
+                                    ),
+                                  );
+                                }
                               }
                             },
                             style: TextButton.styleFrom(

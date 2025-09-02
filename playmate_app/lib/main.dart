@@ -173,7 +173,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     final authProvider = context.read<AuthProvider>();
     await authProvider.checkAuthStatus();
     
-    // 3. 인증 확인 완료 후 상태 업데이트
+    // 3. 인증 확인 완료 후 상태 업데이트 (mounted 체크로 안전성 확보)
     if (mounted) {
       setState(() {
         _isCheckingAuth = false;
