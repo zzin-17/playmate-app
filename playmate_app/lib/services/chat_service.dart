@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_room.dart';
 import '../models/matching.dart';
 import '../models/user.dart';
@@ -10,9 +11,18 @@ import 'chat_event_bus.dart';
 /// 채팅 목록/방 관련 서비스
 /// 실제 백엔드 API를 우선으로 하고, 실패시에만 폴백 처리
 class ChatService {
-  final ApiService _api = ApiService();
   final MatchingService _matchingService = MatchingService();
   final ChatLocalStore _localStore = ChatLocalStore();
+
+  /// 인증 토큰 가져오기
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('playmate_auth_token');
+    } catch (e) {
+      return null;
+    }
+  }
 
   /// 내 채팅방 목록을 조회한다.
   /// 1순위: 백엔드 API (/chat/rooms/my)
@@ -49,23 +59,45 @@ class ChatService {
 
   /// 실제 채팅방 API에서 조회
   Future<List<ChatRoom>> _getChatRoomsFromAPI(User currentUser) async {
-    final rooms = await _api.getMyChatRooms();
-    // 서버 방 목록을 로컬에도 저장 (UX 향상)
-    for (final r in rooms) {
-      await _localStore.upsertRoom(currentUser.id, r);
-    }
-    if (rooms.isEmpty) {
-      // 서버가 비었으면 로컬 캐시 반환
+    final token = await _getAuthToken();
+    if (token == null) {
+      // 토큰이 없으면 로컬 캐시 반환
       final localRooms = await _localStore.loadRooms(currentUser.id);
       return localRooms;
     }
-    return rooms;
+    
+    try {
+      final rooms = await ApiService.getMyChatRooms(token);
+      // 서버 방 목록을 로컬에도 저장 (UX 향상)
+      for (final r in rooms) {
+        await _localStore.upsertRoom(currentUser.id, r);
+      }
+      if (rooms.isEmpty) {
+        // 서버가 비었으면 로컬 캐시 반환
+        final localRooms = await _localStore.loadRooms(currentUser.id);
+        return localRooms;
+      }
+      return rooms.map((r) => ChatRoom.fromJson(r)).toList();
+    } catch (e) {
+      // API 실패시 로컬 캐시 반환
+      final localRooms = await _localStore.loadRooms(currentUser.id);
+      return localRooms;
+    }
   }
 
   /// 매칭 기반으로 채팅방 구성
   Future<List<ChatRoom>> _getChatRoomsFromMatchings(User currentUser) async {
-    final matchings = await _api.getMyMatchings();
-    return _toChatRooms(matchings, currentUser);
+    final token = await _getAuthToken();
+    if (token == null) {
+      return [];
+    }
+    
+    try {
+      final matchings = await ApiService.getMyMatchings(token);
+      return _toChatRooms(matchings, currentUser);
+    } catch (e) {
+      return [];
+    }
   }
 
   // 실시간 생성된 채팅방들을 임시 저장 (실제로는 백엔드에서 관리)
@@ -91,7 +123,17 @@ class ChatService {
   /// 매칭 참여시 백엔드에 채팅방 생성 요청
   Future<bool> createChatRoom(int matchingId, User host, User guest) async {
     try {
-      await _api.createChatRoom(matchingId: matchingId, hostId: host.id, guestId: guest.id);
+      final token = await _getAuthToken();
+      if (token == null) {
+        return false;
+      }
+      
+      await ApiService.createChatRoom(
+        matchingId: matchingId, 
+        hostId: host.id, 
+        guestId: guest.id,
+        token: token,
+      );
       // 채팅방 생성 이벤트 전파 (리스트 즉시 갱신)
       ChatEventBus.instance.emit(ChatRoomCreated(matchingId));
       return true;
@@ -106,7 +148,12 @@ class ChatService {
   /// 채팅 진입을 위해 매칭 상세를 가져온다
   Future<Matching?> getMatchingForRoom(int matchingId) async {
     try {
-      return await _api.getMatchingById(matchingId);
+      final token = await _getAuthToken();
+      if (token == null) {
+        return _matchingService.getMatchingById(matchingId);
+      }
+      
+      return await ApiService.getMatchingDetail(matchingId, token);
     } catch (e) {
       if (kDebugMode) {
         print('매칭 조회 실패, Mock으로 폴백: $e');

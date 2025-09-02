@@ -39,6 +39,7 @@ dependencies:
   
   # 네트워킹 & API
   dio: ^5.4.3
+  http: ^1.2.0
   json_annotation: ^4.8.1
   
   # 로컬 저장소

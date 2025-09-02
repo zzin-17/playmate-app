@@ -35,6 +35,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late TabController _filterTabController;
   final MatchingNotificationService _notificationService = MatchingNotificationService();
   
+  // 성능 최적화를 위한 변수들 추가
+  Timer? _debounceTimer;
+  bool _isFiltering = false;
+  List<Matching> _cachedFilteredMatchings = [];
+  Map<String, dynamic> _lastFilterState = {};
+  
   @override
   void initState() {
     super.initState();
@@ -48,10 +54,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _selectedCityId = null;
     _selectedDistrictIds = [];
     
-    // 검색 컨트롤러 리스너 추가
-    _searchController.addListener(_onSearchChanged);
+    // 검색 컨트롤러 리스너 추가 (디바운싱 적용)
+    _searchController.addListener(_onSearchChangedDebounced);
     
-    _applyFilters();
+    // 초기 필터 적용 (한 번만)
+    _applyFiltersOnce();
     
     // 자동 완료 처리 타이머 시작
     _startAutoCompletionTimer();
@@ -79,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _searchController.dispose();
     _autoRefreshTimer?.cancel(); // 실시간 업데이트 타이머 정리
     _autoCompleteTimer?.cancel(); // 자동 완료 타이머 정리
+    _debounceTimer?.cancel(); // 디바운스 타이머 정리
     super.dispose();
   }
   
@@ -87,8 +95,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<String> _selectedGameTypes = [];
   String? _selectedSkillLevel;
   String? _selectedEndSkillLevel;
-  String? _selectedMinAge;
-  String? _selectedMaxAge;
+  List<String> _selectedAgeRanges = [];
+  bool _noAgeRestriction = false;
   bool _showOnlyRecruiting = false;
   bool _showOnlyFollowing = false; // 팔로우만 보기 추가
   DateTime? _startDate;
@@ -105,10 +113,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   List<Matching> _filteredMatchings = [];
+  List<String> _searchHistory = [];
+  bool _showSearchHistory = false;
 
   
   // UI 상태 변수들
   bool _isLoading = false;
+  String? _errorMessage;
   
   // 실시간 업데이트 관련 변수들
   Timer? _autoRefreshTimer;
@@ -408,7 +419,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final newMatchingWithRecovery = newMatching.copyWith(recoveryCount: 0);
         _mockMatchings.insert(0, newMatchingWithRecovery);
       // 필터링된 목록도 업데이트
-      _applyFilters();
+      _applyFiltersOnce();
     });
     
     // 실제 운영환경에서는 백엔드 API 저장으로 채팅 서비스가 자동 업데이트됨
@@ -427,18 +438,28 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // 검색 및 필터링 메서드
-  void _onSearchChanged() {
-    setState(() {
-      _searchQuery = _searchController.text.trim();
-      _showSearchHistory = _searchQuery.isEmpty && _searchHistory.isNotEmpty;
-      _applyFilters();
-    });
+  // 검색 및 필터링 메서드 (디바운싱 적용)
+  void _onSearchChangedDebounced() {
+    // 기존 타이머 취소
+    _debounceTimer?.cancel();
     
-    // 검색어가 변경될 때마다 히스토리 업데이트
-    if (_searchQuery.isNotEmpty) {
-      _updateSearchHistory(_searchQuery);
-    }
+    // 300ms 후에 실행 (사용자가 타이핑을 멈춘 후)
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _searchQuery = _searchController.text.trim();
+          _showSearchHistory = _searchQuery.isEmpty && _searchHistory.isNotEmpty;
+        });
+        
+        // 검색어가 변경될 때마다 히스토리 업데이트
+        if (_searchQuery.isNotEmpty) {
+          _updateSearchHistory(_searchQuery);
+        }
+        
+        // 필터 적용 (디바운싱된 검색)
+        _applyFiltersIfNeeded();
+      }
+    });
   }
   
   // 검색 히스토리 업데이트 (중복 제거 및 최신순 정렬)
@@ -477,7 +498,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _searchController.text = search;
         setState(() {
           _searchQuery = search;
-          _applyFilters();
+          _applyFiltersOnce();
         });
       },
       child: Container(
@@ -532,7 +553,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _searchController.text = query;
       _searchQuery = query;
       _showSearchHistory = false;
-      _applyFilters();
+      _applyFiltersOnce();
     });
   }
   
@@ -543,38 +564,67 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
   
-  void _applyFilters() {
+  // 필터 적용 메서드 (중복 호출 방지)
+  void _applyFiltersIfNeeded() {
+    if (_isFiltering) return; // 이미 필터링 중이면 스킵
+    
+    // 현재 필터 상태와 이전 상태 비교
+    final currentFilterState = _getCurrentFilterState();
+    if (_areFilterStatesEqual(currentFilterState, _lastFilterState)) {
+      return; // 필터 상태가 변경되지 않았으면 스킵
+    }
+    
+    _applyFiltersOnce();
+  }
+  
+  // 필터 적용 메서드 (실제 실행)
+  void _applyFiltersOnce() {
+    if (_isFiltering) return;
+    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
     
     // 실제 필터링은 비동기로 처리 (UI 반응성 향상)
-    Future.delayed(const Duration(milliseconds: 300), () {
+    Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
         _performFiltering();
+        _lastFilterState = _getCurrentFilterState();
       }
     });
   }
   
   void _performFiltering() {
-
+    if (!mounted) return;
     
+    _isFiltering = true;
+    
+    // 캐시된 결과가 있고 필터가 변경되지 않았으면 재사용
+    if (_cachedFilteredMatchings.isNotEmpty && 
+        _areFilterStatesEqual(_getCurrentFilterState(), _lastFilterState)) {
+      _filteredMatchings = List.from(_cachedFilteredMatchings);
+      _isFiltering = false;
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+    
+    // 실제 필터링 수행
     _filteredMatchings = _mockMatchings.where((matching) {
-      
-      
       // 검색어 필터링
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
         if (!matching.courtName.toLowerCase().contains(query)) {
-
           return false;
         }
       }
       
       // 모집중만 보기 필터
       if (_showOnlyRecruiting && matching.actualStatus != 'recruiting') {
-        
         return false;
       }
       
@@ -583,23 +633,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final authProvider = context.read<AuthProvider>();
         final currentUser = authProvider.currentUser;
         if (currentUser != null) {
-          // 현재 사용자가 팔로우하는 사용자들의 ID 목록
           final followingIds = currentUser.followingIds ?? [];
-          // 매칭 호스트가 팔로우 목록에 있는지 확인
           if (!followingIds.contains(matching.host.id)) {
-  
             return false;
           }
-        } else {
-          // 로그인하지 않은 경우 팔로우 필터 적용 안함
-
         }
       }
       
       // 게임 유형 필터
       if (_selectedGameTypes.isNotEmpty && 
           !_selectedGameTypes.contains(matching.gameType)) {
-        print('  - 게임 유형 불일치로 제외');
         return false;
       }
       
@@ -608,122 +651,80 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final startValue = _getSkillLevelFromText(_selectedSkillLevel);
         final endValue = _getSkillLevelFromText(_selectedEndSkillLevel);
         
-        print('  - 구력 필터 확인');
-        print('  - 선택된 시작 구력: $_selectedSkillLevel (값: $startValue)');
-        print('  - 선택된 종료 구력: $_selectedEndSkillLevel (값: $endValue)');
-        print('  - 매칭 구력: ${matching.minLevel}년-${matching.maxLevel}년');
-        
         if (startValue != null && endValue != null) {
-          // 시작 구력과 종료 구력이 모두 선택된 경우
           final minLevel = matching.minLevel ?? 0;
           final maxLevel = matching.maxLevel ?? 10;
           if (maxLevel < startValue || minLevel > endValue) {
-            print('  - 구력 범위 불일치로 제외');
-          return false;
-        }
+            return false;
+          }
         } else if (startValue != null) {
-          // 시작 구력만 선택된 경우
           final maxLevel = matching.maxLevel ?? 10;
           if (maxLevel < startValue) {
-            print('  - 시작 구력보다 낮아서 제외');
             return false;
           }
         } else if (endValue != null) {
-          // 종료 구력만 선택된 경우
           final minLevel = matching.minLevel ?? 0;
           if (minLevel > endValue) {
-            print('  - 종료 구력보다 높아서 제외');
             return false;
           }
         }
-        
-        print('  - 구력 필터 통과');
       }
       
-      // 연령대 범위 필터
-      if (_selectedMinAge != null || _selectedMaxAge != null) {
-        final startAge = _getAgeFromText(_selectedMinAge);
-        final endAge = _getAgeFromText(_selectedMaxAge);
+      // 연령대 필터 (다수 선택 또는 연령 상관없음)
+      if (!_noAgeRestriction && _selectedAgeRanges.isNotEmpty) {
+        bool ageMatch = false;
+        final minAge = matching.minAge ?? 10;
+        final maxAge = matching.maxAge ?? 60;
         
-        print('  - 연령대 필터 확인');
-        print('  - 선택된 시작 연령대: $_selectedMinAge (값: $startAge)');
-        print('  - 선택된 종료 연령대: $_selectedMaxAge (값: $endAge)');
-        print('  - 매칭 연령대: ${matching.minAge}대-${matching.maxAge}대');
-        
-        if (startAge != null && endAge != null) {
-          // 시작 연령대와 종료 연령대가 모두 선택된 경우
-          final minAge = matching.minAge ?? 10;
-          final maxAge = matching.maxAge ?? 60;
-          if (maxAge < startAge || minAge > endAge) {
-            print('  - 연령대 범위 불일치로 제외');
-            return false;
-          }
-        } else if (startAge != null) {
-          // 시작 연령대만 선택된 경우
-          final maxAge = matching.maxAge ?? 60;
-          if (maxAge < startAge) {
-            print('  - 시작 연령대보다 낮아서 제외');
-            return false;
-          }
-        } else if (endAge != null) {
-          // 종료 연령대만 선택된 경우
-          final minAge = matching.minAge ?? 10;
-          if (minAge > endAge) {
-            print('  - 종료 연령대보다 높아서 제외');
-            return false;
+        for (String ageRange in _selectedAgeRanges) {
+          final selectedAge = _getAgeFromText(ageRange);
+          if (selectedAge != null) {
+            // 선택된 연령대가 매칭의 연령대 범위와 겹치는지 확인
+            if (maxAge >= selectedAge && minAge <= selectedAge + 9) {
+              ageMatch = true;
+              break;
+            }
           }
         }
         
-        print('  - 연령대 필터 통과');
+        if (!ageMatch) {
+          return false;
+        }
       }
       
       // 날짜 범위 필터
       if (_startDate != null && matching.date.isBefore(_startDate!)) {
-        print('  - 시작 날짜 이전이므로 제외');
         return false;
       }
       if (_endDate != null && matching.date.isAfter(_endDate!)) {
-        print('  - 종료 날짜 이후이므로 제외');
         return false;
       }
       
       // 시간 범위 필터
       if (_startTime != null || _endTime != null) {
-        // 매칭의 시간 슬롯을 파싱
         final timeParts = matching.timeSlot.split('~');
         if (timeParts.length == 2) {
           final matchStartTime = timeParts[0].trim();
           final matchEndTime = timeParts[1].trim();
           
-          print('  - 매칭 시간: $matchStartTime ~ $matchEndTime');
-          print('  - 선택된 시간: $_startTime ~ $_endTime');
-          
-          // 시작 시간이 선택된 시작 시간보다 이전이면 제외
           if (_startTime != null) {
             if (_compareTime(matchStartTime, _startTime!) < 0) {
-              print('  - 시작 시간이 선택된 시작 시간보다 이전이므로 제외');
               return false;
             }
           }
           
-          // 종료 시간이 선택된 종료 시간보다 늦으면 제외
           if (_endTime != null) {
             if (_compareTime(matchEndTime, _endTime!) > 0) {
-              print('  - 종료 시간이 선택된 종료 시간보다 늦으므로 제외');
               return false;
             }
           }
-          
-          print('  - 시간 필터 통과');
         }
       }
       
       // 위치 필터
       if (_selectedCityId != null || _selectedDistrictIds.isNotEmpty) {
-        // 도시 선택이 있거나 구/군 선택이 있는 경우
         bool locationMatch = false;
         
-        // 코트별 위치 정보 매핑 (실제로는 데이터베이스에서 가져올 예정)
         Map<String, String> courtLocations = {
           '잠실종합운동장': '서울 송파구',
           '양재시민의숲': '서울 강남구',
@@ -735,66 +736,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         
         String? courtLocation = courtLocations[matching.courtName];
         if (courtLocation == null) {
-          print('    - 위치 정보 없음으로 제외');
-          return false; // 위치 정보가 없으면 제외
+          return false;
         }
         
-        print('    - 코트 위치: $courtLocation');
-        
-        // 도시 선택이 있는 경우
         if (_selectedCityId != null) {
           String cityName = _getCityName(_selectedCityId!);
-          print('    - 선택된 도시: $cityName');
           if (!courtLocation.contains(cityName)) {
-            print('    - 도시 불일치로 제외');
-            return false; // 도시가 일치하지 않으면 제외
+            return false;
           }
         }
         
-        // 구/군 선택이 있는 경우
         if (_selectedDistrictIds.isNotEmpty) {
-          print('    - 선택된 구/군: $_selectedDistrictIds');
           bool districtMatch = false;
           for (String districtId in _selectedDistrictIds) {
             if (districtId.contains('_all')) {
-              // 전체 선택인 경우 해당 도시의 모든 구/군 매칭
               String cityId = districtId.split('_')[0];
               String cityName = _getCityName(cityId);
               if (courtLocation.contains(cityName)) {
                 districtMatch = true;
-                print('    - 도시 전체 선택으로 매칭');
                 break;
               }
             } else {
-              // 특정 구/군 선택인 경우
               String districtName = _getDistrictName(districtId);
-              print('    - 확인 중인 구/군: $districtName');
               if (courtLocation.contains(districtName)) {
                 districtMatch = true;
-                print('    - 구/군 매칭 성공');
                 break;
               }
             }
           }
           if (!districtMatch) {
-            print('    - 구/군 불일치로 제외');
-            return false; // 구/군이 일치하지 않으면 제외
+            return false;
           }
         }
         
         locationMatch = true;
-        print('    - 위치 필터 통과');
       }
       
-      // 필터 상태 동기화
-      _syncFilterState();
-      
-      print('  - 모든 필터 통과');
       return true;
     }).toList();
     
-    print('필터링 결과: ${_filteredMatchings.length}개 매칭');
-    print('=== 필터 적용 완료 ===');
+    // 결과 캐싱
+    _cachedFilteredMatchings = List.from(_filteredMatchings);
+    
+    // 필터 상태 동기화 (한 번만)
+    _syncFilterStateOnce();
+    
+    _isFiltering = false;
     
     if (mounted) {
       setState(() {
@@ -803,8 +790,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // 필터 상태 동기화
-  void _syncFilterState() {
+  // 필터 상태 동기화 (중복 호출 방지)
+  void _syncFilterStateOnce() {
+    if (!mounted) return;
+    
     setState(() {
       // 기존 위치 관련 필터 제거
       _selectedFilters.removeWhere((filter) => 
@@ -883,23 +872,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _selectedFilters.add(skillFilter);
         }
       }
-      
-      // 모집중만 보기는 전용 체크박스로 관리하므로 필터 요약에서 제외
-      // if (_showOnlyRecruiting) {
-      //   if (!_selectedFilters.contains('모집중')) {
-      //         _selectedFilters.add('모집중');
-      //       }
-      //   }
-      
-      // 팔로우만 보기는 전용 체크박스로 관리하므로 필터 요약에서 제외
-      // if (_showOnlyFollowing) {
-      //   if (!_selectedFilters.contains('팔로우만')) {
-      //     _selectedFilters.add('팔로우만');
-      //   }
-      // }
-      
-      print('=== 필터 상태 동기화 완료 ===');
-      print('_selectedFilters: $_selectedFilters');
     });
   }
 
@@ -1041,7 +1013,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   onChanged: (value) {
                     setState(() {
                       _searchQuery = value.trim();
-                      _applyFilters();
+                      _applyFiltersIfNeeded();
                     });
                   },
                   onSubmitted: (value) {
@@ -1050,7 +1022,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       setState(() {
                         _searchQuery = value.trim();
                         _showSearchHistory = false;
-                        _applyFilters();
+                        _applyFiltersOnce();
                       });
                     }
                   },
@@ -1166,7 +1138,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               _endTime = null;
                                   _selectedCityId = null;
                                   _selectedDistrictIds.clear();
-                                  _applyFilters();
+                                  _applyFiltersOnce();
                             });
                           },
                           style: TextButton.styleFrom(
@@ -1650,7 +1622,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
     
     // 필터 적용
-    _applyFilters();
+    _applyFiltersOnce();
     
     // 성공 메시지 표시
     ScaffoldMessenger.of(context).showSnackBar(
@@ -2150,8 +2122,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     List<String> localSelectedGameTypes = List.from(_selectedGameTypes);
     String? localSelectedSkillLevel = _selectedSkillLevel;
     String? localSelectedEndSkillLevel = _selectedEndSkillLevel;
-    String? localSelectedMinAge = _selectedMinAge;
-    String? localSelectedMaxAge = _selectedMaxAge;
+    List<String> localSelectedAgeRanges = List.from(_selectedAgeRanges);
+    bool localNoAgeRestriction = _noAgeRestriction;
     DateTime? localStartDate = _startDate;
     DateTime? localEndDate = _endDate;
     String? localStartTime = _startTime;
@@ -2224,8 +2196,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               localSelectedGameTypes.clear();
                               localSelectedSkillLevel = null;
                               localSelectedEndSkillLevel = null;
-                              localSelectedMinAge = null;
-                              localSelectedMaxAge = null;
+                              localSelectedAgeRanges.clear();
+                              localNoAgeRestriction = false;
                               localStartDate = null;
                               localEndDate = null;
                               localStartTime = null;
@@ -2262,8 +2234,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             localSelectedDistrictIds = List.from(_selectedDistrictIds);
                             localSelectedSkillLevel = _selectedSkillLevel;
                             localSelectedEndSkillLevel = _selectedEndSkillLevel;
-                            localSelectedMinAge = _selectedMinAge;
-                            localSelectedMaxAge = _selectedMaxAge;
                             
                             print('=== 모달 닫기 전 local 변수 업데이트 ===');
                             print('localStartDate: $localStartDate');
@@ -2280,16 +2250,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               _selectedGameTypes = List.from(localSelectedGameTypes);
                               _selectedSkillLevel = localSelectedSkillLevel;
                               _selectedEndSkillLevel = localSelectedEndSkillLevel;
-                              _selectedMinAge = localSelectedMinAge;
-                              _selectedMaxAge = localSelectedMaxAge;
+                              _selectedAgeRanges = List.from(localSelectedAgeRanges);
+                              _noAgeRestriction = localNoAgeRestriction;
                               _startDate = localStartDate;
                               _endDate = localEndDate;
                               _startTime = localStartTime;
                               _endTime = localEndTime;
                               _selectedCityId = localSelectedCityId;
                               _selectedDistrictIds = List.from(localSelectedDistrictIds);
-                              // _selectedFilters 초기화 후 필터 상태 동기화
+                              // _selectedFilters 업데이트
                               _selectedFilters.clear();
+                              _selectedFilters.addAll(localSelectedFilters);
                             });
                             
                             print('=== 모달 닫기 후 실제 변수 상태 ===');
@@ -2303,10 +2274,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             print('_selectedEndSkillLevel: $_selectedEndSkillLevel');
                             
                             // 필터 상태 동기화하여 요약 UI 업데이트
-                            _syncFilterState();
+                            _syncFilterStateOnce();
                             
                             // 필터 적용 후 검색 결과 업데이트
-                            _applyFilters();
+                            _applyFiltersOnce();
                             
                             print('=== 모달 닫기 후 _syncFilterState() 호출 완료 ===');
                             print('_selectedFilters: $_selectedFilters');
@@ -2384,7 +2355,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           // 연령대 탭
                           SingleChildScrollView(
                             padding: const EdgeInsets.all(16),
-                            child: _buildAgeRangeTab(localSelectedMinAge, localSelectedMaxAge, localSelectedFilters, setModalState),
+                            child: _buildAgeRangeTab(setModalState),
                             ),
                           ],
                         ),
@@ -2447,7 +2418,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 _startDate = start;
                 _endDate = end;
                 // 필터 적용하여 상태 동기화
-                _applyFilters();
+                _applyFiltersOnce();
                               });
                             },
           ),
@@ -2669,7 +2640,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   setState(() {
                     _startTime = timeValue;
                     // 필터 적용하여 상태 동기화
-                    _applyFilters();
+                    _applyFiltersOnce();
                   });
                   print('시작 시간 설정 완료: $_startTime');
                 } else if (_endTime == null) {
@@ -2703,7 +2674,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         _startTime = timeValue;
                       }
                       // 필터 적용하여 상태 동기화
-                      _applyFilters();
+                      _applyFiltersOnce();
                     });
                     print('종료 시간 설정 완료: $_endTime');
                                           } else {
@@ -2720,7 +2691,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     _startTime = timeValue;
                     _endTime = null;
                     // 필터 적용하여 상태 동기화
-                    _applyFilters();
+                    _applyFiltersOnce();
                   });
                 }
                                       },
@@ -2791,7 +2762,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       _selectedFilters.add(city.name);
                       
                       // 필터 적용
-                      _applyFilters();
+                      _applyFiltersOnce();
                     });
                     
                     // 실제 상태 변수도 업데이트
@@ -2811,7 +2782,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       _selectedFilters.add(city.name);
                       
                       // 필터 적용
-                      _applyFilters();
+                      _applyFiltersOnce();
                             });
                           },
                   child: Container(
@@ -2870,7 +2841,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           }
                           
                           // 필터 적용
-                          _applyFilters();
+                          _applyFiltersOnce();
                         });
                         
                         // 실제 상태 변수도 업데이트
@@ -2888,7 +2859,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           }
                           
                           // 필터 적용
-                          _applyFilters();
+                          _applyFiltersOnce();
                                         });
                                       },
                                       child: Container(
@@ -2978,7 +2949,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 });
                 
                 // 필터 적용
-                _applyFilters();
+                _applyFiltersOnce();
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -3243,8 +3214,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               _selectedSkillLevel = null;
               _selectedEndSkillLevel = null;
             } else if (category == '연령대') {
-              _selectedMinAge = null;
-              _selectedMaxAge = null;
+              _selectedAgeRanges.clear();
+              _noAgeRestriction = false;
             } else if (category == '날짜') {
               _startDate = null;
               _endDate = null;
@@ -3511,7 +3482,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     _searchController.clear();
                     setState(() {
                       _searchQuery = '';
-                      _applyFilters();
+                      _applyFiltersOnce();
                     });
                   },
                   icon: const Icon(Icons.clear, size: 16),
@@ -3644,7 +3615,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
       
       // 필터 적용
-      _applyFilters();
+      _applyFiltersOnce();
     });
   }
 
@@ -3768,10 +3739,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 }
                 
                 // 필터 상태 동기화하여 요약 UI 업데이트
-                _syncFilterState();
+                _syncFilterStateOnce();
                 
                 // 필터 적용
-                _applyFilters();
+                _applyFiltersOnce();
               });
             },
             child: Icon(
@@ -3824,7 +3795,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // 연령대 범위 필터 탭 위젯
-  Widget _buildAgeRangeTab(String? selectedMinAge, String? selectedMaxAge, List<String> selectedFilters, StateSetter setModalState) {
+  Widget _buildAgeRangeTab(StateSetter setModalState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3847,7 +3818,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         const SizedBox(height: 20),
         
         // 선택된 연령대 범위 표시
-        if (selectedMinAge != null || selectedMaxAge != null) ...[
+        if (_selectedAgeRanges.isNotEmpty || _noAgeRestriction) ...[
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -3855,139 +3826,173 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.people,
-                  color: AppColors.primary,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  selectedMinAge != null && selectedMaxAge != null
-                      ? '$selectedMinAge ~ $selectedMaxAge'
-                      : selectedMinAge != null
-                          ? '$selectedMinAge 이상'
-                          : '$selectedMaxAge 이하',
-                  style: AppTextStyles.body.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
+                if (_noAgeRestriction) ...[
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: AppColors.primary,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '연령 상관없음',
+                        style: AppTextStyles.body.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                ] else ...[
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.people,
+                        color: AppColors.primary,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '선택된 연령대: ${_selectedAgeRanges.join(', ')}',
+                        style: AppTextStyles.body.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
           const SizedBox(height: 20),
         ],
         
-        // 연령대 선택 버튼들
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _ageOptions.map((age) {
-            final isSelected = selectedMinAge == age || selectedMaxAge == age;
-            final isInRange = selectedMinAge != null && selectedMaxAge != null &&
-                _ageOptions.indexOf(age) >= _ageOptions.indexOf(selectedMinAge!) &&
-                _ageOptions.indexOf(age) <= _ageOptions.indexOf(selectedMaxAge!);
-            
-            return GestureDetector(
-              onTap: () {
-                print('=== 연령대 버튼 클릭: $age ===');
-                setModalState(() {
-                  if (selectedMinAge == null) {
-                    // 첫 번째 선택: 시작 연령대
-                    selectedMinAge = age;
-                    print('첫 번째 선택: 시작 연령대 = $age');
-                  } else if (selectedMaxAge == null) {
-                    // 두 번째 선택: 종료 연령대
-                    selectedMaxAge = age;
-                    print('두 번째 선택: 종료 연령대 = $age');
-                    
-                    // 종료 연령대가 시작 연령대보다 작으면 순서 변경
-                    if (_ageOptions.indexOf(selectedMaxAge!) < _ageOptions.indexOf(selectedMinAge!)) {
-                      final temp = selectedMinAge;
-                      selectedMinAge = selectedMaxAge;
-                      selectedMaxAge = temp;
-                    }
-                  } else {
-                    // 새로운 선택: 시작 연령대로 재설정
-                    selectedMinAge = age;
-                    selectedMaxAge = null;
-                    print('새로운 선택: 시작 연령대 재설정 = $age');
-                  }
-                });
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: isSelected || isInRange
-                      ? AppColors.primary
-                      : AppColors.surface,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: isSelected || isInRange
-                        ? AppColors.primary
-                        : AppColors.cardBorder,
-                  ),
+        // 연령 상관없음 체크박스
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+                              Checkbox(
+                  value: _noAgeRestriction,
+                  onChanged: (value) {
+                    setModalState(() {
+                      _noAgeRestriction = value ?? false;
+                      if (_noAgeRestriction) {
+                        // 연령 상관없음 선택 시 모든 연령대 선택 해제
+                        _selectedAgeRanges.clear();
+                        _selectedFilters.removeWhere((filter) => 
+                            filter.contains('10대') || filter.contains('20대') || 
+                            filter.contains('30대') || filter.contains('40대') || 
+                            filter.contains('50대') || filter.contains('60대'));
+                      }
+                    });
+                    // 즉시 필터 적용
+                    _applyFiltersOnce();
+                  },
+                  activeColor: AppColors.primary,
                 ),
-                child: Text(
-                  age,
-                  style: AppTextStyles.body.copyWith(
-                    color: isSelected || isInRange
-                        ? Colors.white
-                        : AppColors.textPrimary,
-                    fontWeight: isSelected || isInRange
-                        ? FontWeight.w600
-                        : FontWeight.normal,
-                  ),
+              const SizedBox(width: 8),
+              Text(
+                '연령 상관없음',
+                style: AppTextStyles.body.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-            );
-          }).toList(),
-        ),
-        
-        const SizedBox(height: 20),
-        
-        // 선택 완료 버튼
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () {
-              print('=== 연령대 필터 선택 완료 ===');
-              print('선택된 시작 연령대: $selectedMinAge');
-              print('선택된 종료 연령대: $selectedMaxAge');
-              
-              // 필터 텍스트 생성
-              if (selectedMinAge != null && selectedMaxAge != null) {
-                final filterText = '$selectedMinAge-$selectedMaxAge';
-                if (!selectedFilters.contains(filterText)) {
-                  selectedFilters.add(filterText);
-                }
-              } else if (selectedMinAge != null) {
-                final filterText = '$selectedMinAge 이상';
-                if (!selectedFilters.contains(filterText)) {
-                  selectedFilters.add(filterText);
-                }
-              } else if (selectedMaxAge != null) {
-                final filterText = '$selectedMaxAge 이하';
-                if (!selectedFilters.contains(filterText)) {
-                  selectedFilters.add(filterText);
-                }
-              }
-              
-              Navigator.of(context).pop();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('선택 완료'),
+            ],
           ),
         ),
+        
+        const SizedBox(height: 16),
+        
+        // 연령대 선택 안내 (연령 상관없음이 선택되지 않았을 때만)
+        if (!_noAgeRestriction) ...[
+          Text(
+            '원하는 연령대를 여러 개 선택할 수 있습니다',
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        
+        // 연령대 선택 버튼들 (연령 상관없음이 선택되지 않았을 때만)
+        if (!_noAgeRestriction)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _ageOptions.map((age) {
+              final isSelected = _selectedAgeRanges.contains(age);
+              print('=== 연령대 버튼 렌더링: $age, isSelected: $isSelected, _selectedAgeRanges: $_selectedAgeRanges ===');
+              
+              return GestureDetector(
+                onTap: () {
+                  print('=== 연령대 버튼 클릭: $age ===');
+                  
+                  if (isSelected) {
+                    // 선택 해제
+                    setModalState(() {
+                      _selectedAgeRanges.remove(age);
+                    });
+                    print('연령대 선택 해제: $age');
+                    
+                    // 필터 텍스트에서 제거
+                    _selectedFilters.removeWhere((filter) => filter.contains(age));
+                  } else {
+                    // 선택 추가
+                    setModalState(() {
+                      _selectedAgeRanges.add(age);
+                    });
+                    print('연령대 선택 추가: $age');
+                    
+                    // 필터 텍스트에 추가
+                    if (!_selectedFilters.contains(age)) {
+                      _selectedFilters.add(age);
+                    }
+                  }
+                  
+                  print('클릭 후 _selectedAgeRanges: $_selectedAgeRanges');
+                  print('클릭 후 _selectedFilters: $_selectedFilters');
+                  
+                  // 즉시 필터 적용
+                  _applyFiltersOnce();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.cardBorder,
+                    ),
+                  ),
+                  child: Text(
+                    age,
+                    style: AppTextStyles.body.copyWith(
+                      color: isSelected
+                          ? Colors.white
+                          : AppColors.textPrimary,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        
+        const SizedBox(height: 20),
       ],
     );
   }
@@ -4117,10 +4122,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   print('선택된 종료 구력: $_selectedEndSkillLevel');
 
                   // 필터 상태 동기화하여 요약 UI 업데이트
-                  _syncFilterState();
+                  _syncFilterStateOnce();
                   
                   // 필터 적용
-                  _applyFilters();
+                  _applyFiltersOnce();
                 },
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
@@ -4200,7 +4205,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         });
         
         // 필터 재적용
-        _applyFilters();
+        _applyFiltersOnce();
         
         print('매칭 데이터 새로고침 완료: ${DateTime.now()}');
       }
@@ -4361,7 +4366,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     // 업데이트가 있으면 필터 적용
     if (hasUpdates) {
-      _applyFilters();
+      _applyFiltersOnce();
     }
   }
 
@@ -4510,7 +4515,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onChanged: (value) {
                 setState(() {
                   _showOnlyRecruiting = value ?? false;
-                  _applyFilters();
+                  _applyFiltersOnce();
                 });
               },
               activeColor: AppColors.primary,
@@ -4522,7 +4527,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             onTap: () {
               setState(() {
                 _showOnlyRecruiting = !_showOnlyRecruiting;
-                _applyFilters();
+                _applyFiltersOnce();
               });
             },
             child: Text(
@@ -4560,7 +4565,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               setState(() {
                 _showOnlyFollowing = value ?? false;
               });
-              _applyFilters();
+              _applyFiltersOnce();
             },
             activeColor: AppColors.accent,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -4571,7 +4576,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               setState(() {
                 _showOnlyFollowing = !_showOnlyFollowing;
               });
-              _applyFilters();
+              _applyFiltersOnce();
             },
             child: Text(
               '팔로우만',
@@ -4587,5 +4592,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  // 현재 필터 상태 가져오기
+  Map<String, dynamic> _getCurrentFilterState() {
+    return {
+      'searchQuery': _searchQuery,
+      'showOnlyRecruiting': _showOnlyRecruiting,
+      'showOnlyFollowing': _showOnlyFollowing,
+      'gameTypes': List<String>.from(_selectedGameTypes),
+      'skillLevel': _selectedSkillLevel,
+      'endSkillLevel': _selectedEndSkillLevel,
+      'ageRanges': List<String>.from(_selectedAgeRanges),
+      'noAgeRestriction': _noAgeRestriction,
+      'startDate': _startDate,
+      'endDate': _endDate,
+      'startTime': _startTime,
+      'endTime': _endTime,
+      'cityId': _selectedCityId,
+      'districtIds': List<String>.from(_selectedDistrictIds),
+    };
+  }
+  
+  // 필터 상태 비교
+  bool _areFilterStatesEqual(Map<String, dynamic> state1, Map<String, dynamic> state2) {
+    if (state1.length != state2.length) return false;
+    
+    for (String key in state1.keys) {
+      if (state1[key] != state2[key]) {
+        // 리스트 타입 특별 처리
+        if (state1[key] is List && state2[key] is List) {
+          List list1 = state1[key] as List;
+          List list2 = state2[key] as List;
+          if (list1.length != list2.length) return false;
+          for (int i = 0; i < list1.length; i++) {
+            if (list1[i] != list2[i]) return false;
+          }
+        } else {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 
 }

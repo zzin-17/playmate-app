@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/common/app_button.dart';
 import '../../models/matching.dart';
 import '../../models/user.dart';
@@ -48,6 +49,16 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
     {'value': 'singles', 'label': '단식'},
     {'value': 'rally', 'label': '랠리'},
   ];
+
+  /// 인증 토큰 가져오기
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('playmate_auth_token');
+    } catch (e) {
+      return null;
+    }
+  }
 
   @override
   void initState() {
@@ -167,11 +178,16 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
 
     try {
       // 실제 백엔드 API로 매칭 생성
-      final apiService = ApiService();
-      final createdMatching = await apiService.createMatching(newMatching.toJson());
-      
-      // 성공시 생성된 매칭을 홈 화면으로 전달
-      Navigator.of(context).pop(createdMatching);
+      final token = await _getAuthToken();
+      if (token != null) {
+        final createdMatching = await ApiService.createMatching(newMatching.toJson(), token);
+        
+        // 성공시 생성된 매칭을 홈 화면으로 전달
+        Navigator.of(context).pop(createdMatching);
+      } else {
+        // 토큰이 없으면 로컬로 처리
+        Navigator.of(context).pop(newMatching);
+      }
     } catch (e) {
       // API 실패시 폴백: 로컬 매칭으로 처리 (개발용)
       print('매칭 생성 API 실패, 로컬로 처리: $e');

@@ -14,7 +14,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
   final _emailController = TextEditingController();
   final _codeController = TextEditingController();
   final _newPasswordController = TextEditingController();
-  final ApiService _api = ApiService();
+  // ApiService는 정적 메서드로 사용
   bool _requested = false;
   bool _loading = false;
 
@@ -30,7 +30,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     if (_emailController.text.isEmpty) return;
     setState(() => _loading = true);
     try {
-      await _api.requestPasswordReset(_emailController.text.trim());
+      await ApiService.requestPasswordReset(_emailController.text.trim());
       setState(() => _requested = true);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -50,7 +50,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await _api.resetPassword(code: _codeController.text.trim(), newPassword: _newPasswordController.text);
+      await ApiService.resetPassword(code: _codeController.text.trim(), newPassword: _newPasswordController.text);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('비밀번호가 변경되었습니다.'), backgroundColor: AppColors.success),

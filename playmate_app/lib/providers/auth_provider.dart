@@ -79,10 +79,9 @@ class AuthProvider extends ChangeNotifier {
       
       // 1) 실제 API 로그인 시도
       try {
-        final response = await _apiService.login(email, password);
+        final response = await ApiService.login(email, password);
         final token = response['token'] as String;
         await _saveToken(token);
-        _apiService.setAuthToken(token);
         await _loadCurrentUser();
         
         // 로그인 성공 시 시도 횟수 초기화
@@ -94,7 +93,6 @@ class AuthProvider extends ChangeNotifier {
         // 2) 실패 시 Mock 계정으로 폴백 (개발/테스트 용)
         final res = await MockAuthService.login(email, password);
         await _saveToken(res['token'] as String);
-        _apiService.setAuthToken(null);
         _currentUser = res['user'] as User;
         
         // 로그인 성공 시 시도 횟수 초기화
@@ -138,7 +136,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       // 실제 API 호출 (백엔드 스펙 확정 시 startYearMonth 전달)
-      final response = await _apiService.register(
+      final response = await ApiService.register(
         email: email,
         password: password,
         nickname: nickname,
@@ -148,7 +146,6 @@ class AuthProvider extends ChangeNotifier {
       
       // 회원가입 후 자동 로그인
       await _saveToken(response['token'] as String);
-      _apiService.setAuthToken(response['token'] as String);
       await _loadCurrentUser();
       // Mock 환경에서는 startYearMonth를 현재 사용자에 반영
       if (_currentUser != null && startYearMonth != null) {
@@ -188,7 +185,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _clearToken();
       _currentUser = null;
-      _apiService.setAuthToken(null);
+              // 토큰 제거 (정적 메서드에서는 불필요)
       _setLoading(false);
       notifyListeners();
     } catch (e) {
@@ -210,8 +207,7 @@ class AuthProvider extends ChangeNotifier {
           _currentUser = user;
           notifyListeners();
         } else {
-          _apiService.setAuthToken(token);
-          final user = await _apiService.getCurrentUser();
+          final user = await ApiService.getCurrentUser(token);
           _currentUser = user;
           notifyListeners();
         }
@@ -230,8 +226,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final token = await _getToken();
       if (token != null) {
-        _apiService.setAuthToken(token);
-        final updatedUser = await _apiService.updateProfile(profileData);
+        final updatedUser = await ApiService.updateProfile(profileData, token);
         _currentUser = updatedUser;
         _setLoading(false);
         notifyListeners();
@@ -250,7 +245,6 @@ class AuthProvider extends ChangeNotifier {
     final token = await _getToken();
     
     if (token != null) {
-      _apiService.setAuthToken(token);
       await _loadCurrentUser();
     } else {
       // 토큰이 없으면 저장된 자격 증명으로 자동 로그인 시도
@@ -369,7 +363,6 @@ class AuthProvider extends ChangeNotifier {
     _error = error;
     // 에러 설정 시에는 notifyListeners() 호출하지 않음
     // (화면이 새로 로드되는 것을 방지)
-
   }
 
   void _clearError() {

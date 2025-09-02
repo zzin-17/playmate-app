@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/matching.dart';
 import '../models/user.dart';
 import '../constants/app_colors.dart';
@@ -12,18 +13,31 @@ class MatchingService {
   factory MatchingService() => _instance;
   MatchingService._internal();
 
+  /// 인증 토큰 가져오기
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('playmate_auth_token');
+    } catch (e) {
+      return null;
+    }
+  }
+
   // 매칭 상태 변경 메서드들
   Future<bool> joinMatching(Matching matching, User user) async {
     try {
       // 실제 API 호출로 매칭 참여 처리
-      final apiService = ApiService();
-      await apiService.requestMatching(matching.id, '참여 신청합니다!');
-      
-      // 성공시 채팅방 생성 요청
-      final chatService = ChatService();
-      await chatService.createChatRoom(matching.id, matching.host, user);
-      
-      return true;
+      final token = await _getAuthToken();
+      if (token != null) {
+        await ApiService.requestMatching(matching.id, '참여 신청합니다!', token);
+        
+        // 성공시 채팅방 생성 요청
+        final chatService = ChatService();
+        await chatService.createChatRoom(matching.id, matching.host, user);
+        
+        return true;
+      }
+      return false;
     } catch (e) {
       print('매칭 참여 실패: $e');
       return false;
