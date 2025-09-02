@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/user.dart';
-import '../../models/matching.dart';
+
 import '../../services/matching_notification_service.dart';
 import '../../services/matching_service.dart';
 import '../../constants/app_colors.dart';

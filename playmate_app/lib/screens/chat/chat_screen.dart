@@ -45,7 +45,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ChatLocalStore _localStore = ChatLocalStore();
   bool _isLoading = false;
   bool _isHost = false;
-  bool _hasApplied = false;
+
   bool _isMatchingConfirmed = false;
   
   // WebSocket 관련 상태
@@ -202,14 +202,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
   
-  // WebSocket 연결 해제
-  void _disconnectWebSocket() {
-    try {
-      WebSocketService.instance.disconnect();
-    } catch (e) {
-      print('WebSocket 연결 해제 실패: $e');
-    }
-  }
+
 
   // 연결 상태 표시 위젯 (연결이 정상이면 숨김)
   Widget _buildConnectionStatus() {
@@ -263,34 +256,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
 
 
-  /// 매칭 확정 알림 전송
-  void _sendMatchingConfirmedNotification() {
-    try {
-      // 게스트들에게 매칭 확정 알림
-      if (widget.matching.guests != null) {
-        for (final guest in widget.matching.guests!) {
-          NotificationService().showMatchingConfirmedNotification(
-            hostName: widget.matching.host.nickname,
-            courtName: widget.matching.courtName,
-            date: _formatDate(widget.matching.date),
-            matchingId: widget.matching.id,
-          );
-        }
-      }
-      
-      // 목업 데이터가 있는 경우에도 알림
-      if (widget.matching.guests == null || widget.matching.guests!.isEmpty) {
-        NotificationService().showMatchingConfirmedNotification(
-          hostName: widget.matching.host.nickname,
-          courtName: widget.matching.courtName,
-          date: _formatDate(widget.matching.date),
-          matchingId: widget.matching.id,
-        );
-      }
-    } catch (e) {
-      print('매칭 확정 알림 전송 실패: $e');
-    }
-  }
+
 
   /// 날짜 포맷팅
   String _formatDate(DateTime date) {
@@ -341,48 +307,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  List<User> _getParticipants() {
-    // 매칭 참여자 목록 반환 (현재 사용자 제외)
-    final participants = <User>[];
-    
-    // 호스트가 현재 사용자가 아닌 경우 호스트 추가
-    if (widget.matching.host.id != widget.currentUser.id) {
-      participants.add(widget.matching.host);
-    }
-    
-    // 게스트 목록 추가 (null 체크 포함)
-    if (widget.matching.guests != null) {
-      for (final guest in widget.matching.guests!) {
-        if (guest.id != widget.currentUser.id) {
-          participants.add(guest);
-        }
-      }
-    }
-    
-    // 목업 데이터: 실제 게스트가 없을 때 테스트용
-    if (participants.isEmpty && widget.matching.host.id != widget.currentUser.id) {
-      // 테스트용 더미 게스트 추가
-      participants.add(User(
-        id: 999,
-        email: 'test@example.com',
-        nickname: '테니스러버',
-        birthYear: 1990,
-        gender: 'male',
-        skillLevel: 3,
-        region: '서울',
-        preferredCourt: '잠실종합운동장',
-        preferredTime: ['오후', '저녁'],
-        playStyle: '공격적',
-        hasLesson: false,
-        mannerScore: 4.5,
-        startYearMonth: '2020-03',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ));
-    }
-    
-    return participants;
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -917,120 +842,9 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // 참여자 온라인 상태 표시 (1:1 채팅에서는 불필요하므로 제거)
-  Widget _buildParticipantsStatus() {
-    // 1:1 채팅에서는 참여자 목록이 불필요하므로 숨김
-    return const SizedBox.shrink();
-    
-    /*
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '참여자',
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              // 호스트
-              _buildParticipantStatus(
-                widget.matching.host,
-                isOnline: _isWebSocketConnected,
-                isHost: true,
-              ),
-              const SizedBox(width: 16),
-              // 게스트들
-              if (widget.matching.guests != null)
-                ...widget.matching.guests!.map((guest) => 
-                  Padding(
-                    padding: const EdgeInsets.only(right: 16),
-                    child: _buildParticipantStatus(
-                      guest,
-                      isOnline: _isWebSocketConnected,
-                      isHost: false,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-    */
-  }
 
-  // 개별 참여자 상태 표시
-  Widget _buildParticipantStatus(User user, {required bool isOnline, required bool isHost}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Stack(
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-              child: Text(
-                user.nickname.substring(0, 1),
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            // 온라인 상태 표시
-            Positioned(
-              right: 0,
-              bottom: 0,
-              child: Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: isOnline ? AppColors.success : AppColors.textSecondary,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.surface,
-                    width: 2,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              user.nickname,
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Text(
-              isHost ? '호스트' : '게스트',
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textSecondary,
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+
+
 
   Widget _buildSystemMessage(ChatMessage message) {
     return Padding(
@@ -1509,46 +1323,9 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  String _getGenderText(String gender) {
-    switch (gender) {
-      case 'male':
-        return '남성';
-      case 'female':
-        return '여성';
-      case 'any':
-        return '성별 무관';
-      default:
-        return '알 수 없음';
-    }
-  }
 
-  // 매칭 확정 버튼 위젯
-  Widget _buildMatchingConfirmationButton() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: AppButton(
-              onPressed: _confirmMatching,
-              text: '매칭 확정',
-              type: ButtonType.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
+
 
   // 매칭 확정 함수
   void _confirmMatching() {
@@ -1674,21 +1451,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // 읽음 확인 이벤트 핸들러
-  void _handleReadReceipt(ChatMessageRead event) {
-    // 해당 사용자가 보낸 메시지들을 읽음 상태로 업데이트
-    setState(() {
-      for (int i = 0; i < _messages.length; i++) {
-        if (_messages[i].senderId == event.userId && 
-            _messages[i].status != 'read') {
-          _messages[i] = _messages[i].copyWith(
-            status: 'read',
-            readAt: event.timestamp,
-          );
-        }
-      }
-    });
-  }
+
 
   // 읽음 확인 전송
   void _sendReadReceipt() {

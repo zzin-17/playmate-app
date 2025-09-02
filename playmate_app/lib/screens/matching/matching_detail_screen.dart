@@ -6,7 +6,7 @@ import '../../constants/app_text_styles.dart';
 import '../../widgets/common/app_button.dart';
 import '../../services/matching_service.dart';
 import '../../services/matching_state_service.dart';
-import '../../services/chat_service.dart';
+
 import '../chat/chat_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../review/write_review_screen.dart';

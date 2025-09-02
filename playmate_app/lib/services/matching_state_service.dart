@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import '../models/matching.dart';
 import 'matching_notification_service.dart';
 
 class MatchingStateService extends ChangeNotifier {

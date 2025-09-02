@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../models/chat_message.dart';
 import 'chat_event_bus.dart';

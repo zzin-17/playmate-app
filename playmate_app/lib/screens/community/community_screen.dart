@@ -34,7 +34,7 @@ class _CommunityScreenState extends State<CommunityScreen>
   
   // 로딩 상태
   bool _isLoading = false;
-  bool _isRefreshing = false;
+
   
   // 필터 상태
   String _currentFilter = '전체'; // 전체, 팔로잉, 인기
@@ -458,151 +458,9 @@ class _CommunityScreenState extends State<CommunityScreen>
     }
   }
 
-  Widget _buildFollowingTab() {
-    return RefreshIndicator(
-      onRefresh: () async {
-        _refreshFeedAfterPostCreation(null);
-      },
-      child: _buildSocialFeed([
-        PostData(
-          id: 101,
-          title: '팔로우하는 사용자 게시글 1',
-          author: '테니스프로',
-          authorId: 101,
-          content: '팔로우하는 사용자들의 게시글만 보여집니다. 오늘은 서브 연습을 했어요! #팔로잉 #테니스 #서브연습',
-          likes: 8,
-          comments: 3,
-          timeAgo: '1시간 전',
-          category: '일반',
-          authorProfileImage: 'https://via.placeholder.com/40x40',
-          isFollowing: true,
-          isLiked: false,
-          isBookmarked: false,
-          shareCount: 1,
-          isSharedByCurrentUser: false,
-          hashtags: ['팔로잉', '테니스', '서브연습'],
-        ),
-        PostData(
-          id: 102,
-          title: '테니스 동호회 모임 후기',
-          author: '동호회장',
-          authorId: 102,
-          content: '지난 주에 진행한 동호회 모임이 성공적으로 마무리되었습니다. 다음 모임도 기대해주세요! #동호회 #모임 #후기',
-          likes: 15,
-          comments: 7,
-          timeAgo: '3시간 전',
-          category: '모임',
-          authorProfileImage: 'https://via.placeholder.com/40x40',
-          isFollowing: true,
-          isLiked: true,
-          isBookmarked: true,
-          shareCount: 3,
-          isSharedByCurrentUser: false,
-          hashtags: ['동호회', '모임', '후기'],
-        ),
-        PostData(
-          id: 103,
-          title: '테니스 레슨 추천',
-          author: '레슨생',
-          authorId: 103,
-          content: '잠실 지역에서 좋은 테니스 레슨을 받고 있습니다. 초보자도 쉽게 배울 수 있어요! #레슨 #추천 #잠실',
-          likes: 22,
-          comments: 12,
-          timeAgo: '5시간 전',
-          category: '일반',
-          authorProfileImage: 'https://via.placeholder.com/40x40',
-          isFollowing: true,
-          isLiked: false,
-          isBookmarked: false,
-          shareCount: 5,
-          isSharedByCurrentUser: false,
-          hashtags: ['레슨', '추천', '잠실'],
-        ),
-      ]),
-    );
-  }
 
-  Widget _buildTrendingTab() {
-    return RefreshIndicator(
-      onRefresh: () async {
-        _refreshFeedAfterPostCreation(null);
-      },
-      child: _buildSocialFeed([
-        PostData(
-          id: 201,
-          title: '🔥 인기 게시글 - 테니스 서브 마스터하기',
-          author: '테니스스타',
-          authorId: 201,
-          content: '현재 인기 있는 게시글입니다. 서브 연습 방법과 팁을 공유합니다! #트렌딩 #인기 #서브 #테니스팁',
-          likes: 156,
-          comments: 89,
-          timeAgo: '3시간 전',
-          category: '테니스팁',
-          authorProfileImage: 'https://via.placeholder.com/40x40',
-          isFollowing: false,
-          isLiked: false,
-          isBookmarked: false,
-          shareCount: 25,
-          isSharedByCurrentUser: false,
-          hashtags: ['트렌딩', '인기', '서브', '테니스팁'],
-        ),
-        PostData(
-          id: 202,
-          title: '🏆 테니스 코트 추천 - 서울 최고의 코트들',
-          author: '코트마스터',
-          authorId: 202,
-          content: '서울 지역 테니스 코트 추천합니다! 잠실, 올림픽공원, 한강공원 등 인기 코트 정보! #코트추천 #서울 #테니스장',
-          likes: 234,
-          comments: 67,
-          timeAgo: '5시간 전',
-          category: '코트리뷰',
-          authorProfileImage: 'https://via.placeholder.com/40x40',
-          isFollowing: false,
-          isLiked: false,
-          isBookmarked: false,
-          shareCount: 42,
-          isSharedByCurrentUser: false,
-          hashtags: ['코트추천', '서울', '테니스장'],
-        ),
-        PostData(
-          id: 203,
-          title: '💪 테니스 체력 훈련 가이드',
-          author: '피트니스코치',
-          authorId: 203,
-          content: '테니스에 필요한 체력 훈련 방법을 알려드립니다. 지구력, 순발력, 근력 향상! #체력훈련 #테니스 #피트니스',
-          likes: 189,
-          comments: 45,
-          timeAgo: '7시간 전',
-          category: '테니스팁',
-          authorProfileImage: 'https://via.placeholder.com/40x40',
-          isFollowing: false,
-          isLiked: true,
-          isBookmarked: true,
-          shareCount: 18,
-          isSharedByCurrentUser: false,
-          hashtags: ['체력훈련', '테니스', '피트니스'],
-        ),
-        PostData(
-          id: 204,
-          title: '🎾 테니스 라켓 선택 가이드 2024',
-          author: '라켓전문가',
-          authorId: 204,
-          content: '2024년 최신 테니스 라켓 추천과 선택 가이드입니다. 초보자부터 고급자까지! #라켓추천 #테니스용품 #가이드',
-          likes: 312,
-          comments: 78,
-          timeAgo: '1일 전',
-          category: '용품리뷰',
-          authorProfileImage: 'https://via.placeholder.com/40x40',
-          isFollowing: false,
-          isLiked: false,
-          isBookmarked: false,
-          shareCount: 67,
-          isSharedByCurrentUser: false,
-          hashtags: ['라켓추천', '테니스용품', '가이드'],
-        ),
-      ]),
-    );
-  }
+
+
 
   Widget _buildMyPostsTab() {
     return RefreshIndicator(
@@ -649,79 +507,9 @@ class _CommunityScreenState extends State<CommunityScreen>
     );
   }
 
-  Widget _buildFreeBoardTab() {
-    return _buildPostsList([
-      PostData(
-        id: 7,
-        title: '테니스 라켓 추천해주세요',
-        author: '라켓고민',
-        authorId: 7,
-        content: '초보자용 테니스 라켓 추천 부탁드립니다. 예산은 20만원 정도입니다.',
-        likes: 32,
-        comments: 28,
-        timeAgo: '3시간 전',
-        category: '자유',
-        authorProfileImage: null,
-        isFollowing: false,
-        isLiked: false,
-        isBookmarked: false,
-        hashtags: ['라켓추천', '초보자'],
-      ),
-      PostData(
-        id: 8,
-        title: '테니스장 예약 팁',
-        author: '예약고수',
-        authorId: 8,
-        content: '인기 테니스장 예약하는 팁을 공유합니다. 특히 주말 예약이 어려운데...',
-        likes: 45,
-        comments: 31,
-        timeAgo: '6시간 전',
-        category: '자유',
-        authorProfileImage: null,
-        isFollowing: false,
-        isLiked: false,
-        isBookmarked: false,
-        hashtags: ['예약팁', '테니스장'],
-      ),
-    ]);
-  }
 
-  Widget _buildTennisTipsTab() {
-    return _buildPostsList([
-      PostData(
-        id: 9,
-        title: '서브 연습 방법',
-        author: '서브마스터',
-        authorId: 9,
-        content: '서브 연습을 위한 단계별 가이드입니다. 처음부터 차근차근 연습해보세요.',
-        likes: 67,
-        comments: 42,
-        timeAgo: '1일 전',
-        category: '테니스팁',
-        authorProfileImage: null,
-        isFollowing: false,
-        isLiked: false,
-        isBookmarked: false,
-        hashtags: ['서브', '연습', '가이드'],
-      ),
-      PostData(
-        id: 10,
-        title: '포핸드 그립 잡는 법',
-        author: '그립전문가',
-        authorId: 10,
-        content: '포핸드 그립을 제대로 잡는 방법을 설명합니다. 그립이 중요해요!',
-        likes: 89,
-        comments: 56,
-        timeAgo: '2일 전',
-        category: '테니스팁',
-        authorProfileImage: null,
-        isFollowing: false,
-        isLiked: false,
-        isBookmarked: false,
-        hashtags: ['포핸드', '그립', '기술'],
-      ),
-    ]);
-  }
+
+
 
   Widget _buildSocialFeed(List<PostData> posts) {
     return ListView.builder(

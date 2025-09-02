@@ -1,7 +1,6 @@
 import '../screens/community/community_screen.dart';
 
 class MockPostService {
-  static const int _pageSize = 10;
   
   /// 모든 목업 데이터
   static List<PostData> getAllMockPosts() {

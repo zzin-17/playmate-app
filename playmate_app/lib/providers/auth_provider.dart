@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'dart:math';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/mock_auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:crypto/crypto.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -263,42 +260,8 @@ class AuthProvider extends ChangeNotifier {
 
   // 자동로그인 보안 검증 (개발/테스트 환경에서는 완화)
   Future<bool> _isAutoLoginSecure(String email) async {
-    final prefs = await SharedPreferences.getInstance();
-    
     // 개발/테스트 환경에서는 보안 완화
-    // TODO: 프로덕션 환경에서는 아래 주석 해제
-    
-    /*
-    // 1. 마지막 자동로그인 시간 체크 (24시간 제한)
-    final lastAutoLoginKey = 'last_auto_login_$email';
-    final lastAutoLogin = prefs.getString(lastAutoLoginKey);
-    
-    if (lastAutoLogin != null) {
-      final lastLoginTime = DateTime.parse(lastAutoLogin);
-      final hoursSinceLastLogin = DateTime.now().difference(lastLoginTime).inHours;
-      
-      if (hoursSinceLastLogin < 24) {
-        print('자동로그인 시간 제한: ${24 - hoursSinceLastLogin}시간 후 가능');
-        return false;
-      }
-    }
-    
-    // 2. 자동로그인 횟수 제한 (하루 3회)
-    final autoLoginCountKey = 'auto_login_count_$email';
-    final today = DateTime.now().toIso8601String().substring(0, 10); // YYYY-MM-DD
-    final autoLoginCount = prefs.getInt('${autoLoginCountKey}_$today') ?? 0;
-    
-    if (autoLoginCount >= 3) {
-      print('자동로그인 횟수 제한: 하루 3회 초과');
-      return false;
-    }
-    
-    // 3. 보안 검증 통과 시 기록 업데이트
-    await prefs.setString(lastAutoLoginKey, DateTime.now().toIso8601String());
-    await prefs.setInt('${autoLoginCountKey}_$today', autoLoginCount + 1);
-    */
-    
-
+    // TODO: 프로덕션 환경에서는 보안 검증 로직 추가
     return true;
   }
 
@@ -359,19 +322,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // 비밀번호 해시화
-  String _hashPassword(String password) {
-    final bytes = utf8.encode(password);
-    final digest = sha256.convert(bytes);
-    return digest.toString();
-  }
-  
-  // 토큰 생성
-  String _generateSecureToken() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(32, (i) => random.nextInt(256));
-    return base64Url.encode(bytes);
-  }
+
   
   // 토큰 저장 (만료 시간 포함)
   Future<void> _saveToken(String token) async {
