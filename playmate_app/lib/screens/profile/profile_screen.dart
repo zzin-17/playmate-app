@@ -9,6 +9,7 @@ import 'my_guest_matchings_screen.dart';
 import 'my_bookmarks_screen.dart';
 import '../review/my_reviews_screen.dart';
 import '../community/community_screen.dart';
+import '../profile/edit_profile_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -110,7 +111,11 @@ class ProfileScreen extends StatelessWidget {
                       title: '프로필 편집',
                       subtitle: '개인정보 수정',
                       onTap: () {
-                        // 프로필 편집 페이지로 이동
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => EditProfileScreen(currentUser: user!),
+                          ),
+                        );
                       },
                     ),
                     MenuItem(

@@ -11,6 +11,7 @@ import 'screens/community/create_post_screen.dart';
 import 'constants/app_colors.dart';
 import 'constants/app_text_styles.dart';
 import 'services/notification_service.dart';
+import 'services/fcm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +20,11 @@ void main() async {
   try {
     await Firebase.initializeApp();
     print('Firebase 초기화 성공');
+    
+    // FCM 서비스 초기화
+    final fcmService = FCMService();
+    await fcmService.initialize();
+    print('FCM 서비스 초기화 완료');
   } catch (e) {
     print('Firebase 초기화 실패: $e');
     // Firebase 초기화 실패 시에도 앱은 계속 실행

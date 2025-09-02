@@ -9,7 +9,9 @@ import '../../models/user.dart';
 import '../../models/location.dart';
 import '../matching/create_matching_screen.dart';
 import '../matching/matching_detail_screen.dart';
-
+import '../notification/notification_list_screen.dart';
+import '../../services/matching_notification_service.dart';
+import '../../services/chat_service.dart';
 
 import '../../widgets/common/app_logo.dart';
 import '../../widgets/common/date_range_calendar.dart';
@@ -31,11 +33,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _currentIndex = 0;
   late TabController _filterTabController;
+  final MatchingNotificationService _notificationService = MatchingNotificationService();
   
   @override
   void initState() {
     super.initState();
-    _filterTabController = TabController(length: 5, vsync: this);
+    _filterTabController = TabController(length: 6, vsync: this);
     
     // 매칭 데이터 초기화
     _createMockMatchings();
@@ -55,6 +58,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     // 실시간 업데이트 타이머 시작
     _startAutoRefreshTimer();
+    
+    // 테스트용 알림 생성 (개발 중에만 사용)
+    _notificationService.createTestNotifications();
   }
 
   @override
@@ -407,6 +413,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // 필터링된 목록도 업데이트
       _applyFilters();
     });
+    
+    // 실제 운영환경에서는 백엔드 API 저장으로 채팅 서비스가 자동 업데이트됨
+    // 개발환경에서만 임시로 로컬 상태 업데이트
     
     // 콜백 호출하여 MainScreen에 알림
     widget.onMatchingAdded?.call();
@@ -930,12 +939,60 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           tooltip: '새로고침',
         ),
         actions: [
+          // 알림 버튼
+          IconButton(
+            icon: Stack(
+              children: [
+                const Icon(Icons.notifications),
+                // 읽지 않은 알림 개수 표시 (0개일 때는 숨김)
+                if (_notificationService.unreadCount > 0)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        '${_notificationService.unreadCount}',
+                        style: AppTextStyles.caption.copyWith(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            onPressed: () async {
+              // 알림 화면으로 이동
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => NotificationListScreen(
+                    currentUser: context.read<AuthProvider>().currentUser!,
+                  ),
+                ),
+              );
+              // 알림 화면에서 돌아올 때 화면 새로고침
+              setState(() {});
+            },
+            tooltip: '알림',
+          ),
           // 필터 버튼
           IconButton(
             icon: const Icon(Icons.filter_list),
             onPressed: () {
               _showFilterBottomSheet(context);
             },
+            tooltip: '필터',
           ),
         ],
       ),

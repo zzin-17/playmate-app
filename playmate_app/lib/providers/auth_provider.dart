@@ -374,6 +374,7 @@ class AuthProvider extends ChangeNotifier {
       print('에러 상세: ${e.toString()}');
     }
   }
+  
 
   // Private methods
   Future<void> _loadCurrentUser() async {

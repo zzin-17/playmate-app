@@ -6,6 +6,7 @@ import 'court/court_screen.dart';
 import 'community/community_screen.dart';
 import 'trade/trade_screen.dart';
 import 'profile/profile_screen.dart';
+import 'chat/chat_list_screen.dart';
 import 'matching/create_matching_screen.dart';
 import '../models/matching.dart';
 
@@ -33,9 +34,11 @@ class _MainScreenState extends State<MainScreen> {
   }
   
   final List<Widget> _pages = [
-    // const CourtScreen(), // TODO: 코트 상세내용 구성 완료 시 활성화
+    // index 1: 채팅
+    const ChatListScreen(),
+    // index 2: 커뮤니티
     const CommunityScreen(),
-    // const TradeScreen(), // TODO: 중고거래 상세내용 구성 완료 시 활성화
+    // index 3: 마이페이지
     const ProfileScreen(),
   ];
 
@@ -74,7 +77,7 @@ class _MainScreenState extends State<MainScreen> {
             style: TextStyle(color: Colors.white),
           ),
         );
-      case 1: // 커뮤니티 (코트 탭 제거로 인덱스 변경)
+      case 2: // 커뮤니티
         return null; // CommunityScreen에서 직접 처리
       default:
         return null; // 다른 탭에서는 플로팅 액션 버튼 숨김
@@ -100,18 +103,14 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.home),
             label: '홈',
           ),
-          // BottomNavigationBarItem(
-          //   icon: Icon(Icons.map),
-          //   label: '코트',
-          // ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.forum),
+            label: '채팅',
+          ),
           BottomNavigationBarItem(
             icon: Icon(Icons.chat_bubble),
             label: '커뮤니티',
           ),
-          // BottomNavigationBarItem(
-          //   icon: Icon(Icons.shopping_bag),
-          //   label: '중고거래',
-          // ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: '마이페이지',

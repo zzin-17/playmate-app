@@ -24,6 +24,7 @@ User _$UserFromJson(Map<String, dynamic> json) => User(
   hasLesson: json['hasLesson'] as bool?,
   mannerScore: (json['mannerScore'] as num?)?.toDouble(),
   profileImage: json['profileImage'] as String?,
+  preferredGameType: json['preferredGameType'] as String?,
   followingIds: (json['followingIds'] as List<dynamic>?)
       ?.map((e) => (e as num).toInt())
       .toList(),
@@ -52,6 +53,7 @@ Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
   'hasLesson': instance.hasLesson,
   'mannerScore': instance.mannerScore,
   'profileImage': instance.profileImage,
+  'preferredGameType': instance.preferredGameType,
   'followingIds': instance.followingIds,
   'followerIds': instance.followerIds,
   'bio': instance.bio,

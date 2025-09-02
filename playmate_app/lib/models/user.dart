@@ -19,6 +19,7 @@ class User {
   final bool? hasLesson;
   final double? mannerScore;
   final String? profileImage;
+  final String? preferredGameType;
   List<int>? followingIds; // 팔로우하는 사용자 ID 목록
   List<int>? followerIds;  // 팔로워 ID 목록
   final String? bio;             // 자기소개
@@ -42,6 +43,7 @@ class User {
     this.hasLesson,
     this.mannerScore,
     this.profileImage,
+    this.preferredGameType,
     this.followingIds,
     this.followerIds,
     this.bio,
@@ -70,6 +72,7 @@ class User {
     bool? hasLesson,
     double? mannerScore,
     String? profileImage,
+    String? preferredGameType,
     List<int>? followingIds,
     List<int>? followerIds,
     String? bio,
@@ -93,6 +96,7 @@ class User {
       hasLesson: hasLesson ?? this.hasLesson,
       mannerScore: mannerScore ?? this.mannerScore,
       profileImage: profileImage ?? this.profileImage,
+      preferredGameType: preferredGameType ?? this.preferredGameType,
       followingIds: followingIds ?? this.followingIds,
       followerIds: followerIds ?? this.followerIds,
       bio: bio ?? this.bio,

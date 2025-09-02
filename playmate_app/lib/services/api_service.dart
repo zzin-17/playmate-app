@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import '../models/user.dart';
 import '../models/matching.dart';
+import '../models/chat_room.dart';
 
 class ApiService {
   static const String baseUrl = 'https://api.playmate.app/v1/';
@@ -32,6 +33,38 @@ class ApiService {
         handler.next(error);
       },
     ));
+  }
+
+  // ===== 채팅 관련 API =====
+  Future<List<ChatRoom>> getMyChatRooms() async {
+    try {
+      final response = await _dio.get('/chat/rooms/my');
+      final List<dynamic> data = response.data;
+      return data.map((json) => ChatRoom.fromJson(json)).toList();
+    } catch (e) {
+      throw Exception('채팅방 목록 조회 실패: $e');
+    }
+  }
+
+  Future<void> createChatRoom({required int matchingId, required int hostId, required int guestId}) async {
+    try {
+      await _dio.post('/chat/rooms', data: {
+        'matching_id': matchingId,
+        'host_id': hostId,
+        'guest_id': guestId,
+      });
+    } catch (e) {
+      throw Exception('채팅방 생성 실패: $e');
+    }
+  }
+
+  Future<Matching> getMatchingById(int matchingId) async {
+    try {
+      final response = await _dio.get('/matchings/' + matchingId.toString());
+      return Matching.fromJson(response.data);
+    } catch (e) {
+      throw Exception('매칭 조회 실패: $e');
+    }
   }
 
   // 외부에서 인증 토큰을 설정/해제할 수 있는 메서드

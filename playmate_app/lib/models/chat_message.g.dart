@@ -22,6 +22,7 @@ ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => ChatMessage(
       ? null
       : DateTime.parse(json['readAt'] as String),
   imageUrl: json['imageUrl'] as String?,
+  fileUrl: json['fileUrl'] as String?,
   latitude: (json['latitude'] as num?)?.toDouble(),
   longitude: (json['longitude'] as num?)?.toDouble(),
   locationName: json['locationName'] as String?,
@@ -40,6 +41,7 @@ Map<String, dynamic> _$ChatMessageToJson(ChatMessage instance) =>
       'deliveredAt': instance.deliveredAt?.toIso8601String(),
       'readAt': instance.readAt?.toIso8601String(),
       'imageUrl': instance.imageUrl,
+      'fileUrl': instance.fileUrl,
       'latitude': instance.latitude,
       'longitude': instance.longitude,
       'locationName': instance.locationName,

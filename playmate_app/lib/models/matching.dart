@@ -146,10 +146,21 @@ class Matching {
   // 연령대 범위 텍스트
   String get ageRangeText {
     if (minAge == null && maxAge == null) return '연령대 제한없음';
-    if (minAge == null) return '~${maxAge}대';
-    if (maxAge == null) return '${minAge}대~';
-    if (minAge == maxAge) return '${minAge}대';
-    return '${minAge}대-${maxAge}대';
+    
+    // 연령을 10대 단위로 변환
+    String _getAgeGroup(int age) {
+      if (age < 20) return '10대';
+      if (age < 30) return '20대';
+      if (age < 40) return '30대';
+      if (age < 50) return '40대';
+      if (age < 60) return '50대';
+      return '60대 이상';
+    }
+    
+    if (minAge == null) return '~${_getAgeGroup(maxAge!)}';
+    if (maxAge == null) return '${_getAgeGroup(minAge!)}~';
+    if (minAge == maxAge) return '${_getAgeGroup(minAge!)}';
+    return '${_getAgeGroup(minAge!)}-${_getAgeGroup(maxAge!)}';
   }
 
   // 게임 유형 텍스트

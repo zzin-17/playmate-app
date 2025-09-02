@@ -5,6 +5,7 @@ import '../../models/matching.dart';
 import '../../models/user.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
+import '../../services/api_service.dart';
 
 class CreateMatchingScreen extends StatefulWidget {
   final Matching? editingMatching;
@@ -164,8 +165,18 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
     print('게스트비용: ${_guestCostController.text}원');
     print('메시지: ${newMatching.message}');
 
-    // 생성된 매칭을 홈 화면으로 전달
-    Navigator.of(context).pop(newMatching);
+    try {
+      // 실제 백엔드 API로 매칭 생성
+      final apiService = ApiService();
+      final createdMatching = await apiService.createMatching(newMatching.toJson());
+      
+      // 성공시 생성된 매칭을 홈 화면으로 전달
+      Navigator.of(context).pop(createdMatching);
+    } catch (e) {
+      // API 실패시 폴백: 로컬 매칭으로 처리 (개발용)
+      print('매칭 생성 API 실패, 로컬로 처리: $e');
+      Navigator.of(context).pop(newMatching);
+    }
   }
 
   @override
