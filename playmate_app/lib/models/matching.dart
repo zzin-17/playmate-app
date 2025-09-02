@@ -159,7 +159,7 @@ class Matching {
     
     if (minAge == null) return '~${_getAgeGroup(maxAge!)}';
     if (maxAge == null) return '${_getAgeGroup(minAge!)}~';
-    if (minAge == maxAge) return '${_getAgeGroup(minAge!)}';
+    if (minAge == maxAge) return _getAgeGroup(minAge!);
     return '${_getAgeGroup(minAge!)}-${_getAgeGroup(maxAge!)}';
   }
 

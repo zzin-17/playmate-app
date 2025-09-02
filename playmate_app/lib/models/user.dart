@@ -143,7 +143,7 @@ class User {
   // NTRP 점수 표시
   String get ntrpScoreText {
     if (ntrpScore == null) return '평가 없음';
-    return '${ntrpScore!.toStringAsFixed(1)}';
+    return ntrpScore!.toStringAsFixed(1);
   }
 
   // NTRP 점수 레벨 텍스트

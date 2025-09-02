@@ -1513,7 +1513,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               const SizedBox(width: 8),
               Text(
-                '${matching.recruitCountText}',
+                matching.recruitCountText,
                 style: AppTextStyles.body.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -2568,8 +2568,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         _startTime == null
                             ? '시작 시간을 선택해주세요'
                             : _endTime == null
-                                ? '${_startTime}부터 종료 시간을 선택해주세요'
-                                : '${_startTime} ~ ${_endTime}',
+                                ? '$_startTime부터 종료 시간을 선택해주세요'
+                                : '$_startTime ~ $_endTime',
                         style: AppTextStyles.body.copyWith(
                           color: _startTime == null || _endTime == null
                               ? AppColors.textSecondary
@@ -4034,10 +4034,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 const SizedBox(width: 8),
                 Text(
                   _selectedSkillLevel != null && _selectedEndSkillLevel != null
-                      ? '${_selectedSkillLevel} ~ ${_selectedEndSkillLevel}'
+                      ? '$_selectedSkillLevel ~ $_selectedEndSkillLevel'
                       : _selectedSkillLevel != null
-                          ? '${_selectedSkillLevel} 이상'
-                          : '${_selectedEndSkillLevel} 이하',
+                          ? '$_selectedSkillLevel 이상'
+                          : '$_selectedEndSkillLevel 이하',
                   style: AppTextStyles.body.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w600,
