@@ -10,7 +10,6 @@ import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_text_field.dart';
 
 import '../review/review_list_screen.dart';
-import '../../services/notification_service.dart';
 import '../../services/websocket_service.dart';
 import '../../services/matching_state_service.dart';
 import '../../services/matching_notification_service.dart';
@@ -19,8 +18,6 @@ import '../../services/chat_local_store.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
-
-import '../../services/chat_event_bus.dart';
 
 class ChatScreen extends StatefulWidget {
   final Matching matching;
@@ -258,10 +255,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
 
 
-  /// 날짜 포맷팅
-  String _formatDate(DateTime date) {
-    return '${date.month}월 ${date.day}일';
-  }
+
 
   Future<void> _writeReview() async {
     // 채팅 상대방 찾기

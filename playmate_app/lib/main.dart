@@ -49,7 +49,6 @@ class PlayMateApp extends StatelessWidget {
           scaffoldBackgroundColor: AppColors.surface,
           colorScheme: ColorScheme.fromSeed(
             seedColor: AppColors.primary,
-            background: AppColors.surface,
             surface: AppColors.surface,
             error: AppColors.error,
           ),

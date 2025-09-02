@@ -31,7 +31,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  int _currentIndex = 0;
+
   late TabController _filterTabController;
   final MatchingNotificationService _notificationService = MatchingNotificationService();
   
@@ -105,18 +105,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   List<Matching> _filteredMatchings = [];
-  List<String> _searchHistory = [];
-  bool _showSearchHistory = false;
+
   
   // UI 상태 변수들
   bool _isLoading = false;
-  String? _errorMessage;
   
   // 실시간 업데이트 관련 변수들
   Timer? _autoRefreshTimer;
   Timer? _autoCompleteTimer; // 자동 완료 타이머 추가
   static const Duration _refreshInterval = Duration(seconds: 30); // 30초마다 새로고침
-  static const Duration _completeCheckInterval = Duration(minutes: 1); // 1분마다 완료 체크
 
   // 연령대 옵션들
   static const List<String> _ageOptions = [

@@ -511,27 +511,7 @@ class _CommunityScreenState extends State<CommunityScreen>
 
 
 
-  Widget _buildSocialFeed(List<PostData> posts) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: posts.length,
-      itemBuilder: (context, index) {
-        final post = posts[index];
-        return _buildSocialPostCard(post);
-      },
-    );
-  }
 
-  Widget _buildPostsList(List<PostData> posts) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: posts.length,
-      itemBuilder: (context, index) {
-        final post = posts[index];
-        return _buildPostCard(post);
-      },
-    );
-  }
 
   Widget _buildSocialPostCard(PostData post) {
     return Container(
