@@ -67,16 +67,14 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // 추가: 자격 증명 저장
   // 에러 메시지를 다음 화면 로드 시 표시하기 위해 저장
   Future<void> _saveErrorForNextScreen(String error) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('playmate_lastError', error);
-      
-      } catch (e) {
-
-      }
+    } catch (e) {
+      // 에러 메시지 저장 실패
+    }
   }
   
   // 저장된 에러 메시지 로드
@@ -89,13 +87,11 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _errorMessage = savedError;
         });
-        print('저장된 에러 메시지 로드됨: $savedError');
-        
         // 에러 메시지 로드 후 SharedPreferences에서 제거
         await prefs.remove('playmate_lastError');
       }
     } catch (e) {
-      print('저장된 에러 메시지 로드 실패: $e');
+      // 저장된 에러 메시지 로드 실패
     }
   }
 
@@ -204,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
-    print('=== 로그인 종료 ===');
+    
   }
 
   void _navigateToRegister() {

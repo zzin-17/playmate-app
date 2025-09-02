@@ -326,27 +326,21 @@ class AuthProvider extends ChangeNotifier {
             if (res['success'] == true) {
               await _saveToken(res['token'] as String);
               _currentUser = res['user'] as User;
-              print('사용자 설정 완료: ${_currentUser?.email}');
-              print('자동 로그인 성공: $savedEmail');
-              print('현재 사용자 상태: ${_currentUser?.email}');
-              print('isLoggedIn 상태: ${_currentUser != null}');
               notifyListeners();
             } else {
-              print('Mock 서비스에서 로그인 실패');
+              // Mock 서비스에서 로그인 실패
             }
           } else {
-            print('저장된 비밀번호가 없음');
+            // 저장된 비밀번호가 없음
           }
         } else {
-          print('저장된 이메일이 없음');
+          // 저장된 이메일이 없음
         }
       } else {
-        print('rememberMe가 false');
+        // rememberMe가 false
       }
-      print('=== 자동 로그인 종료 ===');
     } catch (e) {
-      print('자동 로그인 실패: $e');
-      print('에러 상세: ${e.toString()}');
+      // 자동 로그인 실패
     }
   }
   

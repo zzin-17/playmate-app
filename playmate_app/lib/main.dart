@@ -49,7 +49,7 @@ class PlayMateApp extends StatelessWidget {
           scaffoldBackgroundColor: AppColors.surface,
           colorScheme: ColorScheme.fromSeed(
             seedColor: AppColors.primary,
-            background: AppColors.background,
+            background: AppColors.surface,
             surface: AppColors.surface,
             error: AppColors.error,
           ),
@@ -164,10 +164,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
       final rememberMe = prefs.getBool('playmate_rememberMe') ?? false;
       
       if (savedEmail != null && rememberMe) {
-        print('저장된 자격 증명으로 자동 로그인 시도');
+        // 저장된 자격 증명으로 자동 로그인 시도
       }
     } catch (e) {
-      print('저장된 자격 증명 로드 실패: $e');
+      // 저장된 자격 증명 로드 실패
     }
     
     // 2. AuthProvider 인증 상태 확인

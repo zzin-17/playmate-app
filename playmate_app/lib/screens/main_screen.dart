@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-
-
+import '../../models/matching.dart';
 import 'home/home_screen.dart';
-
 import 'community/community_screen.dart';
-
 import 'profile/profile_screen.dart';
 import 'chat/chat_list_screen.dart';
 import 'matching/create_matching_screen.dart';
