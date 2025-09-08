@@ -421,8 +421,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
 
     try {
-      // TODO: 실제 프로필 업데이트 API 호출
-      await Future.delayed(const Duration(seconds: 1)); // 임시 딜레이
+      // 임시로 성공 처리 (API 연동은 나중에)
+      await Future.delayed(const Duration(seconds: 1));
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

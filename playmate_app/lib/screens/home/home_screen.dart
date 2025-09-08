@@ -11,6 +11,7 @@ import '../matching/create_matching_screen.dart';
 import '../matching/matching_detail_screen.dart';
 import '../notification/notification_list_screen.dart';
 import '../../services/matching_notification_service.dart';
+import '../../services/matching_data_service_v2.dart';
 
 
 import '../../widgets/common/app_logo.dart';
@@ -41,13 +42,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<Matching> _cachedFilteredMatchings = [];
   Map<String, dynamic> _lastFilterState = {};
   
+  // 정렬 관련 변수들
+  String _sortBy = 'latest'; // 'latest', 'date', 'level', 'participants'
+  bool _sortAscending = false;
+  
   @override
   void initState() {
     super.initState();
     _filterTabController = TabController(length: 6, vsync: this);
-    
-    // 매칭 데이터 초기화
-    _createMockMatchings();
     
     // 위치 데이터 초기화 (디폴트로 선택 안됨)
     _locationData = LocationData.cities;
@@ -57,8 +59,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // 검색 컨트롤러 리스너 추가 (디바운싱 적용)
     _searchController.addListener(_onSearchChangedDebounced);
     
-    // 초기 필터 적용 (한 번만)
-    _applyFiltersOnce();
+    // 매칭 데이터 로딩 (백엔드 API 호출)
+    _loadMatchingsFromAPI();
     
     // 자동 완료 처리 타이머 시작
     _startAutoCompletionTimer();
@@ -74,9 +76,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void didUpdateWidget(HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     
-    // 새 매칭이 추가되면 처리
+    print('🎯 didUpdateWidget 호출됨');
+    print('🎯 widget.newMatching: ${widget.newMatching?.courtName}');
+    print('🎯 oldWidget.newMatching: ${oldWidget.newMatching?.courtName}');
+    
+    // 새 매칭이 추가되면 처리 - build 완료 후 실행
     if (widget.newMatching != null && oldWidget.newMatching != widget.newMatching) {
-      _addNewMatching(widget.newMatching!);
+      print('🎯 새 매칭 감지됨! _addNewMatching 호출 예정');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _addNewMatching(widget.newMatching!);
+        }
+      });
     }
   }
   
@@ -124,7 +135,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // 실시간 업데이트 관련 변수들
   Timer? _autoRefreshTimer;
   Timer? _autoCompleteTimer; // 자동 완료 타이머 추가
-  static const Duration _refreshInterval = Duration(seconds: 30); // 30초마다 새로고침
 
   // 연령대 옵션들
   static const List<String> _ageOptions = [
@@ -132,155 +142,103 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   ];
 
 
-  // 매칭 데이터 초기화 함수
-  void _createMockMatchings() {
-    _mockMatchings = [
-      _createMockMatching(
-        id: 1,
-        courtName: '잠실종합운동장',
-        courtLat: 37.512,
-        courtLng: 127.102,
-        date: DateTime.now().add(const Duration(days: 1)),
-        timeSlot: '18:00~20:00',
-        minLevel: 2,
-        maxLevel: 4,
-        minAge: 20,
-        maxAge: 30,
-        gameType: 'mixed',
-        maleRecruitCount: 1,
-        femaleRecruitCount: 1,
-        status: 'confirmed',
-        host: User(
-          id: 1,
-          email: 'host@example.com',
-          nickname: '테린이',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-      ),
-      _createMockMatching(
-        id: 2,
-        courtName: '양재시민의숲',
-        courtLat: 37.469,
-        courtLng: 127.038,
-        date: DateTime.now().add(const Duration(days: 2)),
-        timeSlot: '20:00~22:00',
-        minLevel: 3,
-        maxLevel: 5,
-        minAge: 25,
-        maxAge: 40,
-        gameType: 'male_doubles',
-        maleRecruitCount: 2,
-        femaleRecruitCount: 0,
-        status: 'recruiting',
-        isFollowersOnly: true, // 팔로워 전용 공개
-        host: User(
-          id: 2,
-          email: 'player@example.com',
-          nickname: '테니스마스터',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-      ),
-      // 추가 매칭 데이터 (위치 필터 테스트용)
-      _createMockMatching(
-        id: 3,
-        courtName: '올림픽공원 테니스장',
-        courtLat: 37.521,
-        courtLng: 127.128,
-        date: DateTime.now().add(const Duration(days: 3)),
-        timeSlot: '14:00~16:00',
-        minLevel: 1,
-        maxLevel: 3,
-        minAge: 18,
-        maxAge: 35,
-        gameType: 'mixed',
-        maleRecruitCount: 1,
-        femaleRecruitCount: 1,
-        status: 'recruiting',
-        host: User(
-          id: 3,
-          email: 'tennis@example.com',
-          nickname: '테니스초보',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-      ),
-      _createMockMatching(
-        id: 4,
-        courtName: '한강공원 테니스장',
-        courtLat: 37.528,
-        courtLng: 126.933,
-        date: DateTime.now().add(const Duration(days: 4)),
-        timeSlot: '16:00~18:00',
-        minLevel: 4,
-        maxLevel: 6,
-        minAge: 30,
-        maxAge: 50,
-        gameType: 'singles',
-        maleRecruitCount: 0,
-        femaleRecruitCount: 1,
-        status: 'recruiting',
-        host: User(
-          id: 4,
-          email: 'pro@example.com',
-          nickname: '테니스프로',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-      ),
-      // 다양한 지역의 매칭 추가 (위치 필터 테스트용)
-      _createMockMatching(
-        id: 5,
-        courtName: '분당테니스장',
-        courtLat: 37.350,
-        courtLng: 127.108,
-        date: DateTime.now().add(const Duration(days: 5)),
-        timeSlot: '10:00~12:00',
-        minLevel: 2,
-        maxLevel: 4,
-        minAge: 20,
-        maxAge: 45,
-        gameType: 'female_doubles',
-        maleRecruitCount: 0,
-        femaleRecruitCount: 2,
-        status: 'recruiting',
-        host: User(
-          id: 5,
-          email: 'bundang@example.com',
-          nickname: '분당테니스',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-      ),
-      _createMockMatching(
-        id: 6,
-        courtName: '인천대공원 테니스장',
-        courtLat: 37.448,
-        courtLng: 126.752,
-        date: DateTime.now().add(const Duration(days: 6)),
-        timeSlot: '19:00~21:00',
-        minLevel: 3,
-        maxLevel: 5,
-        minAge: 25,
-        maxAge: 55,
-        gameType: 'mixed',
-        maleRecruitCount: 1,
-        femaleRecruitCount: 1,
-        status: 'recruiting',
-        host: User(
-          id: 6,
-          email: 'incheon@example.com',
-          nickname: '인천테니스',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-      ),
-    ];
+  // 백엔드 API에서 매칭 데이터 로딩
+  Future<void> _loadMatchingsFromAPI() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     
-    // 필터링된 목록 초기화
-    _filteredMatchings = List.from(_mockMatchings);
+    try {
+      print('🔄 백엔드 API에서 매칭 데이터 로딩 시작...');
+      
+      // 백엔드 API에서 매칭 목록 가져오기
+      final matchings = await MatchingDataServiceV2.getMatchings(
+        searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
+        gameTypes: _selectedGameTypes.isNotEmpty ? _selectedGameTypes : null,
+        skillLevel: _selectedSkillLevel,
+        endSkillLevel: _selectedEndSkillLevel,
+        ageRanges: _selectedAgeRanges.isNotEmpty ? _selectedAgeRanges : null,
+        noAgeRestriction: _noAgeRestriction,
+        startDate: _startDate,
+        endDate: _endDate,
+        startTime: _startTime,
+        endTime: _endTime,
+        cityId: _selectedCityId,
+        districtIds: _selectedDistrictIds.isNotEmpty ? _selectedDistrictIds : null,
+        showOnlyRecruiting: _showOnlyRecruiting,
+        showOnlyFollowing: _showOnlyFollowing,
+      );
+      
+      print('✅ 백엔드 API에서 ${matchings.length}개 매칭 데이터 로딩 완료');
+      
+      setState(() {
+        // API에서 가져온 데이터가 있으면 사용, 없으면 기존 데이터 유지
+        if (matchings.isNotEmpty) {
+          // 새로 생성된 매칭이 있으면 보존 (ID가 큰 매칭들)
+          final existingNewMatchings = _mockMatchings.where((m) => m.id > 1000000000).toList();
+          print('🔄 보존할 새 매칭 개수: ${existingNewMatchings.length}');
+          for (var matching in existingNewMatchings) {
+            print('🔄 보존할 매칭: ${matching.courtName} (ID: ${matching.id}, minAge: ${matching.minAge}, maxAge: ${matching.maxAge})');
+          }
+          
+          // 중복 제거: ID 기준으로 Set 사용하고 정렬
+          final allMatchings = [...matchings, ...existingNewMatchings];
+          final uniqueMatchings = <int, Matching>{};
+          for (var matching in allMatchings) {
+            uniqueMatchings[matching.id] = matching;
+          }
+          _mockMatchings = uniqueMatchings.values.toList()
+            ..sort((a, b) => b.id.compareTo(a.id)); // ID 기준 내림차순 정렬 (최신순)
+        } else if (_mockMatchings.isEmpty) {
+          // API 데이터도 없고 기존 데이터도 없으면 빈 리스트 유지
+          _mockMatchings = [];
+        }
+        // API 데이터가 비어있고 기존 데이터가 있으면 기존 데이터 유지
+        _isLoading = false;
+      });
+      
+      // 필터링된 목록 초기화
+      _filteredMatchings = List.from(_mockMatchings);
+      print('🔄 _filteredMatchings 업데이트됨: ${_filteredMatchings.length}개');
+      for (var matching in _filteredMatchings) {
+        print('🔄 필터링된 매칭: ${matching.courtName} (ID: ${matching.id}, minAge: ${matching.minAge}, maxAge: ${matching.maxAge})');
+      }
+      
+      // 초기 필터 적용 (동기적으로 실행)
+      _performFiltering();
+      _lastFilterState = _getCurrentFilterState();
+      
+      // 정렬 적용
+      _sortMatchings();
+      
+      // 필터링 결과 확인 로그
+      print('🔄 새로고침 후 최종 _filteredMatchings 개수: ${_filteredMatchings.length}');
+      for (var matching in _filteredMatchings) {
+        print('🔄 최종 필터링된 매칭: ${matching.courtName} (ID: ${matching.id})');
+      }
+      
+    } catch (e) {
+      print('❌ 백엔드 API 로딩 실패: $e');
+      
+      // API 실패 시 기존 데이터 유지
+      if (_mockMatchings.isEmpty) {
+        _mockMatchings = [];
+      }
+      
+      setState(() {
+        _isLoading = false;
+        _errorMessage = '서버 연결에 실패했습니다. 오프라인 모드로 실행됩니다.';
+      });
+    }
   }
+
+  // 매칭 데이터 초기화 함수 (Mock 데이터) - 사용하지 않음
+  // List<Matching> _createMockMatchings() {
+  //   return [
+  //     // Mock 데이터들...
+  //   ];
+  // }
 
   // 매칭 데이터 자동 생성 함수
   Matching _createMockMatching({
@@ -340,7 +298,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       
       // 확정된 인원만큼 게스트 생성 및 확정 처리
       int confirmedMale = 0;
-      int confirmedFemale = 0;
       
       // 남성 모집 인원 중 확정된 수만큼 생성
       for (int i = 0; i < maleRecruitCount && confirmedMale < confirmedCount; i++) {
@@ -368,7 +325,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           updatedAt: DateTime.now(),
         ));
         confirmedUserIds.add(guestId + maleRecruitCount + i);
-        confirmedFemale++;
         confirmedCount--;
       }
     }
@@ -413,21 +369,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // 새 매칭 추가 메서드
   void _addNewMatching(Matching newMatching) {
-    setState(() {
-      // 새 매칭을 맨 위에 추가
-              // 새로 생성된 매칭에 recoveryCount 추가
+    print('🎯 _addNewMatching 호출됨: ${newMatching.courtName}');
+    print('🎯 새 매칭 연령대 정보: minAge=${newMatching.minAge}, maxAge=${newMatching.maxAge}');
+    print('🎯 현재 _mockMatchings 개수: ${_mockMatchings.length}');
+    
+    // 이미 didUpdateWidget에서 addPostFrameCallback으로 감싸져 있으므로 직접 setState 호출
+    if (mounted) {
+      setState(() {
+        // 새 매칭을 맨 위에 추가
+        // 새로 생성된 매칭에 recoveryCount 추가
         final newMatchingWithRecovery = newMatching.copyWith(recoveryCount: 0);
         _mockMatchings.insert(0, newMatchingWithRecovery);
-      // 필터링된 목록도 업데이트
-      _applyFiltersOnce();
-    });
-    
-    // 실제 운영환경에서는 백엔드 API 저장으로 채팅 서비스가 자동 업데이트됨
-    // 개발환경에서만 임시로 로컬 상태 업데이트
+        print('🎯 새 매칭 추가 완료: ${newMatchingWithRecovery.courtName}');
+        print('🎯 업데이트된 _mockMatchings 개수: ${_mockMatchings.length}');
+        
+        // 필터링된 목록도 직접 업데이트
+        _filteredMatchings.insert(0, newMatchingWithRecovery);
+        print('🎯 _filteredMatchings에 추가 완료: ${_filteredMatchings.length}개');
+      });
+    }
     
     // 콜백 호출하여 MainScreen에 알림
     widget.onMatchingAdded?.call();
-    
+
     // 성공 메시지 표시
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -613,8 +577,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
     
-    // 실제 필터링 수행
+    // 실제 필터링 수행 - 항상 _mockMatchings 사용 (API 데이터 포함)
     _filteredMatchings = _mockMatchings.where((matching) {
+      
+      // 기본 조건: 완료되지 않은 매칭만 표시 (완료, 취소, 삭제 제외)
+      if (matching.actualStatus == 'completed' || 
+          matching.actualStatus == 'cancelled' || 
+          matching.actualStatus == 'deleted') {
+        return false;
+      }
+      
       // 검색어 필터링
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
@@ -670,20 +642,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
       }
       
-      // 연령대 필터 (다수 선택 또는 연령 상관없음)
+      // 연령대 필터 (연속된 범위로 처리)
       if (!_noAgeRestriction && _selectedAgeRanges.isNotEmpty) {
         bool ageMatch = false;
         final minAge = matching.minAge ?? 10;
         final maxAge = matching.maxAge ?? 60;
         
-        for (String ageRange in _selectedAgeRanges) {
-          final selectedAge = _getAgeFromText(ageRange);
-          if (selectedAge != null) {
-            // 선택된 연령대가 매칭의 연령대 범위와 겹치는지 확인
-            if (maxAge >= selectedAge && minAge <= selectedAge + 9) {
-              ageMatch = true;
-              break;
-            }
+        // 선택된 연령대를 연속된 범위로 변환
+        final selectedMinAge = _getMinAgeFromRanges();
+        final selectedMaxAge = _getMaxAgeFromRanges();
+        
+        
+        if (selectedMinAge != null && selectedMaxAge != null) {
+          // 연속된 범위와 매칭의 연령대 범위가 겹치는지 확인
+          // 모집연령과 필터연령이 일부라도 겹치면 노출
+          if (maxAge >= selectedMinAge && minAge <= selectedMaxAge) {
+            ageMatch = true;
           }
         }
         
@@ -723,7 +697,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       
       // 위치 필터
       if (_selectedCityId != null || _selectedDistrictIds.isNotEmpty) {
-        bool locationMatch = false;
         
         Map<String, String> courtLocations = {
           '잠실종합운동장': '서울 송파구',
@@ -736,7 +709,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         
         String? courtLocation = courtLocations[matching.courtName];
         if (courtLocation == null) {
-          return false;
+          // 실제 코트 이름이 아닌 경우 (테스트용 이름 등) 위치 필터를 통과시킴
+          return true;
         }
         
         if (_selectedCityId != null) {
@@ -768,12 +742,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             return false;
           }
         }
-        
-        locationMatch = true;
       }
       
       return true;
     }).toList();
+    
+    print('🔍 필터링 후 개수: ${_filteredMatchings.length}');
+    print('🔍 필터링된 카드들: ${_filteredMatchings.map((m) => m.courtName).toList()}');
+    
+    // 최근 생성된 카드가 첫 번째로 노출되도록 정렬 (생성일 기준 내림차순)
+    _filteredMatchings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    
+    print('🔍 정렬 후 카드들: ${_filteredMatchings.map((m) => '${m.courtName}(${m.createdAt})').toList()}');
     
     // 결과 캐싱
     _cachedFilteredMatchings = List.from(_filteredMatchings);
@@ -1189,12 +1169,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   
 
                   
-                  // 검색 결과 개수 표시 (작은 텍스트 형태)
+                  // 검색 결과 개수 표시 및 정렬 버튼
                   Padding(
                     padding: const EdgeInsets.only(left: 16, right: 16, top: 8),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        // 정렬 버튼
+                        _buildSortButton(),
+                        // 검색 결과 개수
                         Text(
                           _getSearchResultText(),
                           style: AppTextStyles.body.copyWith(
@@ -1254,6 +1237,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         itemCount: _filteredMatchings.length,
               itemBuilder: (context, index) {
                           final matching = _filteredMatchings[index];
+                print('🎯 ListView 렌더링: ${matching.courtName} (ID: ${matching.id}, minAge: ${matching.minAge}, maxAge: ${matching.maxAge})');
                 return _buildMatchingCard(matching);
               },
             ),
@@ -2057,6 +2041,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // 필터링된 매칭 목록 반환
   List<Matching> _getFilteredMatchings() {
     List<Matching> filtered = _mockMatchings;
+    
+    // 기본 조건: 완료되지 않은 매칭만 표시 (완료, 취소, 삭제 제외)
+    filtered = filtered.where((matching) => 
+      matching.actualStatus != 'completed' && 
+      matching.actualStatus != 'cancelled' && 
+      matching.actualStatus != 'deleted'
+    ).toList();
     
     // 모집중만 보기 필터
     if (_showOnlyRecruiting) {
@@ -3525,7 +3516,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String _getSearchResultText() {
     final totalCount = _mockMatchings.length;
     final filteredCount = _filteredMatchings.length;
-    String resultText = '';
 
     if (_searchQuery.isNotEmpty) {
       if (filteredCount == 0) {
@@ -4164,15 +4154,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
-  // 실시간 업데이트 타이머 시작
+  // 실시간 업데이트 타이머 시작 (자동 새로고침 비활성화)
   void _startAutoRefreshTimer() {
-    _autoRefreshTimer = Timer.periodic(_refreshInterval, (timer) {
-      if (mounted) {
-        _refreshMatchingData();
-      } else {
-        timer.cancel();
-      }
-    });
+    // 자동 새로고침을 비활성화하여 생성된 매칭이 사라지는 것을 방지
+    print('🔄 자동 새로고침 비활성화됨 (생성된 매칭 보존을 위해)');
+    // _autoRefreshTimer = Timer.periodic(_refreshInterval, (timer) {
+    //   if (mounted) {
+    //     _refreshMatchingData();
+    //   } else {
+    //     timer.cancel();
+    //   }
+    // });
   }
 
   // 매칭 데이터 새로고침
@@ -4268,25 +4260,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _manualRefresh() {
     if (_isLoading) return;
     
-    setState(() {
-      _isLoading = true;
-    });
+    print('🔄 수동 새로고침 시작...');
     
-    // 새로고침 애니메이션 효과
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted) {
-        _refreshMatchingData();
-        
-        // 새로고침 완료 메시지
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('새로고침이 완료되었습니다'),
-            duration: const Duration(seconds: 2),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    });
+    // 백엔드 API에서 최신 데이터 로딩
+    _loadMatchingsFromAPI();
   }
 
   // 완료된 매칭 체크 및 업데이트 + 자동 확정
@@ -4401,8 +4378,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       
       if (startTimeParts.length != 2 || endTimeParts.length != 2) return false;
       
-      final startHour = int.parse(startTimeParts[0]);
-      final startMinute = int.parse(startTimeParts[1]);
       final endHour = int.parse(endTimeParts[0]);
       final endMinute = int.parse(endTimeParts[1]);
       
@@ -4629,6 +4604,219 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         } else {
           return false;
         }
+      }
+    }
+    return true;
+  }
+
+  // 정렬 메서드들
+  void _sortMatchings() {
+    setState(() {
+      _filteredMatchings.sort((a, b) {
+        switch (_sortBy) {
+          case 'latest':
+            return _sortAscending 
+                ? a.createdAt.compareTo(b.createdAt)
+                : b.createdAt.compareTo(a.createdAt);
+          case 'date':
+            return _sortAscending 
+                ? a.date.compareTo(b.date)
+                : b.date.compareTo(a.date);
+          case 'level':
+            final aLevel = a.minLevel ?? 0;
+            final bLevel = b.minLevel ?? 0;
+            return _sortAscending 
+                ? aLevel.compareTo(bLevel)
+                : bLevel.compareTo(aLevel);
+          case 'participants':
+            final aTotal = (a.maleRecruitCount ?? 0) + (a.femaleRecruitCount ?? 0);
+            final bTotal = (b.maleRecruitCount ?? 0) + (b.femaleRecruitCount ?? 0);
+            return _sortAscending 
+                ? aTotal.compareTo(bTotal)
+                : bTotal.compareTo(aTotal);
+          default:
+            return 0;
+        }
+      });
+    });
+  }
+
+  void _changeSortOrder(String sortBy) {
+    if (_sortBy == sortBy) {
+      // 같은 정렬 기준이면 오름차순/내림차순 토글
+      setState(() {
+        _sortAscending = !_sortAscending;
+      });
+    } else {
+      // 다른 정렬 기준이면 새로 설정하고 내림차순으로 시작
+      setState(() {
+        _sortBy = sortBy;
+        _sortAscending = false;
+      });
+    }
+    _sortMatchings();
+  }
+
+  String _getSortDisplayText() {
+    switch (_sortBy) {
+      case 'latest':
+        return '최신순';
+      case 'date':
+        return '날짜순';
+      case 'level':
+        return '구력순';
+      case 'participants':
+        return '인원순';
+      default:
+        return '최신순';
+    }
+  }
+
+  Widget _buildSortButton() {
+    return PopupMenuButton<String>(
+      icon: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.sort,
+            size: 18,
+            color: AppColors.textSecondary,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            _getSortDisplayText(),
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          Icon(
+            _sortAscending ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+            size: 16,
+            color: AppColors.textSecondary,
+          ),
+        ],
+      ),
+      onSelected: _changeSortOrder,
+      itemBuilder: (BuildContext context) => [
+        PopupMenuItem(
+          value: 'latest',
+          child: Row(
+            children: [
+              Icon(
+                Icons.access_time,
+                size: 16,
+                color: _sortBy == 'latest' ? AppColors.primary : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '최신순',
+                style: AppTextStyles.body.copyWith(
+                  color: _sortBy == 'latest' ? AppColors.primary : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'date',
+          child: Row(
+            children: [
+              Icon(
+                Icons.calendar_today,
+                size: 16,
+                color: _sortBy == 'date' ? AppColors.primary : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '날짜순',
+                style: AppTextStyles.body.copyWith(
+                  color: _sortBy == 'date' ? AppColors.primary : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'level',
+          child: Row(
+            children: [
+              Icon(
+                Icons.star,
+                size: 16,
+                color: _sortBy == 'level' ? AppColors.primary : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '구력순',
+                style: AppTextStyles.body.copyWith(
+                  color: _sortBy == 'level' ? AppColors.primary : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'participants',
+          child: Row(
+            children: [
+              Icon(
+                Icons.people,
+                size: 16,
+                color: _sortBy == 'participants' ? AppColors.primary : AppColors.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '인원순',
+                style: AppTextStyles.body.copyWith(
+                  color: _sortBy == 'participants' ? AppColors.primary : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 연령대 범위에서 최소 연령 추출
+  int? _getMinAgeFromRanges() {
+    if (_selectedAgeRanges.isEmpty) return null;
+    
+    int minAge = 100;
+    for (String ageRange in _selectedAgeRanges) {
+      int? age = _getAgeFromText(ageRange);
+      if (age != null && age < minAge) {
+        minAge = age;
+      }
+    }
+    return minAge == 100 ? null : minAge;
+  }
+
+  // 연령대 범위에서 최대 연령 추출
+  int? _getMaxAgeFromRanges() {
+    if (_selectedAgeRanges.isEmpty) return null;
+    
+    int maxAge = 0;
+    for (String ageRange in _selectedAgeRanges) {
+      int? age = _getAgeFromText(ageRange);
+      if (age != null) {
+        // 연령대의 최대 연령 계산 (예: 20대 -> 29세)
+        int maxAgeForRange = age + 9;
+        if (maxAgeForRange > maxAge) {
+          maxAge = maxAgeForRange;
+        }
+      }
+    }
+    return maxAge == 0 ? null : maxAge;
+  }
+
+  // 연속된 연령대인지 확인
+  bool _isConsecutiveAges(List<int> ages) {
+    if (ages.length <= 1) return true;
+    
+    for (int i = 1; i < ages.length; i++) {
+      if (ages[i] - ages[i-1] != 10) {
+        return false;
       }
     }
     return true;

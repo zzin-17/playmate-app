@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
+import '../../services/user_service.dart';
 
 class FollowListScreen extends StatefulWidget {
   final String title;
@@ -24,6 +25,7 @@ class FollowListScreen extends StatefulWidget {
 class _FollowListScreenState extends State<FollowListScreen> {
   List<User> _users = [];
   bool _isLoading = true;
+  final UserService _userService = UserService();
 
   @override
   void initState() {
@@ -37,11 +39,26 @@ class _FollowListScreenState extends State<FollowListScreen> {
     });
 
     try {
-      // TODO: 실제 API 호출로 변경
-      // 현재는 Mock 데이터 사용
-      _users = _getMockUsers();
+      // 실제 API 호출
+      final currentUser = context.read<AuthProvider>().currentUser;
+      if (currentUser != null) {
+        if (widget.isFollowing) {
+          // 팔로잉 목록 조회
+          _users = await _userService.getFollowingList(currentUser.id);
+        } else {
+          // 팔로워 목록 조회
+          _users = await _userService.getFollowerList(currentUser.id);
+        }
+      }
+      
+      // API 호출이 실패하거나 빈 결과인 경우 Mock 데이터 사용
+      if (_users.isEmpty) {
+        _users = _getMockUsers();
+      }
     } catch (e) {
       print('사용자 목록 로드 실패: $e');
+      // 오류 발생 시 Mock 데이터 사용
+      _users = _getMockUsers();
     } finally {
       setState(() {
         _isLoading = false;
@@ -269,37 +286,48 @@ class _FollowListScreenState extends State<FollowListScreen> {
 
   Future<void> _toggleFollow(User user, bool isFollowing) async {
     try {
-      // TODO: 실제 API 호출로 변경
-      print('${isFollowing ? "언팔로우" : "팔로우"} 시도: ${user.nickname}');
+      bool success = false;
       
-      // Mock: 팔로우 상태 토글
-      setState(() {
-        final currentUser = context.read<AuthProvider>().currentUser;
-        if (currentUser != null) {
-          if (isFollowing) {
-            // 언팔로우
-            currentUser.followingIds?.remove(user.id);
-            user.followerIds?.remove(currentUser.id);
-          } else {
-            // 팔로우
-            currentUser.followingIds ??= [];
-            currentUser.followingIds!.add(user.id);
-            user.followerIds ??= [];
-            user.followerIds!.add(currentUser.id);
+      if (isFollowing) {
+        // 언팔로우
+        success = await _userService.unfollowUser(user.id);
+      } else {
+        // 팔로우
+        success = await _userService.followUser(user.id);
+      }
+      
+      if (success) {
+        // 성공 시 로컬 상태도 업데이트
+        setState(() {
+          final currentUser = context.read<AuthProvider>().currentUser;
+          if (currentUser != null) {
+            if (isFollowing) {
+              // 언팔로우
+              currentUser.followingIds?.remove(user.id);
+              user.followerIds?.remove(currentUser.id);
+            } else {
+              // 팔로우
+              currentUser.followingIds ??= [];
+              currentUser.followingIds!.add(user.id);
+              user.followerIds ??= [];
+              user.followerIds!.add(currentUser.id);
+            }
           }
-        }
-      });
+        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isFollowing 
-                ? '${user.nickname}님을 언팔로우했습니다'
-                : '${user.nickname}님을 팔로우했습니다',
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isFollowing 
+                  ? '${user.nickname}님을 언팔로우했습니다'
+                  : '${user.nickname}님을 팔로우했습니다',
+            ),
+            backgroundColor: AppColors.primary,
           ),
-          backgroundColor: AppColors.primary,
-        ),
-      );
+        );
+      } else {
+        throw Exception('API 호출 실패');
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

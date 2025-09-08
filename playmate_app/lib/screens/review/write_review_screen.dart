@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import '../../models/review.dart';
 import '../../models/user.dart';
 import '../../models/matching.dart';
-import '../../providers/auth_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 
@@ -167,12 +164,10 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isFollowing 
-            ? AppColors.primary.withValues(alpha: 0.1)
-            : AppColors.primary,
+          color: AppColors.primary,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isFollowing ? AppColors.primary : Colors.transparent,
+            color: Colors.transparent,
             width: 1,
           ),
         ),
@@ -180,15 +175,15 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isFollowing ? Icons.person : Icons.person_add,
+              Icons.person_add,
               size: 14,
-              color: isFollowing ? AppColors.primary : Colors.white,
+              color: Colors.white,
             ),
             const SizedBox(width: 4),
             Text(
-              isFollowing ? '팔로잉' : '팔로우',
+              '팔로우',
               style: AppTextStyles.caption.copyWith(
-                color: isFollowing ? AppColors.primary : Colors.white,
+                color: Colors.white,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),

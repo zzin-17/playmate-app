@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
+import '../../services/user_service.dart';
+import '../../models/user.dart';
 
 import 'follow_list_screen.dart';
 import 'comment_screen.dart';
@@ -11,8 +13,8 @@ import '../../services/share_service.dart';
 import '../../services/report_service.dart';
 import '../../services/block_service.dart';
 import '../../services/notification_service.dart';
-import '../../services/bookmark_service.dart';
 import '../../services/mock_post_service.dart';
+import '../../services/community_service.dart';
 import 'package:provider/provider.dart';
 
 class CommunityScreen extends StatefulWidget {
@@ -25,6 +27,7 @@ class CommunityScreen extends StatefulWidget {
 class _CommunityScreenState extends State<CommunityScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final CommunityService _communityService = CommunityService();
   
   // 게시글 데이터
   final List<PostData> _feedPosts = [];
@@ -947,16 +950,7 @@ class _CommunityScreenState extends State<CommunityScreen>
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('사용자 검색'),
-          content: const Text('사용자 검색 기능은 곧 구현될 예정입니다!'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('확인'),
-            ),
-          ],
-        );
+        return UserSearchDialog();
       },
     );
   }
@@ -992,45 +986,62 @@ class _CommunityScreenState extends State<CommunityScreen>
 
 
   void _toggleLike(PostData post) async {
-    setState(() {
-      post.isLiked = !post.isLiked;
-      if (post.isLiked) {
-        post.likes++;
-      } else {
-        post.likes--;
-      }
-    });
+    try {
+      // 실제 API 호출
+      final success = await _communityService.toggleLike(post.id);
+      
+      if (success) {
+        setState(() {
+          post.isLiked = !post.isLiked;
+          if (post.isLiked) {
+            post.likes++;
+          } else {
+            post.likes--;
+          }
+        });
 
-    // 좋아요 시 알림 표시
-    if (post.isLiked) {
-      await NotificationService().showLikeNotification(
-        postTitle: post.title,
-        likerName: '현재 사용자', // TODO: 실제 사용자 이름으로 변경
+        // 좋아요 시 알림 표시
+        if (post.isLiked) {
+          await NotificationService().showLikeNotification(
+            postTitle: post.content,
+            likerName: '현재 사용자', // TODO: 실제 사용자 이름으로 변경
+          );
+        }
+      } else {
+        throw Exception('좋아요 처리 실패');
+      }
+    } catch (e) {
+      print('좋아요 처리 오류: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('좋아요 처리 중 오류가 발생했습니다'),
+          backgroundColor: AppColors.error,
+        ),
       );
     }
   }
 
   Future<void> _toggleBookmark(PostData post) async {
     try {
-      final authProvider = context.read<AuthProvider>();
-      final currentUser = authProvider.currentUser;
+      // 실제 API 호출
+      final success = await _communityService.toggleBookmark(post.id);
       
-      if (currentUser != null) {
-        final isBookmarked = await BookmarkService.toggleBookmark(currentUser.id, post.id);
-        
+      if (success) {
         setState(() {
-          post.isBookmarked = isBookmarked;
+          post.isBookmarked = !post.isBookmarked;
         });
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(isBookmarked ? '북마크에 추가되었습니다' : '북마크에서 제거되었습니다'),
-              backgroundColor: isBookmarked ? Colors.green : Colors.orange,
+              content: Text(post.isBookmarked ? '북마크에 추가되었습니다' : '북마크에서 제거되었습니다'),
+              backgroundColor: post.isBookmarked ? Colors.green : Colors.orange,
               duration: const Duration(seconds: 2),
             ),
           );
         }
+      } else {
+        throw Exception('북마크 처리 실패');
       }
     } catch (e) {
       if (mounted) {
@@ -1164,7 +1175,25 @@ class _CommunityScreenState extends State<CommunityScreen>
     }
   }
 
-  /// 페이지별 목업 데이터 생성
+  /// 페이지별 게시글 데이터 로드 (API 우선, 실패 시 Mock 데이터)
+  Future<List<PostData>> _getPostsForPage(int page) async {
+    try {
+      // 실제 API 호출
+      final posts = await _communityService.getPosts(
+        page: page,
+        limit: _pageSize,
+      );
+      
+      // Post를 PostData로 변환
+      return posts.map((post) => _convertPostToPostData(post)).toList();
+    } catch (e) {
+      print('API 호출 실패, Mock 데이터 사용: $e');
+      // API 실패 시 Mock 데이터 사용
+      return _getMockPostsForPage(page);
+    }
+  }
+
+  /// 페이지별 목업 데이터 생성 (폴백용)
   List<PostData> _getMockPostsForPage(int page) {
     if (page > 3) return []; // 3페이지까지만 데이터 제공
     
@@ -1177,15 +1206,64 @@ class _CommunityScreenState extends State<CommunityScreen>
     return allPosts.sublist(startIndex, endIndex);
   }
 
-  /// 모든 목업 데이터
+  /// 모든 목업 데이터 (폴백용)
   List<PostData> _getAllMockPosts() {
     return MockPostService.getAllMockPosts();
+  }
+
+  /// Post를 PostData로 변환
+  PostData _convertPostToPostData(Post post) {
+    return PostData(
+      id: post.id,
+      authorId: post.authorId,
+      author: post.authorNickname, // PostData는 author 필드 사용
+      authorProfileImage: post.authorProfileImage,
+      content: post.content,
+      hashtags: post.hashtags ?? [],
+      likes: post.likeCount, // PostData는 likes 필드 사용
+      comments: post.commentCount, // PostData는 comments 필드가 int
+      isLiked: post.isLikedByCurrentUser,
+      isBookmarked: post.isBookmarkedByCurrentUser,
+      shareCount: post.shareCount,
+      isSharedByCurrentUser: post.isSharedByCurrentUser,
+      title: post.title, // Post 모델의 title 필드 사용
+      timeAgo: _getTimeAgo(post.createdAt),
+      category: post.category,
+      isFollowing: false, // 기본값
+    );
+  }
+
+  /// 시간 차이를 문자열로 변환
+  String _getTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays}일 전';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}시간 전';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}분 전';
+    } else {
+      return '방금 전';
+    }
   }
 
   /// 내 게시글 로드
   Future<void> _loadMyPosts() async {
     try {
-      // 현재 사용자 ID로 내 게시글 필터링
+      // 실제 API 호출
+      final posts = await _communityService.getMyPosts();
+      
+      setState(() {
+        _myPosts.clear();
+        _myPosts.addAll(
+          posts.map((post) => _convertPostToPostData(post)).toList(),
+        );
+      });
+    } catch (e) {
+      print('내 게시글 로드 실패, Mock 데이터 사용: $e');
+      // API 실패 시 Mock 데이터 사용
       final currentUserId = context.read<AuthProvider>().currentUser?.id ?? 1;
       final allPosts = _getAllMockPosts();
       
@@ -1195,8 +1273,6 @@ class _CommunityScreenState extends State<CommunityScreen>
           allPosts.where((post) => post.authorId == currentUserId).toList(),
         );
       });
-    } catch (e) {
-      print('내 게시글 로딩 실패: $e');
     }
   }
 
@@ -1306,4 +1382,171 @@ class PostData {
     this.shareCount = 0,
     this.isSharedByCurrentUser = false,
   });
+}
+
+/// 사용자 검색 다이얼로그
+class UserSearchDialog extends StatefulWidget {
+  @override
+  _UserSearchDialogState createState() => _UserSearchDialogState();
+}
+
+class _UserSearchDialogState extends State<UserSearchDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  final UserService _userService = UserService();
+  List<User> _searchResults = [];
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _searchUsers(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _searchResults = [];
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final results = await _userService.searchUsers(query);
+      setState(() {
+        _searchResults = results;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _searchResults = [];
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('사용자 검색 중 오류가 발생했습니다: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.9,
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // 제목
+            Row(
+              children: [
+                Text(
+                  '사용자 검색',
+                  style: AppTextStyles.h2,
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // 검색 입력 필드
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: '닉네임으로 검색하세요',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onChanged: _searchUsers,
+            ),
+            const SizedBox(height: 16),
+            
+            // 검색 결과
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _searchResults.isEmpty
+                      ? Center(
+                          child: Text(
+                            _searchController.text.isEmpty
+                                ? '검색어를 입력하세요'
+                                : '검색 결과가 없습니다',
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _searchResults.length,
+                          itemBuilder: (context, index) {
+                            final user = _searchResults[index];
+                            return _buildUserCard(user);
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserCard(User user) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundImage: NetworkImage(user.profileImage ?? 'https://via.placeholder.com/40x40'),
+          onBackgroundImageError: (_, __) {},
+        ),
+        title: Text(user.nickname ?? '사용자'),
+        subtitle: Text('${user.skillLevel}년차 • ${user.region}'),
+        trailing: ElevatedButton(
+          onPressed: () => _followUser(user),
+          child: const Text('팔로우'),
+        ),
+        onTap: () {
+          Navigator.pop(context);
+          // 사용자 프로필 화면으로 이동
+          // Navigator.push(context, MaterialPageRoute(
+          //   builder: (context) => UserProfileScreen(user: user),
+          // ));
+        },
+      ),
+    );
+  }
+
+  Future<void> _followUser(User user) async {
+    try {
+      final success = await _userService.followUser(user.id);
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${user.nickname}님을 팔로우했습니다'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      } else {
+        throw Exception('팔로우 실패');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('팔로우 중 오류가 발생했습니다: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
 }

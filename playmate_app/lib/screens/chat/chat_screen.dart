@@ -374,10 +374,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMatchingStatus() {
-    if (!_isHost) {
-      return const SizedBox.shrink();
-    }
-
     // 매칭 상태에 따라 버튼 표시 결정
     final isConfirmed = widget.matching.status == 'confirmed' || _isMatchingConfirmed;
 

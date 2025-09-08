@@ -5,7 +5,6 @@ import '../../constants/app_text_styles.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
 import 'my_hosted_matchings_screen.dart';
-import 'my_guest_matchings_screen.dart';
 import 'my_bookmarks_screen.dart';
 import '../review/my_reviews_screen.dart';
 import '../community/community_screen.dart';

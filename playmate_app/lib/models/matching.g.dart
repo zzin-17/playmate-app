@@ -7,30 +7,45 @@ part of 'matching.dart';
 // **************************************************************************
 
 Matching _$MatchingFromJson(Map<String, dynamic> json) => Matching(
-  id: (json['id'] as num).toInt(),
-  type: json['type'] as String,
-  courtName: json['courtName'] as String,
-  courtLat: (json['courtLat'] as num).toDouble(),
-  courtLng: (json['courtLng'] as num).toDouble(),
-  date: DateTime.parse(json['date'] as String),
-  timeSlot: json['timeSlot'] as String,
+  id: (json['id'] as num?)?.toInt() ?? 0,
+  type: json['type'] as String? ?? 'host',
+  courtName: json['courtName'] as String? ?? '',
+  courtLat: (json['courtLat'] as num?)?.toDouble() ?? 37.5665,
+  courtLng: (json['courtLng'] as num?)?.toDouble() ?? 126.9780,
+  date: json['date'] != null ? DateTime.parse(json['date'] as String) : DateTime.now(),
+  timeSlot: json['timeSlot'] as String? ?? '18:00~20:00',
   minLevel: (json['minLevel'] as num?)?.toInt(),
   maxLevel: (json['maxLevel'] as num?)?.toInt(),
-  minAge: (json['minAge'] as num?)?.toInt(),
-  maxAge: (json['maxAge'] as num?)?.toInt(),
-  gameType: json['gameType'] as String,
-  maleRecruitCount: (json['maleRecruitCount'] as num).toInt(),
-  femaleRecruitCount: (json['femaleRecruitCount'] as num).toInt(),
-  status: json['status'] as String,
+  minAge: (() {
+    final value = (json['minAge'] as num?)?.toInt();
+    print('🔍 Matching.fromJson minAge: ${json['minAge']} -> $value');
+    return value;
+  })(),
+  maxAge: (() {
+    final value = (json['maxAge'] as num?)?.toInt();
+    print('🔍 Matching.fromJson maxAge: ${json['maxAge']} -> $value');
+    return value;
+  })(),
+  gameType: json['gameType'] as String? ?? 'singles',
+  maleRecruitCount: (json['maleRecruitCount'] as num?)?.toInt() ?? 2,
+  femaleRecruitCount: (json['femaleRecruitCount'] as num?)?.toInt() ?? 2,
+  status: json['status'] as String? ?? 'recruiting',
   message: json['message'] as String?,
   guestCost: (json['guestCost'] as num?)?.toInt(),
   isFollowersOnly: json['isFollowersOnly'] as bool? ?? false,
-  host: User.fromJson(json['host'] as Map<String, dynamic>),
+  host: json['host'] != null ? User.fromJson(json['host'] as Map<String, dynamic>) : User(
+    id: 0,
+    nickname: 'Unknown',
+    email: 'unknown@example.com',
+    profileImage: null,
+    createdAt: DateTime.now(),
+    updatedAt: DateTime.now(),
+  ),
   guests: (json['guests'] as List<dynamic>?)
       ?.map((e) => User.fromJson(e as Map<String, dynamic>))
       .toList(),
-  createdAt: DateTime.parse(json['createdAt'] as String),
-  updatedAt: DateTime.parse(json['updatedAt'] as String),
+  createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt'] as String) : DateTime.now(),
+  updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt'] as String) : DateTime.now(),
   recoveryCount: (json['recoveryCount'] as num?)?.toInt(),
   appliedUserIds: (json['appliedUserIds'] as List<dynamic>?)
       ?.map((e) => (e as num).toInt())

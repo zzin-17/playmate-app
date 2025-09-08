@@ -6,12 +6,13 @@ import '../../models/matching.dart';
 import '../../models/user.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
-import '../../services/api_service.dart';
+import '../../services/matching_data_service_v2.dart';
 
 class CreateMatchingScreen extends StatefulWidget {
   final Matching? editingMatching;
+  final User? currentUser;
   
-  const CreateMatchingScreen({super.key, this.editingMatching});
+  const CreateMatchingScreen({super.key, this.editingMatching, this.currentUser});
 
   @override
   State<CreateMatchingScreen> createState() => _CreateMatchingScreenState();
@@ -33,6 +34,15 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
   int _femaleRecruitCount = 1;
   final _guestCostController = TextEditingController();
   bool _isFollowersOnly = false; // 팔로워 전용 공개 여부
+  
+  // 연령대 선택 (홈화면과 동일한 방식)
+  List<String> _selectedAgeRanges = [];
+  bool _noAgeRestriction = false; // 연령 제한 없음 (기본값 false로 변경)
+  
+  // 연령대 옵션들 (홈화면과 동일)
+  static const List<String> _ageOptions = [
+    '10대', '20대', '30대', '40대', '50대', '60대~'
+  ];
 
   final List<String> _timeOptions = [
     '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
@@ -123,6 +133,27 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
   Future<void> _createMatching() async {
     print('매칭 생성 버튼 클릭됨');
     
+    // 디버깅을 위한 필드 값 확인
+    print('=== 폼 필드 값 확인 ===');
+    print('코트 이름: ${_courtNameController.text}');
+    print('선택된 날짜: $_selectedDate');
+    print('시작 시간: $_selectedStartTime');
+    print('종료 시간: $_selectedEndTime');
+    print('최소 구력: $_selectedMinLevel');
+    print('최대 구력: $_selectedMaxLevel');
+    print('게임 유형: $_selectedGameType');
+    print('남성 모집: $_maleRecruitCount');
+    print('여성 모집: $_femaleRecruitCount');
+    print('연령 제한 없음: $_noAgeRestriction');
+    print('선택된 연령대: $_selectedAgeRanges');
+    print('계산된 최소 연령: ${_getMinAgeFromRanges()}');
+    print('계산된 최대 연령: ${_getMaxAgeFromRanges()}');
+    print('최종 minAge: ${_noAgeRestriction ? null : _getMinAgeFromRanges()}');
+    print('최종 maxAge: ${_noAgeRestriction ? null : _getMaxAgeFromRanges()}');
+    print('게스트비용: ${_guestCostController.text}');
+    print('메시지: ${_messageController.text}');
+    print('=======================');
+    
     if (!_formKey.currentState!.validate()) {
       print('폼 유효성 검사 실패');
       return;
@@ -134,6 +165,15 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
     final timeSlot = '$_selectedStartTime~$_selectedEndTime';
 
     // 실제 Matching 객체 생성
+    final minAge = _noAgeRestriction ? null : _getMinAgeFromRanges();
+    final maxAge = _noAgeRestriction ? null : _getMaxAgeFromRanges();
+    
+    print('🔍 Matching 객체 생성 전 확인:');
+    print('  - minAge: $minAge');
+    print('  - maxAge: $maxAge');
+    print('  - _noAgeRestriction: $_noAgeRestriction');
+    print('  - _isFollowersOnly: $_isFollowersOnly');
+    
     final newMatching = Matching(
       id: widget.editingMatching?.id ?? DateTime.now().millisecondsSinceEpoch, // 편집 시 기존 ID 유지
       type: 'host',
@@ -144,12 +184,15 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
       timeSlot: timeSlot,
       minLevel: _selectedMinLevel,
       maxLevel: _selectedMaxLevel,
+      minAge: minAge,
+      maxAge: maxAge,
       
       gameType: _selectedGameType,
       maleRecruitCount: _maleRecruitCount,
       femaleRecruitCount: _femaleRecruitCount,
       status: 'recruiting',
       message: _messageController.text,
+      isFollowersOnly: _isFollowersOnly,
       host: User(
         id: 1,
         email: 'user@example.com',
@@ -171,6 +214,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
     print('시간: ${newMatching.timeSlot}');
     print('구력: ${newMatching.skillRangeText}');
     print('게임 유형: ${newMatching.gameTypeText}');
+    print('연령대: ${newMatching.ageRangeText} (minAge: ${newMatching.minAge}, maxAge: ${newMatching.maxAge})');
     
     print('모집 인원: 남${newMatching.maleRecruitCount}명, 여${newMatching.femaleRecruitCount}명');
     print('게스트비용: ${_guestCostController.text}원');
@@ -178,14 +222,14 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
 
     try {
       // 실제 백엔드 API로 매칭 생성
-      final token = await _getAuthToken();
-      if (token != null) {
-        final createdMatching = await ApiService.createMatching(newMatching.toJson(), token);
-        
+      final createdMatching = await MatchingDataServiceV2.createMatching(newMatching.toJson());
+      
+      if (createdMatching != null) {
         // 성공시 생성된 매칭을 홈 화면으로 전달
         Navigator.of(context).pop(createdMatching);
       } else {
-        // 토큰이 없으면 로컬로 처리
+        // API 실패시 폴백: 로컬 매칭으로 처리 (개발용)
+        print('매칭 생성 API 실패, 로컬로 처리');
         Navigator.of(context).pop(newMatching);
       }
     } catch (e) {
@@ -248,11 +292,12 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
                       focusNode: _courtNameFocusNode,
                       enabled: true,
                       autofocus: false,
-                      keyboardType: TextInputType.text,
-                      textInputAction: TextInputAction.next,
-                      textCapitalization: TextCapitalization.sentences,
-                      enableIMEPersonalizedLearning: true,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.done,
+                      textCapitalization: TextCapitalization.none,
                       enableSuggestions: true,
+                      autocorrect: true,
+                      enableIMEPersonalizedLearning: true,
                       enableInteractiveSelection: true,
                       showCursor: true,
                       readOnly: false,
@@ -264,16 +309,10 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
                       textAlignVertical: TextAlignVertical.center,
                       textDirection: TextDirection.ltr,
                       obscureText: false,
-                      autocorrect: true,
-                      smartDashesType: SmartDashesType.enabled,
-                      smartQuotesType: SmartQuotesType.enabled,
+                      smartDashesType: SmartDashesType.disabled,
+                      smartQuotesType: SmartQuotesType.disabled,
                       minLines: 1,
                       maxLines: 1,
-                      onTap: () {
-                        if (!_courtNameFocusNode.hasFocus) {
-                          _courtNameFocusNode.requestFocus();
-                        }
-                      },
                       decoration: InputDecoration(
                         hintText: '예: 잠실종합운동장',
                         hintStyle: AppTextStyles.placeholder,
@@ -345,10 +384,15 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
                 // 게임 유형
                 _buildGameTypeSection(),
                 
-
+                const SizedBox(height: 24),
                 
                 // 모집 인원
                 _buildRecruitCountSection(),
+                
+                const SizedBox(height: 24),
+                
+                // 연령대 선택
+                _buildAgeRangeSection(),
                 
                 const SizedBox(height: 24),
                 
@@ -393,14 +437,6 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
                       smartDashesType: SmartDashesType.enabled,
                       smartQuotesType: SmartQuotesType.enabled,
                       minLines: 3,
-                      onTap: () {
-                        if (!_messageController.text.endsWith('\n')) {
-                          _messageController.text = '${_messageController.text}\n';
-                          _messageController.selection = TextSelection.fromPosition(
-                            TextPosition(offset: _messageController.text.length),
-                          );
-                        }
-                      },
                       decoration: InputDecoration(
                         hintText: '게스트에게 전할 메시지를 입력해주세요',
                         hintStyle: AppTextStyles.placeholder,
@@ -652,7 +688,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
         ),
         const SizedBox(height: 8),
         _buildDropdownSection(
-          '게임 유형',
+          '',
           _selectedGameType,
           _gameTypes.map((e) => e['value']!).toList(),
           (value) => setState(() => _selectedGameType = value!),
@@ -819,6 +855,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
             onChanged: (value) {
               setState(() {
                 _isFollowersOnly = value ?? false;
+                print('🔍 팔로워만 모집 체크박스 변경: $_isFollowersOnly');
               });
             },
             activeColor: AppColors.primary,
@@ -950,5 +987,266 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
         ),
       ],
     );
+  }
+
+  // 연령대 선택 섹션 (홈화면과 동일한 방식)
+  Widget _buildAgeRangeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '연령대',
+          style: AppTextStyles.h2,
+        ),
+        const SizedBox(height: 12),
+        
+        // 연령 상관없음 체크박스
+        Row(
+          children: [
+            Checkbox(
+              value: _noAgeRestriction,
+              onChanged: (value) {
+                setState(() {
+                  _noAgeRestriction = value ?? true;
+                  if (_noAgeRestriction) {
+                    _selectedAgeRanges.clear();
+                  }
+                });
+              },
+              activeColor: AppColors.primary,
+            ),
+            Text(
+              '연령 상관없음',
+              style: AppTextStyles.body,
+            ),
+          ],
+        ),
+        
+        if (!_noAgeRestriction) ...[
+          const SizedBox(height: 16),
+          Text(
+            '원하는 연령대를 여러 개 선택할 수 있습니다',
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          // 연령대 선택 버튼들
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _ageOptions.map((age) {
+              final isSelected = _selectedAgeRanges.contains(age);
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    if (_selectedAgeRanges.length >= 2) {
+                      // 이미 2개 이상 선택된 경우, 모든 선택 해제하고 새로 시작
+                      _selectedAgeRanges.clear();
+                    }
+                    _selectedAgeRanges.add(age);
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : AppColors.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : AppColors.cardBorder,
+                    ),
+                  ),
+                  child: Text(
+                    age,
+                    style: AppTextStyles.body.copyWith(
+                      color: isSelected ? Colors.white : AppColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          
+          // 선택된 연령대 표시
+          if (_selectedAgeRanges.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: AppColors.primary,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                                      Text(
+                      '선택된 연령대: ${_getAgeRangeDisplayText()}',
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+
+  // 드롭다운 필드 빌더 메서드
+  Widget _buildDropdownField({
+    required String label,
+    required String? value,
+    required List<String> options,
+    List<String>? displayValues,
+    required ValueChanged<String?> onChanged,
+    String? hint,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: AppTextStyles.body.copyWith(
+            fontWeight: FontWeight.w500,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          value: value,
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppColors.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: AppColors.cardBorder),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: AppColors.cardBorder),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+          ),
+          hint: Text(hint ?? '선택하세요', style: AppTextStyles.placeholder),
+          items: options.asMap().entries.map((entry) {
+            final index = entry.key;
+            final option = entry.value;
+            final displayValue = displayValues != null && index < displayValues.length
+                ? displayValues[index]
+                : option;
+            return DropdownMenuItem(
+              value: option,
+              child: Text(displayValue, style: AppTextStyles.input),
+            );
+          }).toList(),
+          onChanged: onChanged,
+          validator: validator,
+        ),
+      ],
+    );
+  }
+
+  // 연령대 범위에서 최소 연령 추출
+  int? _getMinAgeFromRanges() {
+    try {
+      if (_selectedAgeRanges.isEmpty) return null;
+      
+      int minAge = 100;
+      for (String ageRange in _selectedAgeRanges) {
+        int age = _getAgeFromRange(ageRange);
+        if (age < minAge) {
+          minAge = age;
+        }
+      }
+      return minAge == 100 ? null : minAge;
+    } catch (e) {
+      print('❌ _getMinAgeFromRanges 오류: $e');
+      return null;
+    }
+  }
+
+  // 연령대 범위에서 최대 연령 추출
+  int? _getMaxAgeFromRanges() {
+    try {
+      if (_selectedAgeRanges.isEmpty) return null;
+      
+      int maxAge = 0;
+      for (String ageRange in _selectedAgeRanges) {
+        int age = _getAgeFromRange(ageRange, isMax: true);
+        if (age > maxAge) {
+          maxAge = age;
+        }
+      }
+      return maxAge == 0 ? null : maxAge;
+    } catch (e) {
+      print('❌ _getMaxAgeFromRanges 오류: $e');
+      return null;
+    }
+  }
+
+  // 연속된 연령대인지 확인
+  bool _isConsecutiveAges(List<int> ages) {
+    if (ages.length <= 1) return true;
+    
+    for (int i = 1; i < ages.length; i++) {
+      if (ages[i] - ages[i-1] != 10) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // 연령대 범위 표시 텍스트 생성
+  String _getAgeRangeDisplayText() {
+    if (_selectedAgeRanges.isEmpty) return '';
+    
+    if (_selectedAgeRanges.length == 1) {
+      // 하나만 선택된 경우
+      return '${_selectedAgeRanges.first}';
+    } else {
+      // 두 개 선택된 경우 (마지막 두 선택을 기준으로 범위 표시)
+      final ages = _selectedAgeRanges.map((range) => _getAgeFromRange(range)).toList();
+      ages.sort();
+      
+      final startAge = ages.first;
+      final endAge = ages.last;
+      return '${startAge}대~${endAge}대';
+    }
+  }
+
+  // 연령대 텍스트에서 숫자 값 추출 (홈화면과 동일한 로직)
+  int _getAgeFromRange(String ageRange, {bool isMax = false}) {
+    switch (ageRange) {
+      case '10대':
+        return isMax ? 19 : 10;
+      case '20대':
+        return isMax ? 29 : 20;
+      case '30대':
+        return isMax ? 39 : 30;
+      case '40대':
+        return isMax ? 49 : 40;
+      case '50대':
+        return isMax ? 59 : 50;
+      case '60대~':
+        return isMax ? 100 : 60;
+      default:
+        return isMax ? 100 : 0;
+    }
   }
 } 

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/user.dart';
+import '../../models/matching.dart';
 
 import '../../services/matching_notification_service.dart';
-import '../../services/matching_service.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../matching/matching_detail_screen.dart';
@@ -78,13 +78,36 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
     );
   }
 
-  void _navigateToMatchingDetail(MatchingNotification notification) {
+  void _navigateToMatchingDetail(MatchingNotification notification) async {
     try {
-      // 매칭 서비스에서 해당 매칭 정보 가져오기
-      final matchingService = MatchingService();
-      final matching = matchingService.getMatchingById(notification.matchingId);
+      // 임시로 매칭 상세 화면으로 이동 (API 연동은 나중에)
+      // TODO: 실제 매칭 데이터를 가져와서 처리
       
-      if (matching != null) {
+      // 임시 매칭 객체 생성
+      final matching = Matching(
+        id: notification.matchingId,
+        type: 'host',
+        courtName: '임시 코트',
+        courtLat: 37.5665,
+        courtLng: 126.9780,
+        date: DateTime.now(),
+        timeSlot: '10:00~12:00',
+        gameType: 'mixed',
+        maleRecruitCount: 2,
+        femaleRecruitCount: 2,
+        status: 'completed',
+        host: User(
+          id: 1,
+          email: 'temp@example.com',
+          nickname: '임시 호스트',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      
+      if (true) { // 임시로 항상 true
         // 알림 타입에 따라 다른 화면으로 이동
         if (notification.type == 'new_chat') {
           // 새로운 채팅 알림인 경우 채팅 화면으로 이동
@@ -144,14 +167,6 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
             ),
           );
         }
-      } else {
-        // 매칭을 찾을 수 없는 경우
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('해당 매칭을 찾을 수 없습니다.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
       }
     } catch (e) {
       // 오류 발생 시

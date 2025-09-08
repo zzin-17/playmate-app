@@ -2,16 +2,64 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/matching.dart';
 import '../models/user.dart';
+import '../config/api_config.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://api.playmate.com'; // 실제 API URL로 변경 필요
-  static const Duration timeout = Duration(seconds: 30);
+  static String get baseUrl => ApiConfig.fullBaseUrl;
+  static const Duration timeout = ApiConfig.timeout;
   
   // HTTP 헤더
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    'User-Agent': 'PlayMate-Mobile/1.0.0',
   };
+  
+  // API 로깅
+  static void _logRequest(String method, String url, Map<String, String>? headers, String? body) {
+    if (ApiConfig.enableApiLogging) {
+      print('🌐 API Request: $method $url');
+      if (headers != null) {
+        print('📋 Headers: $headers');
+      }
+      if (body != null) {
+        print('📦 Body: $body');
+      }
+    }
+  }
+  
+  static void _logResponse(String method, String url, int statusCode, String? body) {
+    if (ApiConfig.enableApiLogging) {
+      print('📡 API Response: $method $url -> $statusCode');
+      if (body != null) {
+        print('📦 Response Body: $body');
+      }
+    }
+  }
+  
+  // 재시도 로직
+  static Future<http.Response> _retryRequest(Future<http.Response> Function() request) async {
+    int attempts = 0;
+    while (attempts < ApiConfig.maxRetries) {
+      try {
+        final response = await request();
+        if (response.statusCode < 500) {
+          return response; // 4xx 오류는 재시도하지 않음
+        }
+        attempts++;
+        if (attempts < ApiConfig.maxRetries) {
+          await Future.delayed(ApiConfig.retryDelay * attempts);
+        }
+      } catch (e) {
+        attempts++;
+        if (attempts >= ApiConfig.maxRetries) {
+          rethrow;
+        }
+        await Future.delayed(ApiConfig.retryDelay * attempts);
+      }
+    }
+    throw ApiException('최대 재시도 횟수 초과');
+  }
   
   // 인증 헤더 (토큰이 있는 경우)
   static Map<String, String> getAuthHeaders(String? token) {
@@ -86,16 +134,27 @@ class ApiService {
         queryParams['show_only_following'] = showOnlyFollowing.toString();
       }
       
-      final uri = Uri.parse('$baseUrl/api/matchings').replace(queryParameters: queryParams);
+      final uri = Uri.parse('$baseUrl/matchings').replace(queryParameters: queryParams);
       
-      final response = await http.get(
+      _logRequest('GET', uri.toString(), getAuthHeaders(token), null);
+      
+      final response = await _retryRequest(() => http.get(
         uri,
         headers: getAuthHeaders(token),
-      ).timeout(timeout);
+      ).timeout(timeout));
+      
+      _logResponse('GET', uri.toString(), response.statusCode, response.body);
       
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => Matching.fromJson(json)).toList();
+        final Map<String, dynamic> responseData = json.decode(response.body);
+        
+        // 백엔드 응답 구조에 맞게 데이터 추출
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final List<dynamic> data = responseData['data'];
+          return data.map((json) => Matching.fromJson(json)).toList();
+        } else {
+          throw ApiException('매칭 목록 조회 실패: ${responseData['message'] ?? 'Unknown error'}');
+        }
       } else {
         throw ApiException('매칭 목록 조회 실패: ${response.statusCode}');
       }
@@ -108,7 +167,7 @@ class ApiService {
   // 매칭 상세 조회
   static Future<Matching> getMatchingDetail(int matchingId, String? token) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/matchings/$matchingId');
+      final uri = Uri.parse('$baseUrl/matchings/$matchingId');
       
       final response = await http.get(
         uri,
@@ -130,7 +189,7 @@ class ApiService {
   // 매칭 생성
   static Future<Matching> createMatching(Map<String, dynamic> matchingData, String token) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/matchings');
+      final uri = Uri.parse('$baseUrl/matchings');
       
       final response = await http.post(
         uri,
@@ -139,8 +198,28 @@ class ApiService {
       ).timeout(timeout);
       
       if (response.statusCode == 201) {
-        final data = json.decode(response.body);
-        return Matching.fromJson(data);
+        final responseBody = response.body;
+        print('매칭 생성 API 응답: $responseBody');
+        
+        final responseData = json.decode(responseBody);
+        print('파싱된 응답 데이터: $responseData');
+        
+        // 백엔드 응답 구조에 맞게 데이터 추출
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final matchingData = responseData['data'];
+          print('매칭 데이터: $matchingData');
+          
+          try {
+            final matching = Matching.fromJson(matchingData);
+            print('매칭 객체 생성 성공: ${matching.courtName}');
+            return matching;
+          } catch (e) {
+            print('매칭 객체 생성 실패: $e');
+            throw ApiException('매칭 데이터 변환 실패: $e');
+          }
+        } else {
+          throw ApiException('매칭 생성 실패: ${responseData['message'] ?? 'Unknown error'}');
+        }
       } else {
         throw ApiException('매칭 생성 실패: ${response.statusCode}');
       }
@@ -153,7 +232,7 @@ class ApiService {
   // 매칭 수정
   static Future<Matching> updateMatching(int matchingId, Map<String, dynamic> matchingData, String token) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/matchings/$matchingId');
+      final uri = Uri.parse('$baseUrl/matchings/$matchingId');
       
       final response = await http.put(
         uri,
@@ -176,7 +255,7 @@ class ApiService {
   // 매칭 상태 변경
   static Future<Matching> updateMatchingStatus(int matchingId, String status, String token) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/matchings/$matchingId/status');
+      final uri = Uri.parse('$baseUrl/matchings/$matchingId/status');
       
       final response = await http.patch(
         uri,
@@ -199,7 +278,7 @@ class ApiService {
   // 사용자 정보 조회
   static Future<User> getUserProfile(String? token) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/user/profile');
+      final uri = Uri.parse('$baseUrl/user/profile');
       
       final response = await http.get(
         uri,
@@ -221,7 +300,7 @@ class ApiService {
   // 위치 정보 조회
   static Future<List<dynamic>> getLocations() async {
     try {
-      final uri = Uri.parse('$baseUrl/api/locations');
+      final uri = Uri.parse('$baseUrl/locations');
       
       final response = await http.get(
         uri,
@@ -244,7 +323,7 @@ class ApiService {
   // 로그인
   static Future<Map<String, dynamic>> login(String email, String password) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/auth/login');
+      final uri = Uri.parse('$baseUrl/auth/login');
       
       final response = await http.post(
         uri,
@@ -275,7 +354,7 @@ class ApiService {
     int? birthYear,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/auth/register');
+      final uri = Uri.parse('$baseUrl/auth/register');
       
       final response = await http.post(
         uri,
@@ -303,7 +382,7 @@ class ApiService {
   // 현재 사용자 정보 조회
   static Future<User> getCurrentUser(String token) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/auth/me');
+      final uri = Uri.parse('$baseUrl/auth/me');
       
       final response = await http.get(
         uri,
@@ -325,7 +404,7 @@ class ApiService {
   // 프로필 업데이트
   static Future<User> updateProfile(Map<String, dynamic> profileData, String token) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/auth/profile');
+      final uri = Uri.parse('$baseUrl/auth/profile');
       
       final response = await http.put(
         uri,
@@ -348,7 +427,7 @@ class ApiService {
   // 비밀번호 재설정 요청
   static Future<void> requestPasswordReset(String email) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/auth/password/reset-request');
+      final uri = Uri.parse('$baseUrl/auth/password/reset-request');
       
       final response = await http.post(
         uri,
@@ -371,7 +450,7 @@ class ApiService {
     required String newPassword,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/auth/password/reset');
+      final uri = Uri.parse('$baseUrl/auth/password/reset');
       
       final response = await http.post(
         uri,
@@ -391,12 +470,86 @@ class ApiService {
     }
   }
   
+  // ===== 기본 HTTP 메서드들 =====
+  
+  // GET 요청
+  static Future<http.Response> get(String endpoint, {Map<String, String>? headers}) async {
+    try {
+      final uri = Uri.parse('$baseUrl$endpoint');
+      final response = await http.get(uri, headers: headers).timeout(timeout);
+      _logRequest('GET', uri.toString(), headers, null);
+      _logResponse('GET', uri.toString(), response.statusCode, response.body);
+      return response;
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+  
+  // POST 요청
+  static Future<http.Response> post(String endpoint, {
+    String? body,
+    Map<String, String>? headers,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl$endpoint');
+      final response = await http.post(
+        uri,
+        body: body,
+        headers: headers,
+      ).timeout(timeout);
+      _logRequest('POST', uri.toString(), headers, body);
+      _logResponse('POST', uri.toString(), response.statusCode, response.body);
+      return response;
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+  
+  // PUT 요청
+  static Future<http.Response> put(String endpoint, {
+    String? body,
+    Map<String, String>? headers,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl$endpoint');
+      final response = await http.put(
+        uri,
+        body: body,
+        headers: headers,
+      ).timeout(timeout);
+      _logRequest('PUT', uri.toString(), headers, body);
+      _logResponse('PUT', uri.toString(), response.statusCode, response.body);
+      return response;
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+  
+  // DELETE 요청
+  static Future<http.Response> delete(String endpoint, {
+    Map<String, String>? headers,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl$endpoint');
+      final response = await http.delete(uri, headers: headers).timeout(timeout);
+      _logRequest('DELETE', uri.toString(), headers, null);
+      _logResponse('DELETE', uri.toString(), response.statusCode, response.body);
+      return response;
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+
   // ===== 채팅 관련 API =====
   
   // 내 채팅방 목록 조회
   static Future<List<dynamic>> getMyChatRooms(String token) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/chat/rooms/my');
+      final uri = Uri.parse('$baseUrl/chat/rooms/my');
       
       final response = await http.get(
         uri,
@@ -422,7 +575,7 @@ class ApiService {
     required String token,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/chat/rooms');
+      final uri = Uri.parse('$baseUrl/chat/rooms');
       
       final response = await http.post(
         uri,
@@ -443,12 +596,145 @@ class ApiService {
     }
   }
   
+  // 채팅 메시지 조회
+  static Future<List<dynamic>> getChatMessages({
+    required int roomId,
+    required String token,
+    int? lastMessageId,
+    int limit = 50,
+  }) async {
+    try {
+      String url = '$baseUrl/chat/rooms/$roomId/messages?limit=$limit';
+      if (lastMessageId != null) {
+        url += '&last_message_id=$lastMessageId';
+      }
+      
+      final uri = Uri.parse(url);
+      
+      final response = await http.get(
+        uri,
+        headers: getAuthHeaders(token),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw ApiException('채팅 메시지 조회 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+  
+  // 메시지 전송
+  static Future<Map<String, dynamic>> sendMessage({
+    required int roomId,
+    required String content,
+    required String token,
+    String? messageType,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/chat/rooms/$roomId/messages');
+      
+      final response = await http.post(
+        uri,
+        headers: getAuthHeaders(token),
+        body: json.encode({
+          'content': content,
+          'message_type': messageType ?? 'text',
+        }),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 201) {
+        return json.decode(response.body);
+      } else {
+        throw ApiException('메시지 전송 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+  
+  // 채팅방 참여자 조회
+  static Future<List<dynamic>> getChatRoomMembers({
+    required int roomId,
+    required String token,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/chat/rooms/$roomId/members');
+      
+      final response = await http.get(
+        uri,
+        headers: getAuthHeaders(token),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw ApiException('채팅방 참여자 조회 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+  
+  // 채팅방 나가기
+  static Future<void> leaveChatRoom({
+    required int roomId,
+    required String token,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/chat/rooms/$roomId/leave');
+      
+      final response = await http.post(
+        uri,
+        headers: getAuthHeaders(token),
+      ).timeout(timeout);
+      
+      if (response.statusCode != 200) {
+        throw ApiException('채팅방 나가기 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+  
+  // 메시지 읽음 처리
+  static Future<void> markMessagesAsRead({
+    required int roomId,
+    required String token,
+    int? lastReadMessageId,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/chat/rooms/$roomId/read');
+      
+      final response = await http.post(
+        uri,
+        headers: getAuthHeaders(token),
+        body: json.encode({
+          if (lastReadMessageId != null) 'last_read_message_id': lastReadMessageId,
+        }),
+      ).timeout(timeout);
+      
+      if (response.statusCode != 200) {
+        throw ApiException('메시지 읽음 처리 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+  
   // ===== 매칭 관련 API =====
   
   // 내 매칭 목록 조회
   static Future<List<Matching>> getMyMatchings(String token) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/matchings/my');
+      final uri = Uri.parse('$baseUrl/matchings/my');
       
       final response = await http.get(
         uri,
@@ -470,7 +756,7 @@ class ApiService {
   // 매칭 요청
   static Future<void> requestMatching(int matchingId, String message, String token) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/matchings/$matchingId/request');
+      final uri = Uri.parse('$baseUrl/matchings/$matchingId/request');
       
       final response = await http.post(
         uri,
@@ -495,7 +781,7 @@ class ApiService {
     required String token,
   }) async {
     try {
-      final uri = Uri.parse('$baseUrl/api/matchings/$matchingId/respond');
+      final uri = Uri.parse('$baseUrl/matchings/$matchingId/respond');
       
       final response = await http.post(
         uri,

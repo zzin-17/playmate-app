@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import '../../models/review.dart';
 import '../../models/user.dart';
 import '../../models/matching.dart';
-import '../../providers/auth_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import 'write_review_screen.dart';

@@ -23,11 +23,32 @@ class _MainScreenState extends State<MainScreen> {
     return HomeScreen(
       newMatching: _newMatching,
       onMatchingAdded: () {
-        setState(() {
-          _newMatching = null; // 매칭이 추가되면 초기화
+        // setState를 WidgetsBinding.instance.addPostFrameCallback으로 감싸서 build 완료 후 실행
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _newMatching = null; // 매칭이 추가되면 초기화
+            });
+          }
         });
       },
     );
+  }
+
+  // 매칭 생성 화면으로 이동
+  Future<void> _navigateToCreateMatching() async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const CreateMatchingScreen(),
+      ),
+    );
+    
+    // 매칭이 생성되면 _newMatching에 저장
+    if (result is Matching) {
+      setState(() {
+        _newMatching = result;
+      });
+    }
   }
   
   final List<Widget> _pages = [

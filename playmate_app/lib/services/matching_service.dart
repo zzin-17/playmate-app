@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/matching.dart';
 import '../models/user.dart';
+import 'matching_data_service_v2.dart';
 import '../constants/app_colors.dart';
 import 'matching_notification_service.dart';
 import 'api_service.dart';
@@ -46,11 +47,13 @@ class MatchingService {
 
   Future<bool> cancelMatching(Matching matching, User user) async {
     try {
-      // TODO: 실제 API 호출로 매칭 취소 처리
-      await Future.delayed(const Duration(milliseconds: 500)); // API 호출 시뮬레이션
+      // 실제 API 호출로 매칭 취소 처리
+      final result = await MatchingDataServiceV2.updateMatchingStatus(
+        matching.id,
+        'cancelled',
+      );
       
-      // 성공 시 로컬 상태 업데이트
-      return true;
+      return result != null;
     } catch (e) {
       print('매칭 취소 실패: $e');
       return false;
@@ -59,11 +62,14 @@ class MatchingService {
 
   Future<bool> confirmGuest(Matching matching, User guest) async {
     try {
-      // TODO: 실제 API 호출로 게스트 확정 처리
-      await Future.delayed(const Duration(milliseconds: 500)); // API 호출 시뮬레이션
+      // 실제 API 호출로 게스트 확정 처리
+      final result = await MatchingDataServiceV2.respondToMatching(
+        matchingId: matching.id,
+        requestUserId: guest.id,
+        action: 'accept',
+      );
       
-      // 성공 시 로컬 상태 업데이트
-      return true;
+      return result;
     } catch (e) {
       print('게스트 확정 실패: $e');
       return false;
@@ -72,11 +78,14 @@ class MatchingService {
 
   Future<bool> rejectGuest(Matching matching, User guest) async {
     try {
-      // TODO: 실제 API 호출로 게스트 거절 처리
-      await Future.delayed(const Duration(milliseconds: 500)); // API 호출 시뮬레이션
+      // 실제 API 호출로 게스트 거절 처리
+      final result = await MatchingDataServiceV2.respondToMatching(
+        matchingId: matching.id,
+        requestUserId: guest.id,
+        action: 'reject',
+      );
       
-      // 성공 시 로컬 상태 업데이트
-      return true;
+      return result;
     } catch (e) {
       print('게스트 거절 실패: $e');
       return false;
@@ -85,11 +94,13 @@ class MatchingService {
 
   Future<bool> completeMatching(Matching matching) async {
     try {
-      // TODO: 실제 API 호출로 매칭 완료 처리
-      await Future.delayed(const Duration(milliseconds: 500)); // API 호출 시뮬레이션
+      // 실제 API 호출로 매칭 완료 처리
+      final result = await MatchingDataServiceV2.updateMatchingStatus(
+        matching.id,
+        'completed',
+      );
       
-      // 성공 시 로컬 상태 업데이트
-      return true;
+      return result != null;
     } catch (e) {
       print('매칭 완료 실패: $e');
       return false;
@@ -98,11 +109,13 @@ class MatchingService {
 
   Future<bool> cancelMatchingByHost(Matching matching) async {
     try {
-      // TODO: 실제 API 호출로 호스트가 매칭 취소 처리
-      await Future.delayed(const Duration(milliseconds: 500)); // API 호출 시뮬레이션
+      // 실제 API 호출로 호스트가 매칭 취소 처리
+      final result = await MatchingDataServiceV2.updateMatchingStatus(
+        matching.id,
+        'cancelled',
+      );
       
-      // 성공 시 로컬 상태 업데이트
-      return true;
+      return result != null;
     } catch (e) {
       print('매칭 취소 실패: $e');
       return false;
@@ -110,11 +123,10 @@ class MatchingService {
   }
 
   // ID로 매칭 조회
-  Matching? getMatchingById(int matchingId) {
+  Future<Matching?> getMatchingById(int matchingId) async {
     try {
-      // TODO: 실제 API 호출로 매칭 조회
-      // 현재는 홈 화면의 mock 데이터를 참조하여 조회
-      return _getMockMatchingById(matchingId);
+      // 실제 API 호출로 매칭 조회
+      return await MatchingDataServiceV2.getMatchingDetail(matchingId);
     } catch (e) {
       print('매칭 조회 실패: $e');
       return null;

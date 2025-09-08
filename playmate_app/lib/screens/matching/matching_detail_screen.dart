@@ -26,10 +26,9 @@ class MatchingDetailScreen extends StatefulWidget {
 }
 
 class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
-  bool _isExpanded = false;
+  bool _isLoading = false; // 데이터 로딩 상태
   bool _hasApplied = false;
   bool _isParticipating = false; // 매칭 참여 여부
-  bool _isLoading = false; // 데이터 로딩 상태
   bool _isHost = false; // 호스트 여부
   String _currentMatchingStatus = 'recruiting'; // 현재 매칭 상태
   List<int> _confirmedUserIds = []; // 확정된 사용자 ID 목록
@@ -1506,8 +1505,6 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
 
   // 하단 버튼들 위젯
   Widget _buildBottomButtons() {
-    final isHost = widget.currentUser.id == widget.matching.host.id;
-    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1534,6 +1531,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
         ),
     );
   }
+
 
   // 채팅 시작 함수
   void _startChat() {
@@ -1706,7 +1704,39 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     
     switch (status) {
       case 'recruiting':
-        // 모집중: 게스트는 참여 신청, 호스트는 채팅
+        // 모집중: 호스트와 게스트 모두 채팅 가능
+        return [
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => _startChat(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.buttonChat,
+                foregroundColor: AppColors.textSurface,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.chat, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    '채팅하기',
+                    style: AppTextStyles.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ];
+        
+      case 'confirmed':
+        // 확정: 호스트와 게스트 모두 채팅 가능, 호스트는 완료 처리도 가능
         if (isHost) {
           return [
             Expanded(
@@ -1736,43 +1766,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
                 ),
               ),
             ),
-          ];
-        } else {
-          return [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => _startChat(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.buttonChat,
-                  foregroundColor: AppColors.textSurface,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.chat, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      '참여 신청',
-                      style: AppTextStyles.body.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ];
-        }
-        
-      case 'confirmed':
-        // 확정: 호스트는 완료 처리, 게스트는 채팅
-        if (isHost) {
-          return [
+            const SizedBox(width: 12),
             Expanded(
               child: AppButton(
                 onPressed: () => _completeMatching(),
@@ -1814,7 +1808,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
         }
         
       case 'completed':
-        // 완료: 후기 작성 버튼
+        // 완료: 호스트와 게스트 모두 후기 작성 가능
         return [
           Expanded(
             child: AppButton(

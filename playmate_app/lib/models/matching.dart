@@ -115,6 +115,8 @@ class Matching {
       timeSlot: timeSlot ?? this.timeSlot,
       minLevel: minLevel ?? this.minLevel,
       maxLevel: maxLevel ?? this.maxLevel,
+      minAge: minAge ?? this.minAge,
+      maxAge: maxAge ?? this.maxAge,
       gameType: gameType ?? this.gameType,
       maleRecruitCount: maleRecruitCount ?? this.maleRecruitCount,
       femaleRecruitCount: femaleRecruitCount ?? this.femaleRecruitCount,
@@ -145,7 +147,12 @@ class Matching {
 
   // 연령대 범위 텍스트
   String get ageRangeText {
-    if (minAge == null && maxAge == null) return '연령대 제한없음';
+    print('🔍 ageRangeText 계산 중: minAge=$minAge, maxAge=$maxAge');
+    
+    if (minAge == null && maxAge == null) {
+      print('  → 둘 다 null이므로 "연령대 제한없음" 반환');
+      return '연령대 제한없음';
+    }
     
     // 연령을 10대 단위로 변환
     String _getAgeGroup(int age) {
@@ -157,10 +164,32 @@ class Matching {
       return '60대 이상';
     }
     
-    if (minAge == null) return '~${_getAgeGroup(maxAge!)}';
-    if (maxAge == null) return '${_getAgeGroup(minAge!)}~';
-    if (minAge == maxAge) return _getAgeGroup(minAge!);
-    return '${_getAgeGroup(minAge!)}-${_getAgeGroup(maxAge!)}';
+    if (minAge == null) {
+      final result = '~${_getAgeGroup(maxAge!)}';
+      print('  → minAge가 null이므로 "$result" 반환');
+      return result;
+    }
+    if (maxAge == null) {
+      final result = '${_getAgeGroup(minAge!)}~';
+      print('  → maxAge가 null이므로 "$result" 반환');
+      return result;
+    }
+    
+    // 연령대 범위 표시
+    final minGroup = _getAgeGroup(minAge!);
+    final maxGroup = _getAgeGroup(maxAge!);
+    
+    print('  → minGroup: $minGroup, maxGroup: $maxGroup');
+    
+    if (minGroup == maxGroup) {
+      print('  → 같은 연령대이므로 "$minGroup" 반환');
+      return minGroup;
+    } else {
+      // 범위 표시 (예: 20-49 → 20대-40대)
+      final result = '${minGroup}-${maxGroup}';
+      print('  → 범위 표시: "$result" 반환');
+      return result;
+    }
   }
 
   // 게임 유형 텍스트

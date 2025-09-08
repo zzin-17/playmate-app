@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_room.dart';
+import '../models/chat_message.dart';
 import '../models/matching.dart';
 import '../models/user.dart';
 import 'api_service.dart';
@@ -27,7 +28,7 @@ class ChatService {
   /// 내 채팅방 목록을 조회한다.
   /// 1순위: 백엔드 API (/chat/rooms/my)
   /// 2순위: 매칭 기반 채팅방 구성 (/matchings/my)
-  /// 3순위: Mock 데이터 (개발/테스트용)
+  /// 3순위: 빈 목록 반환 (Mock 데이터 제거)
   Future<List<ChatRoom>> getMyChatRooms(User currentUser) async {
     try {
       // 1순위: 실제 채팅방 API 호출
@@ -53,8 +54,8 @@ class ChatService {
       }
     }
 
-    // 3순위: Mock 데이터 (개발용)
-    return _getMockChatRooms(currentUser);
+    // 3순위: 빈 목록 반환 (실제 채팅방이 없으면 표시하지 않음)
+    return [];
   }
 
   /// 실제 채팅방 API에서 조회
@@ -211,5 +212,148 @@ class ChatService {
     // 최신순 정렬
     rooms.sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
     return rooms;
+  }
+
+  /// 채팅 메시지 조회
+  Future<List<ChatMessage>> getChatMessages({
+    required int roomId,
+    int? lastMessageId,
+    int limit = 50,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        // 토큰이 없으면 로컬 캐시에서 조회
+        // return await _localStore.loadMessages(roomId, limit: limit);
+        return []; // 임시로 빈 목록 반환
+      }
+
+      // 실제 API 호출
+      final messages = await ApiService.getChatMessages(
+        roomId: roomId,
+        token: token,
+        lastMessageId: lastMessageId,
+        limit: limit,
+      );
+
+      // API 응답을 ChatMessage로 변환
+      final chatMessages = messages.map((json) => ChatMessage.fromJson(json)).toList();
+      
+      // 로컬 캐시에도 저장 (메서드가 구현되면 활성화)
+      // for (final message in chatMessages) {
+      //   await _localStore.saveMessage(roomId, message);
+      // }
+
+      return chatMessages;
+    } catch (e) {
+      print('메시지 조회 실패, 로컬 캐시 사용: $e');
+      // API 실패 시 로컬 캐시에서 조회
+      // return await _localStore.loadMessages(roomId, limit: limit);
+      return []; // 임시로 빈 목록 반환
+    }
+  }
+
+  /// 메시지 전송
+  Future<ChatMessage?> sendMessage({
+    required int roomId,
+    required String content,
+    String? messageType,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('인증 토큰이 없습니다');
+      }
+
+      // 실제 API 호출
+      final response = await ApiService.sendMessage(
+        roomId: roomId,
+        content: content,
+        token: token,
+        messageType: messageType,
+      );
+
+      // 응답을 ChatMessage로 변환
+      final message = ChatMessage.fromJson(response);
+      
+      // 로컬 캐시에도 저장 (메서드가 구현되면 활성화)
+      // await _localStore.saveMessage(roomId, message);
+
+      return message;
+    } catch (e) {
+      print('메시지 전송 실패: $e');
+      return null;
+    }
+  }
+
+  /// 채팅방 참여자 조회
+  Future<List<User>> getChatRoomMembers(int roomId) async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        return [];
+      }
+
+      // 실제 API 호출
+      final members = await ApiService.getChatRoomMembers(
+        roomId: roomId,
+        token: token,
+      );
+
+      // API 응답을 User로 변환
+      return members.map((json) => User.fromJson(json)).toList();
+    } catch (e) {
+      print('채팅방 참여자 조회 실패: $e');
+      return [];
+    }
+  }
+
+  /// 채팅방 나가기
+  Future<bool> leaveChatRoom(int roomId) async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        return false;
+      }
+
+      // 실제 API 호출
+      await ApiService.leaveChatRoom(
+        roomId: roomId,
+        token: token,
+      );
+
+      // 로컬 캐시에서도 제거 (메서드가 구현되면 활성화)
+      // await _localStore.removeRoom(roomId);
+
+      return true;
+    } catch (e) {
+      print('채팅방 나가기 실패: $e');
+      return false;
+    }
+  }
+
+  /// 메시지 읽음 처리
+  Future<bool> markMessagesAsRead({
+    required int roomId,
+    int? lastReadMessageId,
+  }) async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        return false;
+      }
+
+      // 실제 API 호출
+      await ApiService.markMessagesAsRead(
+        roomId: roomId,
+        token: token,
+        lastReadMessageId: lastReadMessageId,
+      );
+
+      return true;
+    } catch (e) {
+      print('메시지 읽음 처리 실패: $e');
+      return false;
+    }
   }
 }

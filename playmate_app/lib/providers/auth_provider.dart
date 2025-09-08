@@ -5,8 +5,6 @@ import '../services/mock_auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthProvider extends ChangeNotifier {
-  final ApiService _apiService = ApiService();
-  
   User? _currentUser;
   bool _isLoading = false;
   String? _error;
@@ -405,5 +403,11 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     }
+  }
+
+  // 현재 사용자 정보 업데이트
+  void updateCurrentUser(User updatedUser) {
+    _currentUser = updatedUser;
+    notifyListeners();
   }
 } 
