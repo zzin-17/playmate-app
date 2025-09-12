@@ -8,7 +8,7 @@ const {
   sendMessage,
   markMessagesAsRead,
   leaveChatRoom
-} = require('../controllers/chatController');
+} = require('../controllers/chatControllerMemory');
 
 // 채팅 관련 라우트
 router.route('/rooms')

@@ -1,0 +1,68 @@
+[
+  {
+    "id": 1,
+    "roomId": 1,
+    "senderId": 3,
+    "senderName": "테니스러버",
+    "content": "안녕하세요! 같이 테니스 치고 싶습니다.",
+    "messageType": "text",
+    "timestamp": "2025-09-12T05:30:00.000Z",
+    "isRead": false,
+    "createdAt": "2025-09-12T05:30:00.000Z"
+  },
+  {
+    "id": 2,
+    "roomId": 1,
+    "senderId": 1,
+    "senderName": "개발자",
+    "content": "안녕하세요! 환영합니다. 매칭에 참여해주셔서 감사합니다.",
+    "messageType": "text",
+    "timestamp": "2025-09-12T05:31:00.000Z",
+    "isRead": true,
+    "createdAt": "2025-09-12T05:31:00.000Z"
+  },
+  {
+    "id": 3,
+    "roomId": 1,
+    "senderId": 4,
+    "senderName": "테니스초보",
+    "content": "초보지만 열심히 하겠습니다!",
+    "messageType": "text",
+    "timestamp": "2025-09-12T05:32:00.000Z",
+    "isRead": true,
+    "createdAt": "2025-09-12T05:32:00.000Z"
+  },
+  {
+    "id": 4,
+    "roomId": 1,
+    "senderId": 1,
+    "senderName": "개발자",
+    "content": "좋습니다! 그럼 내일 6시에 강일테니스장에서 만나요.",
+    "messageType": "text",
+    "timestamp": "2025-09-12T05:33:00.000Z",
+    "isRead": true,
+    "createdAt": "2025-09-12T05:33:00.000Z"
+  },
+  {
+    "id": 5,
+    "roomId": 2,
+    "senderId": 1,
+    "senderName": "개발자",
+    "content": "클럽 게스트 모집합니다!",
+    "messageType": "text",
+    "timestamp": "2025-09-12T05:35:00.000Z",
+    "isRead": false,
+    "createdAt": "2025-09-12T05:35:00.000Z"
+  },
+  {
+    "id": 6,
+    "roomId": 2,
+    "senderId": 5,
+    "senderName": "테니스마니아",
+    "content": "참여하고 싶습니다! 어떤 시간대인가요?",
+    "messageType": "text",
+    "timestamp": "2025-09-12T05:36:00.000Z",
+    "isRead": false,
+    "createdAt": "2025-09-12T05:36:00.000Z"
+  }
+]

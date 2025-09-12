@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/matching.dart';
 import '../models/user.dart';
-import 'matching_data_service_v2.dart';
+import 'matching_data_service.dart';
 import '../constants/app_colors.dart';
 import 'matching_notification_service.dart';
 import 'api_service.dart';
@@ -48,7 +48,7 @@ class MatchingService {
   Future<bool> cancelMatching(Matching matching, User user) async {
     try {
       // 실제 API 호출로 매칭 취소 처리
-      final result = await MatchingDataServiceV2.updateMatchingStatus(
+      final result = await MatchingDataService.updateMatchingStatus(
         matching.id,
         'cancelled',
       );
@@ -63,7 +63,7 @@ class MatchingService {
   Future<bool> confirmGuest(Matching matching, User guest) async {
     try {
       // 실제 API 호출로 게스트 확정 처리
-      final result = await MatchingDataServiceV2.respondToMatching(
+      final result = await MatchingDataService.respondToMatching(
         matchingId: matching.id,
         requestUserId: guest.id,
         action: 'accept',
@@ -79,7 +79,7 @@ class MatchingService {
   Future<bool> rejectGuest(Matching matching, User guest) async {
     try {
       // 실제 API 호출로 게스트 거절 처리
-      final result = await MatchingDataServiceV2.respondToMatching(
+      final result = await MatchingDataService.respondToMatching(
         matchingId: matching.id,
         requestUserId: guest.id,
         action: 'reject',
@@ -95,7 +95,7 @@ class MatchingService {
   Future<bool> completeMatching(Matching matching) async {
     try {
       // 실제 API 호출로 매칭 완료 처리
-      final result = await MatchingDataServiceV2.updateMatchingStatus(
+      final result = await MatchingDataService.updateMatchingStatus(
         matching.id,
         'completed',
       );
@@ -110,7 +110,7 @@ class MatchingService {
   Future<bool> cancelMatchingByHost(Matching matching) async {
     try {
       // 실제 API 호출로 호스트가 매칭 취소 처리
-      final result = await MatchingDataServiceV2.updateMatchingStatus(
+      final result = await MatchingDataService.updateMatchingStatus(
         matching.id,
         'cancelled',
       );
@@ -126,7 +126,7 @@ class MatchingService {
   Future<Matching?> getMatchingById(int matchingId) async {
     try {
       // 실제 API 호출로 매칭 조회
-      return await MatchingDataServiceV2.getMatchingDetail(matchingId);
+      return await MatchingDataService.getMatchingDetail(matchingId);
     } catch (e) {
       print('매칭 조회 실패: $e');
       return null;

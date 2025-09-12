@@ -6,19 +6,25 @@ import '../../constants/app_text_styles.dart';
 import '../../widgets/common/app_button.dart';
 import '../../services/matching_service.dart';
 import '../../services/matching_state_service.dart';
+import '../../services/matching_data_service.dart';
 
 import '../chat/chat_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../review/write_review_screen.dart';
+import 'edit_matching_screen.dart';
+import '../../services/matching_notification_service.dart';
+import '../../widgets/tooltip_widget.dart';
 
 class MatchingDetailScreen extends StatefulWidget {
   final Matching matching;
   final User currentUser;
+  final VoidCallback? onMatchingUpdated;
 
   const MatchingDetailScreen({
     super.key,
     required this.matching,
     required this.currentUser,
+    this.onMatchingUpdated,
   });
 
   @override
@@ -54,6 +60,17 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     stateService.addStateChangeListener(widget.matching.id, _onMatchingStateChanged);
     
     print('매칭 상세 화면 초기화 완료: 상태=$_currentMatchingStatus, 확정된 사용자=$_confirmedUserIds');
+  }
+
+  @override
+  void didUpdateWidget(MatchingDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 매칭 객체가 업데이트되면 UI 새로고침
+    if (oldWidget.matching != widget.matching) {
+      setState(() {
+        _currentMatchingStatus = widget.matching.actualStatus;
+      });
+    }
   }
 
   // 사용자의 매칭 참여 상태 확인
@@ -105,6 +122,16 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
       
       print('매칭 상태 변경됨: $newStatus');
     });
+    
+    // 취소 시 확정된 게스트들에게 알림 전송
+    if (newStatus == 'cancelled') {
+      _sendNotificationToConfirmedGuests('cancelled');
+    }
+    
+    // 상위 화면에 매칭 업데이트 알림
+    if (widget.onMatchingUpdated != null) {
+      widget.onMatchingUpdated!();
+    }
   }
 
   // 사용자가 확정된 사용자인지 확인
@@ -187,11 +214,11 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(_currentMatchingStatus),
+                  color: _getStatusColor(widget.matching.actualStatus),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  _getStatusText(_currentMatchingStatus),
+                  _getStatusText(widget.matching.actualStatus),
                   style: AppTextStyles.caption.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w500,
@@ -344,6 +371,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   // 호스트 정보 섹션
   Widget _buildHostInfo() {
     final host = widget.matching.host;
+    final isHost = widget.currentUser.id == host.id;
     
     return Container(
       margin: const EdgeInsets.only(top: 16),
@@ -371,6 +399,41 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              const Spacer(),
+              // 호스트 안내 툴팁
+              if (isHost && _currentMatchingStatus == 'recruiting')
+                TooltipWidget(
+                  message: '채팅에서 참여자들과 소통하고 매칭 확정 버튼으로 최종 확정하세요',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.lightbulb_outline,
+                          color: AppColors.primary,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '안내',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -599,36 +662,6 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.2),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: AppColors.primary,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '채팅에서 매칭 확정 버튼을 눌러 참여자를 확정하세요',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
           const SizedBox(height: 16),
           
@@ -1401,12 +1434,52 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
 
     final isHost = widget.currentUser.id == widget.matching.host.id;
     
+    // 매칭 상태 확인
+    final matchingStatus = widget.matching.status;
+    
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.matching.courtName),
         backgroundColor: AppColors.surface,
         elevation: 0,
         actions: [
+          // 호스트만 수정/삭제 메뉴 표시 (모집중, 확정 상태에서만)
+          if (isHost && (matchingStatus == 'recruiting' || matchingStatus == 'confirmed'))
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                switch (value) {
+                  case 'edit':
+                    _editMatching();
+                    break;
+                  case 'delete':
+                    _showDeleteDialog();
+                    break;
+                }
+              },
+              itemBuilder: (BuildContext context) => [
+                const PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 20),
+                      SizedBox(width: 8),
+                      Text('수정'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 20, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('삭제', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () {
@@ -1444,9 +1517,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
                         _buildMatchingInfo(),
                         _buildHostInfo(),
                         const SizedBox(height: 24),
-                                                            if (isHost && _currentMatchingStatus == 'recruiting')
-                    _buildHostGuidance(),
-                  _buildApplicantsSection(),
+                        _buildApplicantsSection(),
                       ],
                     ),
                   ),
@@ -1458,50 +1529,6 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     );
   }
 
-  Widget _buildHostGuidance() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.lightbulb_outline,
-            color: AppColors.primary,
-            size: 24,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '호스트 안내',
-                  style: AppTextStyles.body.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '채팅에서 참여자들과 소통하고 매칭 확정 버튼으로 최종 확정하세요',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   // 하단 버튼들 위젯
   Widget _buildBottomButtons() {
@@ -1825,6 +1852,118 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
         
       default:
         return [];
+    }
+  }
+
+  // 매칭 수정 함수
+  void _editMatching() {
+    // 매칭 수정 화면으로 이동
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => EditMatchingScreen(
+          matching: widget.matching,
+          onMatchingUpdated: () {
+            // 매칭 수정 후 상세화면 새로고침
+            setState(() {});
+          },
+        ),
+      ),
+    );
+  }
+
+  // 확정된 게스트들에게 알림 전송
+  void _sendNotificationToConfirmedGuests(String newStatus) {
+    try {
+      final notificationService = MatchingNotificationService();
+      
+      // 취소 또는 삭제 사유 설정
+      String reason = newStatus == 'cancelled' ? '호스트에 의한 취소' : '호스트에 의한 삭제';
+      
+      // 매칭 취소/삭제 알림 생성
+      notificationService.createMatchingCancelledNotification(
+        widget.matching, 
+        widget.currentUser, 
+        reason
+      );
+      
+      print('확정된 게스트들에게 ${newStatus} 알림 전송 완료: ${widget.matching.courtName}');
+    } catch (e) {
+      print('알림 전송 오류: $e');
+    }
+  }
+
+  // 매칭 삭제 확인 다이얼로그
+  void _showDeleteDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('매칭 삭제'),
+          content: const Text(
+            '정말로 이 매칭을 삭제하시겠습니까?\n\n'
+            '삭제된 매칭은 복구할 수 없습니다.\n'
+            '채팅 내용은 보존됩니다.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteMatching();
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 매칭 삭제 실행
+  Future<void> _deleteMatching() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final success = await MatchingDataService.deleteMatching(widget.matching.id);
+      
+      if (success) {
+        // 확정된 게스트들에게 삭제 알림 전송
+        _sendNotificationToConfirmedGuests('deleted');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('매칭이 삭제되었습니다.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop(); // 상세 화면에서 나가기
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('매칭 삭제에 실패했습니다.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('오류가 발생했습니다: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 

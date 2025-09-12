@@ -6,7 +6,10 @@ import '../../models/matching.dart';
 import '../../models/user.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
-import '../../services/matching_data_service_v2.dart';
+import '../../services/matching_data_service.dart';
+import '../../services/tennis_court_service.dart';
+import '../../models/tennis_court.dart';
+import 'court_selection_screen.dart';
 
 class CreateMatchingScreen extends StatefulWidget {
   final Matching? editingMatching;
@@ -23,6 +26,10 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
   final _courtNameController = TextEditingController();
   final _messageController = TextEditingController();
   final _courtNameFocusNode = FocusNode();
+  
+  // 테니스장 선택 관련
+  TennisCourt? _selectedCourt;
+  final TennisCourtService _courtService = TennisCourtService();
   
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   String _selectedStartTime = '18:00';
@@ -86,8 +93,8 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
       _selectedGameType = matching.gameType;
       _maleRecruitCount = matching.maleRecruitCount;
       _femaleRecruitCount = matching.femaleRecruitCount;
+      _guestCostController.text = matching.guestCost?.toString() ?? '0'; // 게스트 비용 초기화
       _messageController.text = matching.message ?? '';
-      // 게스트비용은 별도 필드가 없으므로 기본값 유지
     }
     
     // 키보드 및 입력 시스템 초기화
@@ -114,6 +121,31 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
     _guestCostController.dispose();
     _courtNameFocusNode.dispose();
     super.dispose();
+  }
+
+  // 테니스장 선택 화면으로 이동
+  Future<void> _selectCourt() async {
+    final result = await Navigator.of(context).push<TennisCourt>(
+      MaterialPageRoute(
+        builder: (context) => CourtSelectionScreen(
+          selectedCourt: _selectedCourt,
+          initialSearchQuery: _courtNameController.text.isNotEmpty ? _courtNameController.text : null,
+          onCourtSelected: (court) {
+            setState(() {
+              _selectedCourt = court;
+              _courtNameController.text = court.name;
+            });
+          },
+        ),
+      ),
+    );
+    
+    if (result != null) {
+      setState(() {
+        _selectedCourt = result;
+        _courtNameController.text = result.name;
+      });
+    }
   }
 
   Future<void> _selectDate() async {
@@ -174,6 +206,11 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
     print('  - _noAgeRestriction: $_noAgeRestriction');
     print('  - _isFollowersOnly: $_isFollowersOnly');
     
+    // 게스트 비용 처리 (입력하지 않으면 0원)
+    final guestCost = _guestCostController.text.isNotEmpty 
+        ? int.tryParse(_guestCostController.text) ?? 0 
+        : 0;
+
     final newMatching = Matching(
       id: widget.editingMatching?.id ?? DateTime.now().millisecondsSinceEpoch, // 편집 시 기존 ID 유지
       type: 'host',
@@ -186,7 +223,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
       maxLevel: _selectedMaxLevel,
       minAge: minAge,
       maxAge: maxAge,
-      
+      guestCost: guestCost, // 게스트 비용 추가
       gameType: _selectedGameType,
       maleRecruitCount: _maleRecruitCount,
       femaleRecruitCount: _femaleRecruitCount,
@@ -217,12 +254,12 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
     print('연령대: ${newMatching.ageRangeText} (minAge: ${newMatching.minAge}, maxAge: ${newMatching.maxAge})');
     
     print('모집 인원: 남${newMatching.maleRecruitCount}명, 여${newMatching.femaleRecruitCount}명');
-    print('게스트비용: ${_guestCostController.text}원');
+    print('게스트비용: ${newMatching.guestCost}원');
     print('메시지: ${newMatching.message}');
 
     try {
       // 실제 백엔드 API로 매칭 생성
-      final createdMatching = await MatchingDataServiceV2.createMatching(newMatching.toJson());
+      final createdMatching = await MatchingDataService.createMatching(newMatching.toJson());
       
       if (createdMatching != null) {
         // 성공시 생성된 매칭을 홈 화면으로 전달
@@ -318,15 +355,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
                         hintStyle: AppTextStyles.placeholder,
                         prefixIcon: const Icon(Icons.location_on, color: AppColors.textSecondary),
                         suffixIcon: GestureDetector(
-                          onTap: () {
-                            // TODO: 코트 검색 기능 구현
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('코트 검색 기능은 곧 추가될 예정입니다!'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
+                          onTap: _selectCourt,
                           child: const Icon(Icons.search, color: AppColors.primary),
                         ),
                         filled: true,
@@ -361,6 +390,49 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
                         });
                       },
                     ),
+                    if (_selectedCourt != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.primary.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: AppColors.primary,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _selectedCourt!.name,
+                                    style: AppTextStyles.body2.copyWith(
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  Text(
+                                    _selectedCourt!.address,
+                                    style: AppTextStyles.caption.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 
@@ -718,7 +790,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
           textInputAction: TextInputAction.next,
           style: AppTextStyles.input,
           decoration: InputDecoration(
-            hintText: '예: 15000',
+            hintText: '입력하지 않으면 0원 (무료)',
             hintStyle: AppTextStyles.placeholder,
             prefixIcon: const Icon(Icons.currency_exchange, color: AppColors.textSecondary),
             suffixText: '원',

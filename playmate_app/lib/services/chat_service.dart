@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import '../models/chat_room.dart';
 import '../models/chat_message.dart';
 import '../models/matching.dart';
@@ -60,26 +62,36 @@ class ChatService {
 
   /// 실제 채팅방 API에서 조회
   Future<List<ChatRoom>> _getChatRoomsFromAPI(User currentUser) async {
-    final token = await _getAuthToken();
-    if (token == null) {
-      // 토큰이 없으면 로컬 캐시 반환
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:3000/api/chat/rooms'),
+        headers: {
+          'Authorization': 'Bearer temp_jwt_token',
+          'Content-Type': 'application/json',
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          final rooms = (data['data'] as List)
+              .map((json) => ChatRoom.fromJson(json))
+              .toList();
+          
+          // 서버 방 목록을 로컬에도 저장 (UX 향상)
+          for (final r in rooms) {
+            await _localStore.upsertRoom(currentUser.id, r);
+          }
+          
+          return rooms;
+        }
+      }
+      
+      // API 실패시 로컬 캐시 반환
       final localRooms = await _localStore.loadRooms(currentUser.id);
       return localRooms;
-    }
-    
-    try {
-      final rooms = await ApiService.getMyChatRooms(token);
-      // 서버 방 목록을 로컬에도 저장 (UX 향상)
-      for (final r in rooms) {
-        await _localStore.upsertRoom(currentUser.id, r);
-      }
-      if (rooms.isEmpty) {
-        // 서버가 비었으면 로컬 캐시 반환
-        final localRooms = await _localStore.loadRooms(currentUser.id);
-        return localRooms;
-      }
-      return rooms.map((r) => ChatRoom.fromJson(r)).toList();
     } catch (e) {
+      print('채팅방 API 호출 실패: $e');
       // API 실패시 로컬 캐시 반환
       final localRooms = await _localStore.loadRooms(currentUser.id);
       return localRooms;
@@ -124,20 +136,28 @@ class ChatService {
   /// 매칭 참여시 백엔드에 채팅방 생성 요청
   Future<bool> createChatRoom(int matchingId, User host, User guest) async {
     try {
-      final token = await _getAuthToken();
-      if (token == null) {
-        return false;
-      }
-      
-      await ApiService.createChatRoom(
-        matchingId: matchingId, 
-        hostId: host.id, 
-        guestId: guest.id,
-        token: token,
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:3000/api/chat/rooms/direct'),
+        headers: {
+          'Authorization': 'Bearer temp_jwt_token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'targetUserId': guest.id,
+          'matchingId': matchingId,
+        }),
       );
-      // 채팅방 생성 이벤트 전파 (리스트 즉시 갱신)
-      ChatEventBus.instance.emit(ChatRoomCreated(matchingId));
-      return true;
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          // 채팅방 생성 이벤트 전파 (리스트 즉시 갱신)
+          ChatEventBus.instance.emit(ChatRoomCreated(matchingId));
+          return true;
+        }
+      }
+
+      return false;
     } catch (e) {
       if (kDebugMode) {
         print('채팅방 생성 실패: $e');
@@ -221,35 +241,41 @@ class ChatService {
     int limit = 50,
   }) async {
     try {
-      final token = await _getAuthToken();
-      if (token == null) {
-        // 토큰이 없으면 로컬 캐시에서 조회
-        // return await _localStore.loadMessages(roomId, limit: limit);
-        return []; // 임시로 빈 목록 반환
-      }
-
-      // 실제 API 호출
-      final messages = await ApiService.getChatMessages(
-        roomId: roomId,
-        token: token,
-        lastMessageId: lastMessageId,
-        limit: limit,
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:3000/api/chat/rooms/$roomId/messages').replace(
+          queryParameters: {
+            'page': '1',
+            'limit': limit.toString(),
+          },
+        ),
+        headers: {
+          'Authorization': 'Bearer temp_jwt_token',
+          'Content-Type': 'application/json',
+        },
       );
 
-      // API 응답을 ChatMessage로 변환
-      final chatMessages = messages.map((json) => ChatMessage.fromJson(json)).toList();
-      
-      // 로컬 캐시에도 저장 (메서드가 구현되면 활성화)
-      // for (final message in chatMessages) {
-      //   await _localStore.saveMessage(roomId, message);
-      // }
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          final messages = (data['data'] as List)
+              .map((json) => ChatMessage.fromJson(json))
+              .toList();
+          
+          // 로컬 캐시에도 저장
+          for (final message in messages) {
+            await _localStore.saveMessage(roomId, message);
+          }
 
-      return chatMessages;
-    } catch (e) {
-      print('메시지 조회 실패, 로컬 캐시 사용: $e');
+          return messages;
+        }
+      }
+
       // API 실패 시 로컬 캐시에서 조회
-      // return await _localStore.loadMessages(roomId, limit: limit);
-      return []; // 임시로 빈 목록 반환
+      return await _localStore.loadMessages(roomId, limit: limit);
+    } catch (e) {
+      print('메시지 조회 실패: $e');
+      // API 실패 시 로컬 캐시에서 조회
+      return await _localStore.loadMessages(roomId, limit: limit);
     }
   }
 
@@ -260,26 +286,31 @@ class ChatService {
     String? messageType,
   }) async {
     try {
-      final token = await _getAuthToken();
-      if (token == null) {
-        throw Exception('인증 토큰이 없습니다');
-      }
-
-      // 실제 API 호출
-      final response = await ApiService.sendMessage(
-        roomId: roomId,
-        content: content,
-        token: token,
-        messageType: messageType,
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:3000/api/chat/rooms/$roomId/messages'),
+        headers: {
+          'Authorization': 'Bearer temp_jwt_token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'content': content,
+          'type': messageType ?? 'text',
+        }),
       );
 
-      // 응답을 ChatMessage로 변환
-      final message = ChatMessage.fromJson(response);
-      
-      // 로컬 캐시에도 저장 (메서드가 구현되면 활성화)
-      // await _localStore.saveMessage(roomId, message);
+      if (response.statusCode == 201) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          final message = ChatMessage.fromJson(data['data']);
+          
+          // 로컬 캐시에도 저장
+          await _localStore.saveMessage(roomId, message);
 
-      return message;
+          return message;
+        }
+      }
+
+      throw Exception('메시지 전송 실패: ${response.statusCode}');
     } catch (e) {
       print('메시지 전송 실패: $e');
       return null;

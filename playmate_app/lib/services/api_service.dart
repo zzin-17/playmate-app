@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/matching.dart';
 import '../models/user.dart';
+import '../models/review.dart';
 import '../config/api_config.dart';
 
 class ApiService {
@@ -68,6 +69,52 @@ class ApiService {
       headers['Authorization'] = 'Bearer $token';
     }
     return headers;
+  }
+
+  // 인증 헤더 (토큰이 있는 경우) - private 버전
+  static Map<String, String> _getAuthHeaders(String token) {
+    final headers = Map<String, String>.from(_headers);
+    headers['Authorization'] = 'Bearer $token';
+    return headers;
+  }
+
+  // HTTP 요청 실행
+  static Future<http.Response> _makeRequest(
+    String method,
+    String endpoint, {
+    Map<String, String>? headers,
+    String? body,
+  }) async {
+    final uri = Uri.parse('$baseUrl$endpoint');
+    final requestHeaders = headers ?? _headers;
+    
+    _logRequest(method, uri.toString(), requestHeaders, body);
+    
+    http.Response response;
+    switch (method.toUpperCase()) {
+      case 'GET':
+        response = await _retryRequest(() => http.get(uri, headers: requestHeaders));
+        break;
+      case 'POST':
+        response = await _retryRequest(() => http.post(uri, headers: requestHeaders, body: body));
+        break;
+      case 'PUT':
+        response = await _retryRequest(() => http.put(uri, headers: requestHeaders, body: body));
+        break;
+      case 'DELETE':
+        response = await _retryRequest(() => http.delete(uri, headers: requestHeaders));
+        break;
+      default:
+        throw ApiException('지원하지 않는 HTTP 메서드: $method');
+    }
+    
+    _logResponse(method, uri.toString(), response.statusCode, response.body);
+    
+    if (response.statusCode >= 400) {
+      throw ApiException('HTTP ${response.statusCode}: ${response.body}');
+    }
+    
+    return response;
   }
   
   // 매칭 목록 조회
@@ -229,28 +276,6 @@ class ApiService {
     }
   }
   
-  // 매칭 수정
-  static Future<Matching> updateMatching(int matchingId, Map<String, dynamic> matchingData, String token) async {
-    try {
-      final uri = Uri.parse('$baseUrl/matchings/$matchingId');
-      
-      final response = await http.put(
-        uri,
-        headers: getAuthHeaders(token),
-        body: json.encode(matchingData),
-      ).timeout(timeout);
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return Matching.fromJson(data);
-      } else {
-        throw ApiException('매칭 수정 실패: ${response.statusCode}');
-      }
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException('네트워크 오류: $e');
-    }
-  }
   
   // 매칭 상태 변경
   static Future<Matching> updateMatchingStatus(int matchingId, String status, String token) async {
@@ -798,6 +823,116 @@ class ApiService {
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException('네트워크 오류: $e');
+    }
+  }
+
+  // ==================== 후기 관련 API ====================
+  
+  // 내 후기 목록 조회
+  static Future<List<Review>> getMyReviews(String token) async {
+    try {
+      final response = await _makeRequest(
+        'GET',
+        '/reviews/my',
+        headers: _getAuthHeaders(token),
+      );
+      
+      final data = json.decode(response.body);
+      if (data is List) {
+        return data.map((json) => Review.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      throw ApiException('내 후기 목록 조회 실패: $e');
+    }
+  }
+
+  // 후기 작성
+  static Future<void> createReview(Map<String, dynamic> reviewData, String token) async {
+    try {
+      await _makeRequest(
+        'POST',
+        '/reviews',
+        headers: _getAuthHeaders(token),
+        body: json.encode(reviewData),
+      );
+    } catch (e) {
+      throw ApiException('후기 작성 실패: $e');
+    }
+  }
+
+  // 후기 수정
+  static Future<void> updateReview(int reviewId, Map<String, dynamic> reviewData, String token) async {
+    try {
+      await _makeRequest(
+        'PUT',
+        '/reviews/$reviewId',
+        headers: _getAuthHeaders(token),
+        body: json.encode(reviewData),
+      );
+    } catch (e) {
+      throw ApiException('후기 수정 실패: $e');
+    }
+  }
+
+  // 후기 삭제
+  static Future<void> deleteReview(int reviewId, String token) async {
+    try {
+      await _makeRequest(
+        'DELETE',
+        '/reviews/$reviewId',
+        headers: _getAuthHeaders(token),
+      );
+    } catch (e) {
+      throw ApiException('후기 삭제 실패: $e');
+    }
+  }
+
+  // 특정 사용자의 후기 목록 조회
+  static Future<List<Review>> getUserReviews(int userId, String token) async {
+    try {
+      final response = await _makeRequest(
+        'GET',
+        '/reviews/user/$userId',
+        headers: _getAuthHeaders(token),
+      );
+      
+      final data = json.decode(response.body);
+      if (data is List) {
+        return data.map((json) => Review.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      throw ApiException('사용자 후기 목록 조회 실패: $e');
+    }
+  }
+
+  // ==================== 매칭 수정/삭제 API ====================
+  
+  // 매칭 수정
+  static Future<void> updateMatching(int matchingId, Map<String, dynamic> matchingData, String token) async {
+    try {
+      await _makeRequest(
+        'PUT',
+        '/matchings/$matchingId',
+        headers: _getAuthHeaders(token),
+        body: json.encode(matchingData),
+      );
+    } catch (e) {
+      throw ApiException('매칭 수정 실패: $e');
+    }
+  }
+
+  // 매칭 삭제
+  static Future<void> deleteMatching(int matchingId, String token) async {
+    try {
+      await _makeRequest(
+        'DELETE',
+        '/matchings/$matchingId',
+        headers: _getAuthHeaders(token),
+      );
+    } catch (e) {
+      throw ApiException('매칭 삭제 실패: $e');
     }
   }
 }

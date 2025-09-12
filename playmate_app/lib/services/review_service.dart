@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/review.dart';
+import 'api_service.dart';
 
 class ReviewService {
   // 내 후기 목록 조회
@@ -8,11 +9,7 @@ class ReviewService {
       final token = await _getAuthToken();
       if (token == null) return [];
       
-      // TODO: 실제 API 엔드포인트 구현
-      // return await ApiService.getMyReviews(token);
-      
-      // 임시로 빈 리스트 반환
-      return [];
+      return await ApiService.getMyReviews(token);
     } catch (e) {
       print('내 후기 목록 조회 오류: $e');
       return [];
@@ -25,9 +22,7 @@ class ReviewService {
       final token = await _getAuthToken();
       if (token == null) throw Exception('인증 토큰이 없습니다.');
       
-      // TODO: 실제 API 엔드포인트 구현
-      // await ApiService.createReview(review.toJson(), token);
-      
+      await ApiService.createReview(review.toJson(), token);
       return true;
     } catch (e) {
       print('후기 작성 오류: $e');
@@ -41,9 +36,7 @@ class ReviewService {
       final token = await _getAuthToken();
       if (token == null) throw Exception('인증 토큰이 없습니다.');
       
-      // TODO: 실제 API 엔드포인트 구현
-      // await ApiService.updateReview(reviewId, review.toJson(), token);
-      
+      await ApiService.updateReview(reviewId, review.toJson(), token);
       return true;
     } catch (e) {
       print('후기 수정 오류: $e');
@@ -57,9 +50,7 @@ class ReviewService {
       final token = await _getAuthToken();
       if (token == null) throw Exception('인증 토큰이 없습니다.');
       
-      // TODO: 실제 API 엔드포인트 구현
-      // await ApiService.deleteReview(reviewId, token);
-      
+      await ApiService.deleteReview(reviewId, token);
       return true;
     } catch (e) {
       print('후기 삭제 오류: $e');
@@ -73,10 +64,7 @@ class ReviewService {
       final token = await _getAuthToken();
       if (token == null) return [];
       
-      // TODO: 실제 API 엔드포인트 구현
-      // return await ApiService.getUserReviews(userId, token);
-      
-      return [];
+      return await ApiService.getUserReviews(userId, token);
     } catch (e) {
       print('사용자 후기 목록 조회 오류: $e');
       return [];

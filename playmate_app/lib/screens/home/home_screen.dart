@@ -9,9 +9,12 @@ import '../../models/user.dart';
 import '../../models/location.dart';
 import '../matching/create_matching_screen.dart';
 import '../matching/matching_detail_screen.dart';
+import '../matching/edit_matching_screen.dart';
 import '../notification/notification_list_screen.dart';
 import '../../services/matching_notification_service.dart';
-import '../../services/matching_data_service_v2.dart';
+import '../../services/matching_data_service.dart';
+import '../../services/tennis_court_service.dart';
+import '../../models/tennis_court.dart';
 
 
 import '../../widgets/common/app_logo.dart';
@@ -39,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // 성능 최적화를 위한 변수들 추가
   Timer? _debounceTimer;
   bool _isFiltering = false;
-  List<Matching> _cachedFilteredMatchings = [];
+  List<Matching>? _cachedFilteredMatchings;
   Map<String, dynamic> _lastFilterState = {};
   
   // 정렬 관련 변수들
@@ -153,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       print('🔄 백엔드 API에서 매칭 데이터 로딩 시작...');
       
       // 백엔드 API에서 매칭 목록 가져오기
-      final matchings = await MatchingDataServiceV2.getMatchings(
+      final matchings = await MatchingDataService.getMatchings(
         searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
         gameTypes: _selectedGameTypes.isNotEmpty ? _selectedGameTypes : null,
         skillLevel: _selectedSkillLevel,
@@ -173,23 +176,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       print('✅ 백엔드 API에서 ${matchings.length}개 매칭 데이터 로딩 완료');
       
       setState(() {
-        // API에서 가져온 데이터가 있으면 사용, 없으면 기존 데이터 유지
+        // API에서 가져온 데이터를 우선시하여 _mockMatchings 업데이트
         if (matchings.isNotEmpty) {
-          // 새로 생성된 매칭이 있으면 보존 (ID가 큰 매칭들)
-          final existingNewMatchings = _mockMatchings.where((m) => m.id > 1000000000).toList();
-          print('🔄 보존할 새 매칭 개수: ${existingNewMatchings.length}');
-          for (var matching in existingNewMatchings) {
-            print('🔄 보존할 매칭: ${matching.courtName} (ID: ${matching.id}, minAge: ${matching.minAge}, maxAge: ${matching.maxAge})');
-          }
-          
-          // 중복 제거: ID 기준으로 Set 사용하고 정렬
-          final allMatchings = [...matchings, ...existingNewMatchings];
-          final uniqueMatchings = <int, Matching>{};
-          for (var matching in allMatchings) {
-            uniqueMatchings[matching.id] = matching;
-          }
-          _mockMatchings = uniqueMatchings.values.toList()
-            ..sort((a, b) => b.id.compareTo(a.id)); // ID 기준 내림차순 정렬 (최신순)
+          // 백엔드 데이터를 직접 사용 (상태 변경 등이 반영된 최신 데이터)
+          _mockMatchings = matchings;
+          print('🔄 백엔드 데이터로 _mockMatchings 업데이트: ${_mockMatchings.length}개');
         } else if (_mockMatchings.isEmpty) {
           // API 데이터도 없고 기존 데이터도 없으면 빈 리스트 유지
           _mockMatchings = [];
@@ -565,9 +556,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _isFiltering = true;
     
     // 캐시된 결과가 있고 필터가 변경되지 않았으면 재사용
-    if (_cachedFilteredMatchings.isNotEmpty && 
+    if (_cachedFilteredMatchings != null && 
+        _cachedFilteredMatchings!.isNotEmpty && 
         _areFilterStatesEqual(_getCurrentFilterState(), _lastFilterState)) {
-      _filteredMatchings = List.from(_cachedFilteredMatchings);
+      _filteredMatchings = List.from(_cachedFilteredMatchings!);
       _isFiltering = false;
       if (mounted) {
         setState(() {
@@ -580,10 +572,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // 실제 필터링 수행 - 항상 _mockMatchings 사용 (API 데이터 포함)
     _filteredMatchings = _mockMatchings.where((matching) {
       
-      // 기본 조건: 완료되지 않은 매칭만 표시 (완료, 취소, 삭제 제외)
-      if (matching.actualStatus == 'completed' || 
-          matching.actualStatus == 'cancelled' || 
-          matching.actualStatus == 'deleted') {
+      // 기본 조건: 삭제된 매칭만 제외 (완료, 취소는 표시)
+      if (matching.actualStatus == 'deleted') {
         return false;
       }
       
@@ -1252,7 +1242,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void _editMatching(Matching matching) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => CreateMatchingScreen(editingMatching: matching),
+        builder: (context) => EditMatchingScreen(
+          matching: matching,
+          onMatchingUpdated: () {
+            // 매칭 수정 후 홈화면 새로고침
+            _loadMatchingsFromAPI();
+          },
+        ),
       ),
     );
   }
@@ -1427,6 +1423,50 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  // 삭제 확인 다이얼로그 표시
+  void _showDeletionConfirmation(BuildContext context, Matching matching) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('매칭 삭제 확인'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${matching.courtName} 매칭을 삭제하시겠습니까?'),
+              const SizedBox(height: 16),
+              Text(
+                '⚠️ 삭제된 매칭은 복구할 수 없습니다.\n채팅 내용은 보존됩니다.',
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // 다이얼로그 닫기
+                _changeMatchingStatus(matching, 'deleted');
+                Navigator.of(context).pop(); // 상태 변경 다이얼로그도 닫기
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // 매칭 정보 요약 위젯
   Widget _buildMatchingSummary(Matching matching) {
     return Container(
@@ -1514,18 +1554,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         
         // 삭제
         if (matching.actualStatus != 'deleted')
-          _buildStatusOption(context, matching, 'deleted', '삭제', Colors.grey, requiresConfirmation: true),
+          _buildStatusOption(context, matching, 'deleted', '삭제', Colors.grey, requiresDeletionConfirmation: true),
       ],
     );
   }
 
   // 상태 옵션 위젯
-  Widget _buildStatusOption(BuildContext context, Matching matching, String status, String label, Color color, {bool requiresConfirmation = false}) {
+  Widget _buildStatusOption(BuildContext context, Matching matching, String status, String label, Color color, {bool requiresConfirmation = false, bool requiresDeletionConfirmation = false}) {
     return GestureDetector(
       onTap: () {
         if (requiresConfirmation) {
           // 취소 상태 변경 시 추가 확인
           _showCancellationConfirmation(context, matching);
+        } else if (requiresDeletionConfirmation) {
+          // 삭제 상태 변경 시 추가 확인
+          _showDeletionConfirmation(context, matching);
         } else {
           _changeMatchingStatus(matching, status);
           Navigator.of(context).pop();
@@ -1561,10 +1604,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   // 매칭 상태 변경
-  void _changeMatchingStatus(Matching matching, String newStatus) {
-    setState(() {
-      final index = _mockMatchings.indexWhere((m) => m.id == matching.id);
-      if (index != -1) {
+  Future<void> _changeMatchingStatus(Matching matching, String newStatus) async {
+    try {
+      // 백엔드 API 호출
+      final success = await MatchingDataService.updateMatching(matching.id, {
+        'status': newStatus,
+        'cancelledAt': newStatus == 'cancelled' ? DateTime.now().toIso8601String() : null,
+      });
+      
+      if (success) {
         // 취소된 매칭을 모집중으로 복구할 때 복구 횟수 증가
         final newRecoveryCount = newStatus == 'recruiting' && matching.status == 'cancelled' 
             ? (matching.recoveryCount ?? 0) + 1 
@@ -1583,39 +1631,76 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           updateData['appliedUserIds'] = []; // 신청자 목록 비우기
         }
         
-        // 완료 상태는 자동으로 처리되므로 수동 변경 불가
-        // if (newStatus == 'completed') {
-        //   updateData['completedAt'] = DateTime.now();
-        // }
-        
         // 취소 상태로 변경할 때 취소 시간 기록
         if (newStatus == 'cancelled') {
           updateData['cancelledAt'] = DateTime.now();
         }
         
-        _mockMatchings[index] = matching.copyWith(
-          status: newStatus,
-          recoveryCount: newRecoveryCount,
-          updatedAt: DateTime.now(),
-          confirmedUserIds: updateData['confirmedUserIds'],
-          appliedUserIds: updateData['appliedUserIds'],
-          completedAt: updateData['completedAt'],
-          cancelledAt: updateData['cancelledAt'],
-        );
+        setState(() {
+          final index = _mockMatchings.indexWhere((m) => m.id == matching.id);
+          if (index != -1) {
+            _mockMatchings[index] = matching.copyWith(
+              status: newStatus,
+              recoveryCount: newRecoveryCount,
+              updatedAt: DateTime.now(),
+              confirmedUserIds: updateData['confirmedUserIds'],
+              appliedUserIds: updateData['appliedUserIds'],
+              completedAt: updateData['completedAt'],
+              cancelledAt: updateData['cancelledAt'],
+            );
+          }
+          
+          // _filteredMatchings도 즉시 업데이트
+          final filteredIndex = _filteredMatchings.indexWhere((m) => m.id == matching.id);
+          if (filteredIndex != -1) {
+            _filteredMatchings[filteredIndex] = matching.copyWith(
+              status: newStatus,
+              recoveryCount: newRecoveryCount,
+              updatedAt: DateTime.now(),
+              confirmedUserIds: updateData['confirmedUserIds'],
+              appliedUserIds: updateData['appliedUserIds'],
+              completedAt: updateData['completedAt'],
+              cancelledAt: updateData['cancelledAt'],
+            );
+          }
+          
+          // 캐시된 필터링된 매칭 초기화
+          _cachedFilteredMatchings = null;
+        });
+        
+        // 필터링 재적용
+        _applyFiltersOnce();
+        
+        // 백엔드에서 최신 데이터 다시 로드 (비동기)
+        _loadMatchingsFromAPI();
+        
+        // 취소 또는 삭제 시 확정된 게스트들에게 알림 전송
+        if (newStatus == 'cancelled' || newStatus == 'deleted') {
+          _sendNotificationToConfirmedGuests(matching, newStatus);
+        }
+      } else {
+        throw Exception('상태 변경 실패');
       }
-    });
-    
-    // 필터 적용
-    _applyFiltersOnce();
+    } catch (e) {
+      print('상태 변경 오류: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('상태 변경에 실패했습니다: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
     
     // 성공 메시지 표시
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('매칭 상태가 "${_getStatusText(matching)}"로 변경되었습니다.'),
-        backgroundColor: _getStatusColor(newStatus),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('매칭 상태가 "${_getStatusTextByStatus(newStatus)}"로 변경되었습니다.'),
+          backgroundColor: _getStatusColor(newStatus),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
     
     // 상태 변경 로그
     print('매칭 상태 변경: ${matching.courtName} (${matching.id}) ${matching.actualStatus} → $newStatus');
@@ -1627,6 +1712,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final actualStatus = matching.actualStatus;
     
     switch (actualStatus) {
+      case 'recruiting':
+        return '모집중';
+      case 'confirmed':
+        return '확정';
+      case 'completed':
+        return '완료';
+      case 'cancelled':
+        return '취소';
+      case 'deleted':
+        return '삭제됨';
+      default:
+        return '알 수 없음';
+    }
+  }
+
+  // 상태 텍스트 반환 메서드 (상태 문자열 직접 전달)
+  String _getStatusTextByStatus(String status) {
+    switch (status) {
       case 'recruiting':
         return '모집중';
       case 'confirmed':
@@ -1728,6 +1831,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               builder: (context) => MatchingDetailScreen(
                 matching: matching,
                 currentUser: currentUser,
+                onMatchingUpdated: () {
+                  // 상세화면에서 매칭이 업데이트되면 홈화면 새로고침
+                  _loadMatchingsFromAPI();
+                },
               ),
             ),
           );
@@ -4465,6 +4572,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return Icons.delete_forever; // 삭제됨: 영구 삭제 아이콘
       default:
         return Icons.info; // 기본: 정보 아이콘
+    }
+  }
+
+  // 확정된 게스트들에게 알림 전송
+  void _sendNotificationToConfirmedGuests(Matching matching, String newStatus) {
+    try {
+      final notificationService = MatchingNotificationService();
+      final authProvider = context.read<AuthProvider>();
+      final currentUser = authProvider.currentUser;
+      
+      if (currentUser == null) return;
+      
+      // 취소 또는 삭제 사유 설정
+      String reason = newStatus == 'cancelled' ? '호스트에 의한 취소' : '호스트에 의한 삭제';
+      
+      // 매칭 취소/삭제 알림 생성
+      notificationService.createMatchingCancelledNotification(
+        matching, 
+        currentUser, 
+        reason
+      );
+      
+      print('확정된 게스트들에게 ${newStatus} 알림 전송 완료: ${matching.courtName}');
+    } catch (e) {
+      print('알림 전송 오류: $e');
     }
   }
 

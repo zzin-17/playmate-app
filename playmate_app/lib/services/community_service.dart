@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import '../models/post.dart';
 import '../models/comment.dart';
 import 'api_service.dart';
@@ -22,28 +23,43 @@ class CommunityService {
   Future<List<Post>> getPosts({
     int page = 1,
     int limit = 20,
-    String? hashtag,
+    String? category,
+    String? search,
   }) async {
     try {
-      final token = await _getAuthToken();
-      if (token == null) throw Exception('인증 토큰이 없습니다');
-
-      String url = '/posts?page=$page&limit=$limit';
-      if (hashtag != null) {
-        url += '&hashtag=${Uri.encodeComponent(hashtag)}';
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+      
+      if (category != null && category.isNotEmpty) {
+        queryParams['category'] = category;
+      }
+      
+      if (search != null && search.isNotEmpty) {
+        queryParams['search'] = search;
       }
 
-      final response = await ApiService.get(
-        url,
-        headers: {'Authorization': 'Bearer $token'},
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:3000/api/community/posts').replace(
+          queryParameters: queryParams,
+        ),
+        headers: {
+          'Authorization': 'Bearer temp_jwt_token',
+          'Content-Type': 'application/json',
+        },
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return (data['posts'] as List).map((json) => Post.fromJson(json)).toList();
-      } else {
-        throw Exception('게시글 목록 조회 실패: ${response.statusCode}');
+        if (data['success'] == true) {
+          return (data['data'] as List)
+              .map((json) => Post.fromJson(json))
+              .toList();
+        }
       }
+      
+      throw Exception('게시글 목록 조회 실패: ${response.statusCode}');
     } catch (e) {
       print('게시글 목록 조회 오류: $e');
       return [];
@@ -53,20 +69,22 @@ class CommunityService {
   /// 게시글 상세 조회
   Future<Post?> getPost(int postId) async {
     try {
-      final token = await _getAuthToken();
-      if (token == null) throw Exception('인증 토큰이 없습니다');
-
-      final response = await ApiService.get(
-        '/posts/$postId',
-        headers: {'Authorization': 'Bearer $token'},
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:3000/api/community/posts/$postId'),
+        headers: {
+          'Authorization': 'Bearer temp_jwt_token',
+          'Content-Type': 'application/json',
+        },
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return Post.fromJson(data);
-      } else {
-        throw Exception('게시글 조회 실패: ${response.statusCode}');
+        if (data['success'] == true) {
+          return Post.fromJson(data['data']);
+        }
       }
+      
+      throw Exception('게시글 조회 실패: ${response.statusCode}');
     } catch (e) {
       print('게시글 조회 오류: $e');
       return null;

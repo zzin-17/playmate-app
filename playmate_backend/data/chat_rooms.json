@@ -1,0 +1,60 @@
+[
+  {
+    "id": 1,
+    "matchingId": 1757653771696,
+    "matchingTitle": "서울특별시강동구도시관리공단 강일테니스장",
+    "hostId": 1,
+    "hostName": "개발자",
+    "participants": [
+      {
+        "id": 1,
+        "name": "개발자",
+        "email": "dev@playmate.com",
+        "profileImage": null
+      },
+      {
+        "id": 3,
+        "name": "테니스러버",
+        "email": "tennis@example.com",
+        "profileImage": null
+      },
+      {
+        "id": 4,
+        "name": "테니스초보",
+        "email": "beginner@example.com",
+        "profileImage": null
+      }
+    ],
+    "lastMessage": "안녕하세요! 같이 테니스 치고 싶습니다.",
+    "lastMessageTime": "2025-09-12T05:30:00.000Z",
+    "unreadCount": 0,
+    "createdAt": "2025-09-12T05:20:00.000Z",
+    "updatedAt": "2025-09-12T05:30:00.000Z"
+  },
+  {
+    "id": 2,
+    "matchingId": 1757654183804,
+    "matchingTitle": "명일테니스장",
+    "hostId": 1,
+    "hostName": "개발자",
+    "participants": [
+      {
+        "id": 1,
+        "name": "개발자",
+        "email": "dev@playmate.com",
+        "profileImage": null
+      },
+      {
+        "id": 5,
+        "name": "테니스마니아",
+        "email": "mania@example.com",
+        "profileImage": null
+      }
+    ],
+    "lastMessage": "클럽 게스트 모집합니다!",
+    "lastMessageTime": "2025-09-12T05:35:00.000Z",
+    "unreadCount": 1,
+    "createdAt": "2025-09-12T05:25:00.000Z",
+    "updatedAt": "2025-09-12T05:35:00.000Z"
+  }
+]

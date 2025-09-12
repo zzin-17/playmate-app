@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/matching.dart';
 import '../models/user.dart';
-import 'matching_data_service_v2.dart';
+import 'matching_data_service.dart';
 
 class MatchingHomeService extends ChangeNotifier {
   static final MatchingHomeService _instance = MatchingHomeService._internal();
@@ -59,7 +59,7 @@ class MatchingHomeService extends ChangeNotifier {
     notifyListeners();
     
     try {
-      _mockMatchings = await MatchingDataServiceV2.getMatchings();
+      _mockMatchings = await MatchingDataService.getMatchings();
       _applyFilters();
     } catch (e) {
       _error = e.toString();
@@ -94,7 +94,7 @@ class MatchingHomeService extends ChangeNotifier {
     notifyListeners();
     
     try {
-      _mockMatchings = await MatchingDataServiceV2.getMatchings(
+      _mockMatchings = await MatchingDataService.getMatchings(
         searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
         gameTypes: _selectedGameTypes.isNotEmpty ? _selectedGameTypes : null,
         skillLevel: _selectedSkillLevel,

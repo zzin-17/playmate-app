@@ -30,6 +30,13 @@ class AppTextStyles {
     color: AppColors.textPrimary,
   );
   
+  // Body2 - 13pt Regular
+  static const TextStyle body2 = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    color: AppColors.textPrimary,
+  );
+  
   // Caption - 12pt Light
   static const TextStyle caption = TextStyle(
     fontSize: 12,

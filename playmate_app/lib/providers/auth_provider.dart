@@ -199,7 +199,33 @@ class AuthProvider extends ChangeNotifier {
     try {
       final token = await _getToken();
       if (token != null) {
-        if (token.startsWith('mock_token_')) {
+        if (token == 'temp_jwt_token') {
+          // 개발 환경에서 임시 사용자 정보 설정
+          _currentUser = User(
+            id: 1, // 임시 사용자 ID
+            email: 'dev@playmate.com',
+            nickname: '개발자',
+            gender: 'male',
+            birthYear: 1990,
+            region: '서울',
+            skillLevel: 3,
+            startYearMonth: '2020-01',
+            preferredCourt: '실내',
+            preferredTime: ['18:00~20:00', '20:00~22:00'],
+            playStyle: '공격적',
+            hasLesson: false,
+            mannerScore: 4.5,
+            ntrpScore: 3.5,
+            profileImage: null,
+            followingIds: [],
+            followerIds: [],
+            bio: '개발 환경 테스트 사용자',
+            reviewCount: 0,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+          notifyListeners();
+        } else if (token.startsWith('mock_token_')) {
           // 데모/소셜(Mock) 토큰인 경우 Mock 서비스로 유저 로드
           final user = await MockAuthService.getCurrentUser(token);
           _currentUser = user;
@@ -305,9 +331,43 @@ class AuthProvider extends ChangeNotifier {
     try {
       final token = await _getToken();
       if (token != null) {
-        final user = await MockAuthService.getCurrentUser(token);
-        _currentUser = user;
-        notifyListeners();
+        if (token == 'temp_jwt_token') {
+          // 개발 환경에서 임시 사용자 정보 설정
+          _currentUser = User(
+            id: 1, // 임시 사용자 ID
+            email: 'dev@playmate.com',
+            nickname: '개발자',
+            gender: 'male',
+            birthYear: 1990,
+            region: '서울',
+            skillLevel: 3,
+            startYearMonth: '2020-01',
+            preferredCourt: '실내',
+            preferredTime: ['18:00~20:00', '20:00~22:00'],
+            playStyle: '공격적',
+            hasLesson: false,
+            mannerScore: 4.5,
+            ntrpScore: 3.5,
+            profileImage: null,
+            followingIds: [],
+            followerIds: [],
+            bio: '개발 환경 테스트 사용자',
+            reviewCount: 0,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+          notifyListeners();
+        } else if (token.startsWith('mock_token_')) {
+          // Mock 토큰인 경우 Mock 서비스로 유저 로드
+          final user = await MockAuthService.getCurrentUser(token);
+          _currentUser = user;
+          notifyListeners();
+        } else {
+          // 실제 API 토큰인 경우
+          final user = await ApiService.getCurrentUser(token);
+          _currentUser = user;
+          notifyListeners();
+        }
       }
     } catch (e) {
       _setError(e.toString());

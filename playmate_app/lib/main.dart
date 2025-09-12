@@ -8,6 +8,8 @@ import 'screens/auth/login_screen.dart';
 import 'screens/main_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/community/create_post_screen.dart';
+import 'screens/matching/edit_matching_screen.dart';
+import 'models/matching.dart';
 
 import 'constants/app_colors.dart';
 import 'constants/app_text_styles.dart';
@@ -144,6 +146,10 @@ class PlayMateApp extends StatelessWidget {
           '/main': (context) => const MainScreen(),
           '/home': (context) => const HomeScreen(),
           '/write-post': (context) => const CreatePostScreen(),
+          '/edit-matching': (context) {
+            final matching = ModalRoute.of(context)!.settings.arguments as Matching;
+            return EditMatchingScreen(matching: matching);
+          },
         },
       ),
     );

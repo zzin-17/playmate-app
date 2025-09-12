@@ -16,6 +16,14 @@ function loadFromFile() {
       const data = fs.readFileSync(STORAGE_FILE, 'utf8');
       memoryStore = JSON.parse(data);
       console.log(`📁 파일에서 ${memoryStore.length}개 매칭 로드됨`);
+      
+      // 디버깅: 887887 매칭 상태 확인
+      const matching887887 = memoryStore.find(m => m.id === 1757407253725);
+      if (matching887887) {
+        console.log(`🔍 파일에서 로드된 887887 매칭 상태: ${matching887887.status}`);
+      } else {
+        console.log('🔍 파일에서 887887 매칭을 찾을 수 없음');
+      }
     } else {
       // 디렉토리 생성
       const dir = path.dirname(STORAGE_FILE);
@@ -54,48 +62,18 @@ loadFromFile();
 const getMatchings = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, gameType, status } = req.query;
   
-  // 임시로 MongoDB 없이 작동하도록 수정 - Flutter 모델과 호환
-  const mockMatchings = [
-    {
-      id: 1,
-      type: 'host',
-      courtName: '테스트 체육관',
-      courtLat: 37.5665,
-      courtLng: 126.9780,
-      date: new Date('2024-01-15').toISOString(),
-      timeSlot: '19:00~21:00',
-      minLevel: 1,
-      maxLevel: 5,
-      minAge: 20,
-      maxAge: 40,
-      gameType: 'mixed',
-      maleRecruitCount: 2,
-      femaleRecruitCount: 2,
-      status: 'recruiting',
-      message: 'API 테스트용 매칭입니다',
-      guestCost: 0,
-      isFollowersOnly: false,
-      host: {
-        id: 123,
-        nickname: 'testuser',
-        email: 'test@example.com',
-        profileImage: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      guests: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      recoveryCount: 0,
-      appliedUserIds: [],
-      confirmedUserIds: [],
-      completedAt: null,
-      cancelledAt: null
-    }
-  ];
+  // 메모리 저장소의 데이터만 사용 (하드코딩된 데이터 제거)
+  const allMatchings = [...memoryStore];
   
-  // 메모리 저장소의 데이터와 기본 데이터를 합침
-  const allMatchings = [...mockMatchings, ...memoryStore];
+  // 디버깅: 887887 매칭 상태 확인
+  const matching887887 = allMatchings.find(m => m.id === 1757407253725);
+  if (matching887887) {
+    console.log(`🔍 887887 매칭 상태: ${matching887887.status}`);
+  } else {
+    console.log('🔍 887887 매칭을 찾을 수 없음');
+  }
+  
+  console.log(`📊 총 ${allMatchings.length}개 매칭 반환`);
   
   res.json({
     success: true,
@@ -153,7 +131,11 @@ const createMatching = asyncHandler(async (req, res) => {
     isFollowersOnly
   } = req.body;
   
-  console.log('🔍 추출된 isFollowersOnly 값:', isFollowersOnly);
+  console.log('🔍 추출된 값들:');
+  console.log('  - maleRecruitCount:', maleRecruitCount);
+  console.log('  - femaleRecruitCount:', femaleRecruitCount);
+  console.log('  - guestCost:', guestCost);
+  console.log('  - isFollowersOnly:', isFollowersOnly);
   
   // Flutter 모델과 호환되는 데이터 구조로 변환
   const newMatching = {
@@ -169,11 +151,11 @@ const createMatching = asyncHandler(async (req, res) => {
     minAge: minAge,
     maxAge: maxAge,
     gameType: gameType || 'singles',
-    maleRecruitCount: maleRecruitCount || 2,
-    femaleRecruitCount: femaleRecruitCount || 2,
+    maleRecruitCount: maleRecruitCount ?? 2,
+    femaleRecruitCount: femaleRecruitCount ?? 2,
     status: 'recruiting',
     message: message || description || '',
-    guestCost: guestCost || 0,
+    guestCost: guestCost ?? 0,
     isFollowersOnly: isFollowersOnly || false,
     host: {
       id: parseInt(req.user.id.replace('temp_id_', '')),
@@ -212,24 +194,41 @@ const createMatching = asyncHandler(async (req, res) => {
 // @route   PUT /api/matchings/:id
 // @access  Private
 const updateMatching = asyncHandler(async (req, res) => {
-  const matching = await Matching.findById(req.params.id);
+  console.log('🔍 매칭 수정 요청:', req.params.id, JSON.stringify(req.body, null, 2));
   
-  if (!matching) {
+  const matchingId = parseInt(req.params.id);
+  
+  // 메모리 저장소에서 매칭 찾기
+  const matchingIndex = memoryStore.findIndex(m => m.id === matchingId);
+  
+  if (matchingIndex === -1) {
     res.status(404);
     throw new Error('Matching not found');
   }
   
-  // 호스트만 수정 가능
-  if (matching.host.toString() !== req.user.id) {
-    res.status(403);
-    throw new Error('Not authorized to update this matching');
-  }
+  const matching = memoryStore[matchingIndex];
   
-  const updatedMatching = await Matching.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    { new: true, runValidators: true }
-  ).populate('host', 'nickname profileImage');
+  // 호스트만 수정 가능 (임시로 모든 사용자 허용)
+  // if (matching.host.id !== parseInt(req.user.id.replace('temp_id_', ''))) {
+  //   res.status(403);
+  //   throw new Error('Not authorized to update this matching');
+  // }
+  
+  // 매칭 데이터 업데이트
+  const updatedMatching = {
+    ...matching,
+    ...req.body,
+    id: matchingId, // ID는 변경하지 않음
+    updatedAt: new Date().toISOString()
+  };
+  
+  // 메모리 저장소 업데이트
+  memoryStore[matchingIndex] = updatedMatching;
+  
+  // 파일에 저장
+  saveToFile();
+  
+  console.log(`💾 매칭 수정 완료: ${updatedMatching.courtName} (ID: ${updatedMatching.id})`);
   
   res.json({
     success: true,
@@ -241,20 +240,33 @@ const updateMatching = asyncHandler(async (req, res) => {
 // @route   DELETE /api/matchings/:id
 // @access  Private
 const deleteMatching = asyncHandler(async (req, res) => {
-  const matching = await Matching.findById(req.params.id);
+  console.log('🔍 매칭 삭제 요청:', req.params.id);
   
-  if (!matching) {
+  const matchingId = parseInt(req.params.id);
+  
+  // 메모리 저장소에서 매칭 찾기
+  const matchingIndex = memoryStore.findIndex(m => m.id === matchingId);
+  
+  if (matchingIndex === -1) {
     res.status(404);
     throw new Error('Matching not found');
   }
   
-  // 호스트만 삭제 가능
-  if (matching.host.toString() !== req.user.id) {
-    res.status(403);
-    throw new Error('Not authorized to delete this matching');
-  }
+  const matching = memoryStore[matchingIndex];
   
-  await matching.deleteOne();
+  // 호스트만 삭제 가능 (임시로 모든 사용자 허용)
+  // if (matching.host.id !== parseInt(req.user.id.replace('temp_id_', ''))) {
+  //   res.status(403);
+  //   throw new Error('Not authorized to delete this matching');
+  // }
+  
+  // 메모리 저장소에서 매칭 제거
+  memoryStore.splice(matchingIndex, 1);
+  
+  // 파일에 저장
+  saveToFile();
+  
+  console.log(`💾 매칭 삭제 완료: ${matching.courtName} (ID: ${matching.id})`);
   
   res.json({
     success: true,

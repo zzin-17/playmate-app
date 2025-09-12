@@ -303,8 +303,14 @@ class Matching {
     return remainingCount <= 0;
   }
 
-  // 실제 매칭 상태 (모집 완료 여부에 따라 동적 계산)
+  // 실제 매칭 상태 (백엔드 status 우선, 모집 완료 여부는 보조)
   String get actualStatus {
+    // 백엔드에서 설정된 상태가 있으면 우선 사용 (cancelled, deleted 등)
+    if (status == 'cancelled' || status == 'deleted' || status == 'completed') {
+      return status;
+    }
+    
+    // 모집 완료 여부에 따라 동적 계산 (recruiting, confirmed만)
     if (isFullyBooked) {
       return 'confirmed'; // 모든 인원이 확정되면 '확정' 상태
     } else {

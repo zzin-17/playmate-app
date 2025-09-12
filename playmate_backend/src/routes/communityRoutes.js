@@ -3,14 +3,15 @@ const router = express.Router();
 const { protect } = require('../middleware/auth');
 const {
   getPosts,
-  getPost,
+  getPostById,
   createPost,
   updatePost,
   deletePost,
-  toggleLike,
-  toggleBookmark,
-  addComment
-} = require('../controllers/communityController');
+  togglePostLike,
+  getComments,
+  createComment,
+  toggleCommentLike
+} = require('../controllers/communityControllerMemory');
 
 // 커뮤니티 관련 라우트
 router.route('/posts')
@@ -18,17 +19,18 @@ router.route('/posts')
   .post(protect, createPost);
 
 router.route('/posts/:id')
-  .get(protect, getPost)
+  .get(protect, getPostById)
   .put(protect, updatePost)
   .delete(protect, deletePost);
 
 router.route('/posts/:id/like')
-  .post(protect, toggleLike);
-
-router.route('/posts/:id/bookmark')
-  .post(protect, toggleBookmark);
+  .post(protect, togglePostLike);
 
 router.route('/posts/:id/comments')
-  .post(protect, addComment);
+  .get(protect, getComments)
+  .post(protect, createComment);
+
+router.route('/comments/:commentId/like')
+  .post(protect, toggleCommentLike);
 
 module.exports = router;

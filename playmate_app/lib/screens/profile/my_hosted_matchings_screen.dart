@@ -42,6 +42,11 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
     // TODO: 실제 API 호출로 대체
     setState(() {
       _isLoading = false;
+      
+      // 현재 사용자 ID 가져오기 (디버깅용)
+      final currentUserId = widget.currentUser.id;
+      print('🔍 MyHostedMatchingsScreen - 현재 사용자 ID: $currentUserId');
+      
       // 홈 화면의 모의 데이터를 사용하여 테스트
       _myHostedMatchings = [
         // 잠실종합운동장
@@ -60,7 +65,7 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
           femaleRecruitCount: 1,
           status: 'recruiting',
           host: User(
-            id: 1,
+            id: currentUserId, // 현재 사용자 ID 사용
             email: 'host@example.com',
             nickname: '테린이',
             createdAt: DateTime.now(),
@@ -87,7 +92,7 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
           status: 'recruiting',
           isFollowersOnly: true,
           host: User(
-            id: 2,
+            id: currentUserId, // 현재 사용자 ID 사용
             email: 'player@example.com',
             nickname: '테니스마스터',
             createdAt: DateTime.now(),
@@ -113,7 +118,7 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
           femaleRecruitCount: 1,
           status: 'completed',
           host: User(
-            id: 3,
+            id: currentUserId, // 현재 사용자 ID 사용
             email: 'tennis@example.com',
             nickname: '테니스초보',
             createdAt: DateTime.now(),
@@ -163,7 +168,7 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
           femaleRecruitCount: 1,
           status: 'completed',
           host: User(
-            id: 4,
+            id: currentUserId, // 현재 사용자 ID 사용
             email: 'pro@example.com',
             nickname: '테니스프로',
             createdAt: DateTime.now(),
@@ -202,7 +207,7 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
           femaleRecruitCount: 2,
           status: 'cancelled',
           host: User(
-            id: 5,
+            id: currentUserId, // 현재 사용자 ID 사용
             email: 'bundang@example.com',
             nickname: '분당테니스',
             createdAt: DateTime.now(),
@@ -228,7 +233,7 @@ class _MyHostedMatchingsScreenState extends State<MyHostedMatchingsScreen>
           femaleRecruitCount: 1,
           status: 'recruiting',
           host: User(
-            id: 6,
+            id: currentUserId, // 현재 사용자 ID 사용
             email: 'incheon@example.com',
             nickname: '인천테니스',
             createdAt: DateTime.now(),

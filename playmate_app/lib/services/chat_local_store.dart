@@ -30,14 +30,24 @@ class ChatLocalStore {
     await prefs.setString(key, jsonEncode(rooms.map((e) => e.toJson()).toList()));
   }
 
-  Future<List<ChatMessage>> loadMessages(int matchingId) async {
+  Future<List<ChatMessage>> loadMessages(int matchingId, {int? limit}) async {
     final prefs = await SharedPreferences.getInstance();
     final key = _msgsKeyPrefix + matchingId.toString();
     final raw = prefs.getString(key);
     if (raw == null || raw.isEmpty) return [];
     try {
       final List<dynamic> list = jsonDecode(raw);
-      return list.map((e) => ChatMessage.fromJson(Map<String, dynamic>.from(e))).toList();
+      final messages = list.map((e) => ChatMessage.fromJson(Map<String, dynamic>.from(e))).toList();
+      
+      // 최신순 정렬
+      messages.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      
+      // limit이 지정된 경우 제한
+      if (limit != null && limit > 0) {
+        return messages.take(limit).toList();
+      }
+      
+      return messages;
     } catch (_) {
       return [];
     }
@@ -57,6 +67,20 @@ class ChatLocalStore {
     }
     final prefs = await SharedPreferences.getInstance();
     final key = _msgsKeyPrefix + message.matchingId.toString();
+    await prefs.setString(key, jsonEncode(msgs.map((e) => e.toJson()).toList()));
+  }
+
+  Future<void> saveMessage(int roomId, ChatMessage message) async {
+    final msgs = await loadMessages(roomId);
+    // 중복 방지
+    final isDup = msgs.any((m) => m.id == message.id);
+    if (!isDup) {
+      msgs.add(message);
+      // 최신순 정렬
+      msgs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final key = _msgsKeyPrefix + roomId.toString();
     await prefs.setString(key, jsonEncode(msgs.map((e) => e.toJson()).toList()));
   }
 }

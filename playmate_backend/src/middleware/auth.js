@@ -13,9 +13,9 @@ const protect = asyncHandler(async (req, res, next) => {
       // 임시로 MongoDB 없이 작동하도록 수정
       if (token === 'temp_jwt_token') {
         req.user = {
-          id: 'temp_id_123',
-          email: 'test@example.com',
-          nickname: 'testuser'
+          id: 'temp_id_1',
+          email: 'dev@playmate.com',
+          nickname: '개발자'
         };
         next();
         return;

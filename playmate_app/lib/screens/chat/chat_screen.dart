@@ -84,17 +84,51 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void _loadInitialMessages() {
-    // 로컬 저장된 메시지 우선 로드 (오프라인/서버지연 대비)
-    _localStore.loadMessages(widget.matching.id).then((msgs) {
-      if (msgs.isNotEmpty && mounted) {
+  void _loadInitialMessages() async {
+    try {
+      // 실제 API에서 메시지 로딩
+      final chatService = ChatService();
+      final roomId = widget.matching.id; // 매칭 ID를 채팅방 ID로 사용
+      
+      final apiMessages = await chatService.getChatMessages(
+        roomId: roomId,
+        limit: 50,
+      );
+      
+      if (apiMessages.isNotEmpty && mounted) {
         setState(() {
           _messages
             ..clear()
-            ..addAll(msgs);
+            ..addAll(apiMessages);
+        });
+        
+        // API 메시지를 로컬에도 저장
+        for (final message in apiMessages) {
+          await _localStore.saveMessage(roomId, message);
+        }
+      } else {
+        // API에서 메시지가 없으면 로컬 저장소에서 로드
+        final localMessages = await _localStore.loadMessages(widget.matching.id);
+        if (localMessages.isNotEmpty && mounted) {
+          setState(() {
+            _messages
+              ..clear()
+              ..addAll(localMessages);
+          });
+        }
+      }
+    } catch (e) {
+      print('메시지 로딩 실패: $e');
+      // API 실패시 로컬 저장소에서 로드
+      final localMessages = await _localStore.loadMessages(widget.matching.id);
+      if (localMessages.isNotEmpty && mounted) {
+        setState(() {
+          _messages
+            ..clear()
+            ..addAll(localMessages);
         });
       }
-    });
+    }
   }
 
   /// 채팅방 존재 확인 및 생성
