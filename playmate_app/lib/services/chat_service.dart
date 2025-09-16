@@ -171,12 +171,14 @@ class ChatService {
   }
 
   /// Mock 데이터 (개발/테스트용)
-  Future<List<ChatRoom>> _getMockChatRooms(User currentUser) async {
+  /*
+  Future<List<ChatRoom>> _getMockChatRooms(User currentUser) async { // 사용되지 않음
     // 로컬 저장된 채팅방 반환 → 없으면 메모리 활성 목록
     final saved = await _localStore.loadRooms(currentUser.id);
     if (saved.isNotEmpty) return saved;
     return _activeChatRooms;
   }
+  */
 
   /// 매칭 참여시 백엔드에 채팅방 생성 요청
   Future<bool> createChatRoom(int matchingId, User host, User guest) async {

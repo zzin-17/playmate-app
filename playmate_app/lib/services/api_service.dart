@@ -415,8 +415,20 @@ class ApiService {
       ).timeout(timeout);
       
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return User.fromJson(data);
+        final responseData = json.decode(response.body);
+        
+        // 백엔드 응답 구조에 맞게 데이터 추출
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final userData = Map<String, dynamic>.from(responseData['data']);
+          
+          // 누락된 필수 필드에 기본값 추가
+          userData['createdAt'] = userData['createdAt'] ?? DateTime.now().toIso8601String();
+          userData['updatedAt'] = userData['updatedAt'] ?? DateTime.now().toIso8601String();
+          
+          return User.fromJson(userData);
+        } else {
+          throw ApiException('사용자 정보 조회 실패: ${responseData['message'] ?? 'Unknown error'}');
+        }
       } else {
         throw ApiException('사용자 정보 조회 실패: ${response.statusCode}');
       }

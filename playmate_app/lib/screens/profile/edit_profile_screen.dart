@@ -118,7 +118,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     : null,
                 child: _selectedImagePath == null
                     ? Text(
-                        widget.currentUser.nickname?.substring(0, 1) ?? 'U',
+                        widget.currentUser.nickname.substring(0, 1),
                         style: TextStyle(
                           fontSize: 40,
                           fontWeight: FontWeight.bold,

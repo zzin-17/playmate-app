@@ -4,7 +4,6 @@ import '../../models/user.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../widgets/common/app_button.dart';
-import '../../services/matching_service.dart';
 import '../../services/matching_state_service.dart';
 import '../../services/matching_data_service.dart';
 import '../../services/user_service.dart';
@@ -34,9 +33,6 @@ class MatchingDetailScreen extends StatefulWidget {
 
 class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   bool _isLoading = false; // 데이터 로딩 상태
-  bool _hasApplied = false;
-  bool _isParticipating = false; // 매칭 참여 여부
-  bool _isHost = false; // 호스트 여부
   String _currentMatchingStatus = 'recruiting'; // 현재 매칭 상태
   List<int> _confirmedUserIds = []; // 확정된 사용자 ID 목록
   bool _isFollowingHost = false; // 호스트 팔로우 상태
@@ -132,18 +128,15 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     }
 
     try {
-      final currentUserId = widget.currentUser.id;
-      
       // 호스트 여부 확인
-      _isHost = widget.matching.host.id == currentUserId;
       
       // 게스트로 참여 중인지 확인
-      if (widget.matching.guests != null) {
-        _isParticipating = widget.matching.guests!.any((guest) => guest.id == currentUserId);
-      }
+      // if (widget.matching.guests != null) {
+      //   _isParticipating = widget.matching.guests!.any((guest) => guest.id == currentUserId);
+      // }
       
       // 신청 중인지 확인 (임시 로직)
-      _hasApplied = _applicants.any((applicant) => applicant['user'].id == currentUserId);
+      // _hasApplied = _applicants.any((applicant) => applicant['user'].id == currentUserId);
       
       // TODO: 실제 API 호출로 매칭 데이터 로딩
       await Future.delayed(const Duration(milliseconds: 1000)); // 로딩 시뮬레이션
@@ -970,7 +963,8 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   }
 
   // 확정된 게스트 목록 섹션
-  Widget _buildConfirmedGuestsSection() {
+  /*
+  Widget _buildConfirmedGuestsSection() { // 사용되지 않음
     // 호스트인지 확인
     final isHost = widget.currentUser.email == widget.matching.host.email;
     
@@ -1098,6 +1092,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
       children: confirmedGuests.map((guest) => _buildConfirmedGuestCard(guest)).toList(),
     );
   }
+  */
 
   // 확정된 게스트 카드 위젯
   Widget _buildConfirmedGuestCard(Map<String, dynamic> guest) {
@@ -1453,7 +1448,8 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     }
   }
 
-  String _getGenderText(String gender) {
+  /*
+  String _getGenderText(String gender) { // 사용되지 않음
     switch (gender) {
       case 'male':
         return '남성';
@@ -1465,6 +1461,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
         return '알 수 없음';
     }
   }
+  */
 
   String _getSkillLevelText(int? skillLevel) {
     switch (skillLevel) {
@@ -1487,43 +1484,6 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   
   @override
   Widget build(BuildContext context) {
-    // 데이터 검증
-    if (widget.matching == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('매칭 상세'),
-          backgroundColor: AppColors.surface,
-          elevation: 0,
-        ),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: AppColors.error,
-              ),
-              SizedBox(height: 16),
-              Text(
-                '매칭 정보를 불러올 수 없습니다',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                '잠시 후 다시 시도해주세요',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
 
     final isHost = widget.currentUser.email == widget.matching.host.email;
     
@@ -2329,13 +2289,15 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     }
   }
 
-  // 매칭 참여 함수
+  // 매칭 참여 함수 (사용되지 않음)
+  /*
   void _joinMatching() async {
-    final success = await MatchingService().joinMatching(widget.matching, widget.currentUser);
+    // final success = await MatchingService().joinMatching(widget.matching, widget.currentUser);
+    final success = false; // 임시로 false 반환
     if (success) {
       setState(() {
-        _isParticipating = true;
-        _hasApplied = false;
+        // _isParticipating = true;
+        // _hasApplied = false;
       });
       
       // 실제 운영환경에서는 API 호출로 백엔드가 자동 처리함
@@ -2355,13 +2317,16 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
       );
     }
   }
+  */
 
-  // 매칭 취소 함수
+  // 매칭 취소 함수 (사용되지 않음)
+  /*
   void _cancelMatching() async {
-    final success = await MatchingService().cancelMatching(widget.matching, widget.currentUser);
+    // final success = await MatchingService().cancelMatching(widget.matching, widget.currentUser);
+    final success = false; // 임시로 false 반환
     if (success) {
       setState(() {
-        _isParticipating = false;
+        // _isParticipating = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -2378,6 +2343,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
       );
     }
   }
+  */
 
   // 매칭 완료 함수
   void _completeMatching() {

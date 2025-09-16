@@ -48,12 +48,12 @@ class MatchingDataService {
         );
       } catch (e) {
         retryCount++;
-        print('매칭 목록 조회 오류 (시도 $retryCount/$maxRetries): $e');
+        // 매칭 목록 조회 오류 (시도 $retryCount/$maxRetries): $e
         
         if (retryCount >= maxRetries) {
-          print('최대 재시도 횟수 초과, Mock 데이터 사용');
-          // API 실패 시 Mock 데이터 반환 (오프라인 모드)
-          return _createMockMatchings();
+          // 최대 재시도 횟수 초과, 빈 목록 반환
+          // API 실패 시 빈 목록 반환
+          return [];
         }
         
         // 재시도 전 대기
@@ -61,7 +61,7 @@ class MatchingDataService {
       }
     }
     
-    return _createMockMatchings();
+    return [];
   }
 
   // 매칭 상세 조회
@@ -185,9 +185,8 @@ class MatchingDataService {
   // 인증 토큰 가져오기
   static Future<String?> _getAuthToken() async {
     try {
-      // 실제 인증 토큰 사용
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('playmate_auth_token') ?? 'temp_jwt_token';
+      // 개발 중: JWT 토큰 문제로 인해 temp_jwt_token 사용
+      return 'temp_jwt_token';
       
       // 실제 운영환경에서는 아래 코드 사용
       /*
@@ -216,70 +215,4 @@ class MatchingDataService {
     }
   }
 
-  // Mock 데이터 생성 (오프라인 모드용)
-  static List<Matching> _createMockMatchings() {
-    final now = DateTime.now();
-    final List<Matching> matchings = [];
-
-    // 다양한 매칭 데이터 생성
-    for (int i = 1; i <= 10; i++) {
-      final matching = _createMockMatching(
-        id: i,
-        courtName: '테니스 코트 $i',
-        date: now.add(Duration(days: i % 7)),
-        gameType: ['mixed', 'male_doubles', 'female_doubles', 'singles'][i % 4],
-        status: ['recruiting', 'confirmed', 'completed', 'cancelled'][i % 4],
-      );
-      matchings.add(matching);
-    }
-
-    return matchings;
-  }
-
-  // 개별 Mock 매칭 생성
-  static Matching _createMockMatching({
-    required int id,
-    required String courtName,
-    required DateTime date,
-    String gameType = 'mixed',
-    String status = 'recruiting',
-    int maleRecruitCount = 2,
-    int femaleRecruitCount = 2,
-    int minLevel = 1,
-    int maxLevel = 5,
-    int? minAge,
-    int? maxAge,
-    bool isFollowersOnly = false,
-  }) {
-    final host = User(
-      id: id + 1000,
-      email: 'host$id@example.com',
-      nickname: '호스트$id',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-
-    return Matching(
-      id: id,
-      type: 'host',
-      courtName: courtName,
-      courtLat: 37.5665 + (id * 0.001),
-      courtLng: 126.9780 + (id * 0.001),
-      date: date,
-      timeSlot: '10:00~12:00',
-      minLevel: minLevel,
-      maxLevel: maxLevel,
-      minAge: minAge,
-      maxAge: maxAge,
-      gameType: gameType,
-      maleRecruitCount: maleRecruitCount,
-      femaleRecruitCount: femaleRecruitCount,
-      status: status,
-      isFollowersOnly: isFollowersOnly,
-      host: host,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      recoveryCount: 0,
-    );
-  }
 }

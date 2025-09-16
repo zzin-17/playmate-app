@@ -378,10 +378,12 @@ class WebSocketService {
     _startReconnectTimer();
   }
 
-  // 연결 해제 처리
+  // 연결 해제 처리 (사용되지 않음)
+  /*
   void _handleDisconnection() {
     _isConnected = false;
     _statusController?.add('disconnected');
     _startReconnectTimer();
   }
+  */
 }

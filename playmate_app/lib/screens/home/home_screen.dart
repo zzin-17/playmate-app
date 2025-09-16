@@ -1936,7 +1936,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // 필터링된 매칭 목록 반환
+  // 필터링된 매칭 목록 반환 (사용되지 않음)
+  /*
   List<Matching> _getFilteredMatchings() {
     List<Matching> filtered = _mockMatchings;
     
@@ -2003,6 +2004,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     return filtered;
   }
+  */
 
   // 필터 바텀시트 표시
   void _showFilterBottomSheet(BuildContext context) {
@@ -2926,7 +2928,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return 0;
   }
 
-  // 선택된 구력 범위 내의 모든 구력 텍스트 반환
+  // 선택된 구력 범위 내의 모든 구력 텍스트 반환 (사용되지 않음)
+  /*
   List<String> _getSelectedSkillLevels(String? startSkill, String? endSkill) {
     final skillLevels = [
       '6개월', '1년', '2년', '3년', '4년', '5년',
@@ -2956,6 +2959,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     return selectedSkills;
   }
+  */
 
   // 선택된 시간 범위 내의 모든 시간 반환
   List<int> _getSelectedTimeHours(String? startTime, String? endTime) {
@@ -2981,7 +2985,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return selectedHours;
   }
 
-  // 필터 그룹 위젯
+  // 필터 그룹 위젯 (사용되지 않음)
+  /*
   Widget _buildFilterGroups() {
     // 필터를 카테고리별로 분류
     Map<String, List<String>> filterGroups = {
@@ -3047,8 +3052,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ],
     );
   }
+  */
 
-  // 카테고리별 대표 필터 버튼
+  // 카테고리별 대표 필터 버튼 (사용되지 않음)
+  /*
   Widget _buildCategoryFilter(String? filter, String category) {
     IconData icon;
     Color color;
@@ -3204,6 +3211,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     return filter;
   }
+  */
 
   // 필터 버튼 위젯
   Widget _buildFilterButton(String filter) {
@@ -3467,7 +3475,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return '';
   }
 
-  // 위치 필터 적용
+  // 위치 필터 적용 (사용되지 않음)
+  /*
   void _applyLocationFilter(String cityId, String? districtId) {
     setState(() {
       if (districtId == null) {
@@ -3506,6 +3515,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _applyFiltersOnce();
     });
   }
+  */
 
   // 매칭별 위치 정보 반환
   String _getMatchingLocationText(Matching matching) {
@@ -4065,7 +4075,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     // });
   }
 
-  // 매칭 데이터 새로고침
+  // 매칭 데이터 새로고침 (사용되지 않음)
+  /*
   void _refreshMatchingData() {
     if (!mounted) return;
     
@@ -4101,8 +4112,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     });
   }
+  */
 
-  // 새로운 매칭 추가 시뮬레이션
+  // 새로운 매칭 추가 시뮬레이션 (비활성화)
+  /*
   void _simulateNewMatching() {
     final newMatching = Matching(
       id: DateTime.now().millisecondsSinceEpoch,
@@ -4133,8 +4146,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _mockMatchings.insert(0, newMatching);
     print('새로운 매칭 추가 시뮬레이션: ${newMatching.courtName}');
   }
+  */
 
-  // 매칭 상태 변경 시뮬레이션
+  // 매칭 상태 변경 시뮬레이션 (비활성화)
+  /*
   void _simulateStatusChange() {
     if (_mockMatchings.isEmpty) return;
     
@@ -4153,6 +4168,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       print('매칭 상태 변경 시뮬레이션: ${matching.courtName} → 확정');
     }
   }
+  */
 
   // 수동 새로고침
   void _manualRefresh() {
@@ -4733,7 +4749,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return maxAge == 0 ? null : maxAge;
   }
 
-  // 연속된 연령대인지 확인
+  // 연속된 연령대인지 확인 (사용되지 않음)
+  /*
   bool _isConsecutiveAges(List<int> ages) {
     if (ages.length <= 1) return true;
     
@@ -4744,5 +4761,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     return true;
   }
+  */
 
 }

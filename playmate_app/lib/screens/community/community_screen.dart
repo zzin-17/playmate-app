@@ -518,7 +518,8 @@ class _CommunityScreenState extends State<CommunityScreen>
 
 
 
-  Widget _buildSocialPostCard(Post post) {
+  /*
+  Widget _buildSocialPostCard(Post post) { // 사용되지 않음
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -680,6 +681,7 @@ class _CommunityScreenState extends State<CommunityScreen>
       ),
     );
   }
+  */
 
   Widget _buildPostCard(Post post) {
     return Container(
@@ -1163,7 +1165,8 @@ class _CommunityScreenState extends State<CommunityScreen>
   }
 
   /// 페이지별 게시글 데이터 로드 (API 우선, 실패 시 Mock 데이터)
-  Future<List<Post>> _getPostsForPage(int page) async {
+  /*
+  Future<List<Post>> _getPostsForPage(int page) async { // 사용되지 않음
     try {
       // 실제 API 호출
       final posts = await _communityService.getPosts(
@@ -1179,6 +1182,7 @@ class _CommunityScreenState extends State<CommunityScreen>
       return _getMockPostsForPage(page);
     }
   }
+  */
 
   /// 페이지별 목업 데이터 생성 (폴백용)
   List<Post> _getMockPostsForPage(int page) {
@@ -1224,7 +1228,8 @@ class _CommunityScreenState extends State<CommunityScreen>
 
 
   /// 시간 차이를 문자열로 변환
-  String _getTimeAgo(DateTime dateTime) {
+  /*
+  String _getTimeAgo(DateTime dateTime) { // 사용되지 않음
     final now = DateTime.now();
     final difference = now.difference(dateTime);
     
@@ -1238,6 +1243,7 @@ class _CommunityScreenState extends State<CommunityScreen>
       return '방금 전';
     }
   }
+  */
 
   /// 내 게시글 로드
   Future<void> _loadMyPosts() async {
@@ -1299,7 +1305,7 @@ class _CommunityScreenState extends State<CommunityScreen>
 
   // 게시글 수정
   void _editPost(Post post) async {
-    final result = await Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => EditPostScreen(
           post: post,

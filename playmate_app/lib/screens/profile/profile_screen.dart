@@ -248,7 +248,7 @@ class ProfileScreen extends StatelessWidget {
             radius: 50,
             backgroundColor: AppColors.primary.withValues(alpha: 0.1),
             child: Text(
-              user?.nickname?.substring(0, 1) ?? 'U',
+              user?.nickname.substring(0, 1) ?? 'U',
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -386,7 +386,8 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  void _navigateToTransactions(BuildContext context) {
+  /*
+  void _navigateToTransactions(BuildContext context) { // 사용되지 않음
     // 내 거래 페이지로 이동
     // TODO: 내 거래 페이지 구현
     ScaffoldMessenger.of(context).showSnackBar(
@@ -397,6 +398,7 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+  */
 
   Widget _buildMenuSection({
     required String title,

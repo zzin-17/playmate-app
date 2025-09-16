@@ -182,7 +182,7 @@ class KakaoApiService {
       final roadAddressName = doc['road_address_name']?.toString() ?? '';
       final phone = doc['phone']?.toString() ?? '';
       final categoryName = doc['category_name']?.toString() ?? '';
-      final placeUrl = doc['place_url']?.toString() ?? '';
+      // final placeUrl = doc['place_url']?.toString() ?? '';
       
       // 좌표 정보
       final x = double.tryParse(doc['x']?.toString() ?? '0') ?? 0.0;

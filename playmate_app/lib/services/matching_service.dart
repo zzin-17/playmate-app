@@ -134,7 +134,8 @@ class MatchingService {
   }
 
   // Mock 데이터에서 매칭 조회 (임시 구현)
-  Matching? _getMockMatchingById(int matchingId) {
+  /*
+  Matching? _getMockMatchingById(int matchingId) { // 사용되지 않음
     final now = DateTime.now();
     
     // 홈 화면에서 사용하는 mock 매칭 데이터와 동일한 구조
@@ -288,6 +289,7 @@ class MatchingService {
       return null;
     }
   }
+  */
 
   // 매칭 참여 시 호스트에게 알림 생성
   Future<bool> joinMatchingWithNotification(Matching matching, User guest) async {

@@ -36,7 +36,8 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   // 매칭 생성 화면으로 이동
-  Future<void> _navigateToCreateMatching() async {
+  /*
+  Future<void> _navigateToCreateMatching() async { // 사용되지 않음
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const CreateMatchingScreen(),
@@ -50,6 +51,7 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
   }
+  */
   
   final List<Widget> _pages = [
     // index 1: 채팅
@@ -60,7 +62,8 @@ class _MainScreenState extends State<MainScreen> {
     const ProfileScreen(),
   ];
 
-  String _getTabName(int index) {
+  /*
+  String _getTabName(int index) { // 사용되지 않음
     switch (index) {
       case 0: return '홈';
       case 1: return '커뮤니티';
@@ -68,6 +71,7 @@ class _MainScreenState extends State<MainScreen> {
       default: return '알 수 없음';
     }
   }
+  */
 
   Widget? _buildFloatingActionButton() {
     switch (_currentIndex) {

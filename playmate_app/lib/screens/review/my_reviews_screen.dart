@@ -225,7 +225,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> with TickerProviderSt
                   radius: 20,
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   child: Text(
-                    review.reviewer?.nickname?[0].toUpperCase() ?? '?',
+                    review.reviewer?.nickname[0].toUpperCase() ?? '?',
                     style: AppTextStyles.body.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.bold,

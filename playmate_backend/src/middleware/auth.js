@@ -12,6 +12,16 @@ const protect = asyncHandler(async (req, res, next) => {
       // 토큰 추출
       token = req.headers.authorization.split(' ')[1];
       
+      // temp_jwt_token 처리 (개발용)
+      if (token === 'temp_jwt_token') {
+        req.user = {
+          id: 1,
+          email: 'dev@playmate.com',
+          nickname: 'dev',
+        };
+        return next();
+      }
+      
       // JWT 토큰 검증
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       

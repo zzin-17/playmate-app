@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../widgets/common/app_button.dart';
 import '../../models/matching.dart';
 import '../../models/user.dart';
@@ -66,14 +65,17 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
   ];
 
   /// 인증 토큰 가져오기
-  Future<String?> _getAuthToken() async {
+  /*
+  Future<String?> _getAuthToken() async { // 사용되지 않음
     try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('playmate_auth_token');
+      // final prefs = await SharedPreferences.getInstance();
+      // return prefs.getString('playmate_auth_token');
+      return null; // 임시로 null 반환
     } catch (e) {
       return null;
     }
   }
+  */
 
   @override
   void initState() {
@@ -582,10 +584,10 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
                 (value) => setState(() => _selectedStartTime = value!),
                 '시작 시간',
                 validator: (value) {
-                  if (_selectedStartTime == null) {
+                  if (_selectedStartTime.isEmpty) {
                     return '시작 시간을 선택해주세요';
                   }
-                  if (_selectedEndTime != null && _selectedStartTime.compareTo(_selectedEndTime) >= 0) {
+                  if (_selectedEndTime.isNotEmpty && _selectedStartTime.compareTo(_selectedEndTime) >= 0) {
                     return '시작 시간이 종료 시간보다 늦을 수 없습니다';
                   }
                   return null;
@@ -601,10 +603,10 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
                 (value) => setState(() => _selectedEndTime = value!),
                 '종료 시간',
                 validator: (value) {
-                  if (_selectedEndTime == null) {
+                  if (_selectedEndTime.isEmpty) {
                     return '종료 시간을 선택해주세요';
                   }
-                  if (_selectedStartTime != null && _selectedStartTime.compareTo(_selectedEndTime) >= 0) {
+                  if (_selectedStartTime.isNotEmpty && _selectedStartTime.compareTo(_selectedEndTime) >= 0) {
                     return '종료 시간이 시작 시간보다 빠를 수 없습니다';
                   }
                   return null;
@@ -1175,7 +1177,8 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
   }
 
   // 드롭다운 필드 빌더 메서드
-  Widget _buildDropdownField({
+  /*
+  Widget _buildDropdownField({ // 사용되지 않음
     required String label,
     required String? value,
     required List<String> options,
@@ -1231,6 +1234,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
       ],
     );
   }
+  */
 
   // 연령대 범위에서 최소 연령 추출
   int? _getMinAgeFromRanges() {
@@ -1270,7 +1274,8 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
     }
   }
 
-  // 연속된 연령대인지 확인
+  // 연속된 연령대인지 확인 (사용되지 않음)
+  /*
   bool _isConsecutiveAges(List<int> ages) {
     if (ages.length <= 1) return true;
     
@@ -1281,6 +1286,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
     }
     return true;
   }
+  */
 
   // 연령대 범위 표시 텍스트 생성
   String _getAgeRangeDisplayText() {

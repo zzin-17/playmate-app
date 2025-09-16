@@ -1513,7 +1513,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
 
   // 읽음 확인 전송
-  void _sendReadReceipt() {
+  /*
+  void _sendReadReceipt() { // 사용되지 않음
     try {
       WebSocketService.instance.sendReadReceipt(
         matchingId: widget.matching.id,
@@ -1524,6 +1525,7 @@ class _ChatScreenState extends State<ChatScreen> {
       print('읽음 확인 전송 실패: $e');
     }
   }
+  */
 
   // 매칭 확정 취소 함수
   void _cancelMatchingConfirmation() {

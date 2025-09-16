@@ -9,7 +9,6 @@ enum LogLevel {
 }
 
 class Logger {
-  static const String _appName = 'PlayMate';
   static LogLevel _minLevel = kDebugMode ? LogLevel.debug : LogLevel.info;
   
   static void setMinLevel(LogLevel level) {
@@ -91,7 +90,6 @@ class Logger {
   }
   
   static void apiResponse(String method, String url, int statusCode, {String? body, Duration? duration}) {
-    final status = statusCode >= 200 && statusCode < 300 ? 'SUCCESS' : 'ERROR';
     final durationStr = duration != null ? ' (${duration.inMilliseconds}ms)' : '';
     
     if (statusCode >= 200 && statusCode < 300) {
