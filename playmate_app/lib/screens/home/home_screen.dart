@@ -7,14 +7,11 @@ import '../../constants/app_text_styles.dart';
 import '../../models/matching.dart';
 import '../../models/user.dart';
 import '../../models/location.dart';
-import '../matching/create_matching_screen.dart';
 import '../matching/matching_detail_screen.dart';
 import '../matching/edit_matching_screen.dart';
 import '../notification/notification_list_screen.dart';
 import '../../services/matching_notification_service.dart';
 import '../../services/matching_data_service.dart';
-import '../../services/tennis_court_service.dart';
-import '../../models/tennis_court.dart';
 
 
 import '../../widgets/common/app_logo.dart';
@@ -79,13 +76,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void didUpdateWidget(HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     
-    print('🎯 didUpdateWidget 호출됨');
-    print('🎯 widget.newMatching: ${widget.newMatching?.courtName}');
-    print('🎯 oldWidget.newMatching: ${oldWidget.newMatching?.courtName}');
-    
     // 새 매칭이 추가되면 처리 - build 완료 후 실행
     if (widget.newMatching != null && oldWidget.newMatching != widget.newMatching) {
-      print('🎯 새 매칭 감지됨! _addNewMatching 호출 예정');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _addNewMatching(widget.newMatching!);
@@ -128,12 +120,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String _searchQuery = '';
   List<Matching> _filteredMatchings = [];
   List<String> _searchHistory = [];
-  bool _showSearchHistory = false;
-
   
   // UI 상태 변수들
   bool _isLoading = false;
-  String? _errorMessage;
   
   // 실시간 업데이트 관련 변수들
   Timer? _autoRefreshTimer;
@@ -149,11 +138,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _loadMatchingsFromAPI() async {
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
     
     try {
-      print('🔄 백엔드 API에서 매칭 데이터 로딩 시작...');
       
       // 백엔드 API에서 매칭 목록 가져오기
       final matchings = await MatchingDataService.getMatchings(
@@ -180,7 +167,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (matchings.isNotEmpty) {
           // 백엔드 데이터를 직접 사용 (상태 변경 등이 반영된 최신 데이터)
           _mockMatchings = matchings;
-          print('🔄 백엔드 데이터로 _mockMatchings 업데이트: ${_mockMatchings.length}개');
         } else if (_mockMatchings.isEmpty) {
           // API 데이터도 없고 기존 데이터도 없으면 빈 리스트 유지
           _mockMatchings = [];
@@ -191,10 +177,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       
       // 필터링된 목록 초기화
       _filteredMatchings = List.from(_mockMatchings);
-      print('🔄 _filteredMatchings 업데이트됨: ${_filteredMatchings.length}개');
-      for (var matching in _filteredMatchings) {
-        print('🔄 필터링된 매칭: ${matching.courtName} (ID: ${matching.id}, minAge: ${matching.minAge}, maxAge: ${matching.maxAge})');
-      }
       
       // 초기 필터 적용 (동기적으로 실행)
       _performFiltering();
@@ -203,11 +185,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // 정렬 적용
       _sortMatchings();
       
-      // 필터링 결과 확인 로그
-      print('🔄 새로고침 후 최종 _filteredMatchings 개수: ${_filteredMatchings.length}');
-      for (var matching in _filteredMatchings) {
-        print('🔄 최종 필터링된 매칭: ${matching.courtName} (ID: ${matching.id})');
-      }
       
     } catch (e) {
       print('❌ 백엔드 API 로딩 실패: $e');
@@ -219,7 +196,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       
       setState(() {
         _isLoading = false;
-        _errorMessage = '서버 연결에 실패했습니다. 오프라인 모드로 실행됩니다.';
       });
     }
   }
@@ -231,132 +207,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   //   ];
   // }
 
-  // 매칭 데이터 자동 생성 함수
-  Matching _createMockMatching({
-    required int id,
-    required String courtName,
-    required double courtLat,
-    required double courtLng,
-    required DateTime date,
-    required String timeSlot,
-    required int minLevel,
-    required int maxLevel,
-    int? minAge,
-    int? maxAge,
-    required String gameType,
-    required int maleRecruitCount,
-    required int femaleRecruitCount,
-    required String status,
-    required User host,
-    bool isFollowersOnly = false,
-  }) {
-    final totalRecruitCount = maleRecruitCount + femaleRecruitCount;
-    
-    // 자동으로 게스트와 확정 인원 생성
-    List<User> guests = [];
-    List<int> confirmedUserIds = [];
-    
-    if (status == 'recruiting' || status == 'confirmed') {
-      // 모집중/확정 상태면 자동으로 게스트 생성
-      int guestId = id * 10; // 고유한 게스트 ID 생성
-      
-      // 확정 인원 수를 다양하게 설정 (테스트용)
-      int confirmedCount = 0;
-      
-      // ID별로 다른 확정 인원 수 설정
-      switch (id) {
-        case 1: // 잠실종합운동장 - 100% 확정 (2명)
-          confirmedCount = totalRecruitCount;
-          break;
-        case 2: // 양재시민의숲 - 50% 확정 (1명)
-          confirmedCount = totalRecruitCount ~/ 2;
-          break;
-        case 3: // 올림픽공원 - 0% 확정 (0명)
-          confirmedCount = 0;
-          break;
-        case 4: // 한강공원 - 100% 확정 (1명)
-          confirmedCount = totalRecruitCount;
-          break;
-        case 5: // 분당 - 50% 확정 (1명)
-          confirmedCount = totalRecruitCount ~/ 2;
-          break;
-        case 6: // 인천 - 100% 확정 (2명)
-          confirmedCount = totalRecruitCount;
-          break;
-        default:
-          confirmedCount = 0;
-      }
-      
-      // 확정된 인원만큼 게스트 생성 및 확정 처리
-      int confirmedMale = 0;
-      
-      // 남성 모집 인원 중 확정된 수만큼 생성
-      for (int i = 0; i < maleRecruitCount && confirmedMale < confirmedCount; i++) {
-        guests.add(User(
-          id: guestId + i,
-          email: 'guest${guestId + i}@example.com',
-          nickname: '게스트${guestId + i}',
-          gender: 'male',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
-        confirmedUserIds.add(guestId + i);
-        confirmedMale++;
-        confirmedCount--;
-      }
-      
-      // 여성 모집 인원 중 확정된 수만큼 생성
-      for (int i = 0; i < femaleRecruitCount && confirmedCount > 0; i++) {
-        guests.add(User(
-          id: guestId + maleRecruitCount + i,
-          email: 'guest${guestId + maleRecruitCount + i}@example.com',
-          nickname: '게스트${guestId + maleRecruitCount + i}',
-          gender: 'female',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ));
-        confirmedUserIds.add(guestId + maleRecruitCount + i);
-        confirmedCount--;
-      }
-    }
-    
-    // 상태를 동적으로 결정 (확정 인원에 따라)
-    String actualStatus = status;
-    if (status == 'recruiting' || status == 'confirmed') {
-      if (confirmedUserIds.length == totalRecruitCount) {
-        actualStatus = 'confirmed'; // 100% 확정 완료
-      } else if (confirmedUserIds.length > 0) {
-        actualStatus = 'recruiting'; // 일부만 확정
-      } else {
-        actualStatus = 'recruiting'; // 미확정
-      }
-    }
-    
-    return Matching(
-      id: id,
-      type: 'host',
-      courtName: courtName,
-      courtLat: courtLat,
-      courtLng: courtLng,
-      date: date,
-      timeSlot: timeSlot,
-              minLevel: minLevel,
-        maxLevel: maxLevel,
-        minAge: minAge,
-        maxAge: maxAge,
-        gameType: gameType,
-      maleRecruitCount: maleRecruitCount,
-      femaleRecruitCount: femaleRecruitCount,
-      status: actualStatus, // 동적으로 결정된 상태 사용
-      host: host,
-      guests: guests,
-      confirmedUserIds: confirmedUserIds,
-      isFollowersOnly: isFollowersOnly,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      recoveryCount: 0,
-    );
-  }
 
   // 새 매칭 추가 메서드
   void _addNewMatching(Matching newMatching) {
@@ -403,7 +253,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (mounted) {
         setState(() {
           _searchQuery = _searchController.text.trim();
-          _showSearchHistory = _searchQuery.isEmpty && _searchHistory.isNotEmpty;
         });
         
         // 검색어가 변경될 때마다 히스토리 업데이트
@@ -503,14 +352,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
   
   // 검색어 선택
-  void _selectSearchHistory(String query) {
-    setState(() {
-      _searchController.text = query;
-      _searchQuery = query;
-      _showSearchHistory = false;
-      _applyFiltersOnce();
-    });
-  }
   
   // 검색 히스토리 삭제
   void _removeFromSearchHistory(String query) {
@@ -538,7 +379,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
     
     // 실제 필터링은 비동기로 처리 (UI 반응성 향상)
@@ -991,7 +831,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       _addToSearchHistory(value.trim());
                       setState(() {
                         _searchQuery = value.trim();
-                        _showSearchHistory = false;
                         _applyFiltersOnce();
                       });
                     }
@@ -1706,26 +1545,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     print('매칭 상태 변경: ${matching.courtName} (${matching.id}) ${matching.actualStatus} → $newStatus');
   }
 
-  // 상태 텍스트 반환 메서드 (동적 상태 기반)
-  String _getStatusText(Matching matching) {
-    // 실제 상태에 따라 동적으로 결정
-    final actualStatus = matching.actualStatus;
-    
-    switch (actualStatus) {
-      case 'recruiting':
-        return '모집중';
-      case 'confirmed':
-        return '확정';
-      case 'completed':
-        return '완료';
-      case 'cancelled':
-        return '취소';
-      case 'deleted':
-        return '삭제됨';
-      default:
-        return '알 수 없음';
-    }
-  }
 
   // 상태 텍스트 반환 메서드 (상태 문자열 직접 전달)
   String _getStatusTextByStatus(String status) {
@@ -1745,52 +1564,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // 관련 데이터 확인 메서드
-  bool _checkRelatedData(Matching matching) {
-    // 게스트가 있는 경우
-    if (matching.guests != null && matching.guests!.isNotEmpty) {
-      return true;
-    }
-    
-    // 채팅 이력이 있는 경우 (실제로는 API 호출이 필요하지만, 현재는 모의 데이터)
-    // 여기서는 간단하게 게스트 수로 판단
-    if (matching.maleRecruitCount > 0 || matching.femaleRecruitCount > 0) {
-      return true;
-    }
-    
-    // 상태가 모집중이 아닌 경우 (확정, 완료 등)
-    if (matching.actualStatus != 'recruiting') {
-      return true;
-    }
-    
-    return false;
-  }
 
-  // 관련 데이터 경고 메시지 반환
-  String _getRelatedDataWarning(Matching matching) {
-    final warnings = <String>[];
-    
-    // 게스트가 있는 경우
-    if (matching.guests != null && matching.guests!.isNotEmpty) {
-      warnings.add('신청자가 ${matching.guests!.length}명 있습니다');
-    }
-    
-    // 상태가 모집중이 아닌 경우
-    if (matching.actualStatus != 'recruiting') {
-      warnings.add('매칭이 ${matching.actualStatusText} 상태입니다');
-    }
-    
-    // 채팅 이력이 있을 가능성이 있는 경우
-    if (matching.maleRecruitCount > 0 || matching.femaleRecruitCount > 0) {
-      warnings.add('채팅 이력이 있을 수 있습니다');
-    }
-    
-    if (warnings.isEmpty) {
-      return '관련 데이터가 있을 수 있습니다';
-    }
-    
-    return '⚠️ ${warnings.join(', ')}';
-  }
 
   // 카드 배경색 반환 메서드
   Color _getCardBackgroundColor(Matching matching) {
@@ -1821,7 +1595,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildMatchingCard(Matching matching) {
     final authProvider = context.read<AuthProvider>();
     final currentUser = authProvider.currentUser;
-    final isHost = currentUser != null && matching.host.id == currentUser.id;
+    final isHost = currentUser != null && matching.host.email == currentUser.email;
     
     return GestureDetector(
       onTap: () {
@@ -2129,6 +1903,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               style: AppTextStyles.body.copyWith(
                                 color: AppColors.textSecondary,
                                 fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // 게스트 비용 (오른쪽 정렬)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.attach_money, color: AppColors.primary, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              matching.guestCostText,
+                              style: AppTextStyles.body.copyWith(
+                                color: AppColors.primary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],

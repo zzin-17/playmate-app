@@ -60,22 +60,67 @@ class ChatService {
     return [];
   }
 
+  /// 백엔드 채팅방 데이터를 ChatRoom 모델로 변환
+  ChatRoom _convertBackendRoomToChatRoom(Map<String, dynamic> json, User currentUser) {
+    // 매칭 정보를 가져와서 필요한 데이터 구성
+    final matchingId = json['matchingId'] as int;
+    
+    print('🔍 _convertBackendRoomToChatRoom - matchingId: $matchingId');
+    
+    // 임시 데이터 (실제로는 매칭 정보를 조회해야 함)
+    return ChatRoom(
+      matchingId: matchingId,
+      courtName: '테니스장', // 실제로는 매칭 정보에서 가져와야 함
+      date: DateTime.now(),
+      timeSlot: '18:00~20:00',
+      myRole: 'guest', // 실제로는 참여자 정보에서 확인해야 함
+      partner: User(
+        id: 1,
+        email: 'partner@example.com',
+        nickname: '상대방',
+        gender: 'male',
+        birthYear: 1990,
+        region: '서울',
+        skillLevel: 3,
+        startYearMonth: '2020-01',
+        preferredCourt: '실내',
+        preferredTime: ['18:00~20:00'],
+        playStyle: '공격적',
+        hasLesson: false,
+        mannerScore: 4.0,
+        profileImage: null,
+        followingIds: [],
+        followerIds: [],
+        reviewCount: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+      lastMessageAt: DateTime.now(),
+      unreadCount: 0,
+      status: 'recruiting',
+    );
+  }
+
   /// 실제 채팅방 API에서 조회
   Future<List<ChatRoom>> _getChatRoomsFromAPI(User currentUser) async {
     try {
+      print('🔍 채팅방 API 호출 시작');
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:3000/api/chat/rooms'),
+        Uri.parse('http://192.168.6.100:3000/api/chat/rooms'),
         headers: {
-          'Authorization': 'Bearer temp_jwt_token',
+          'Authorization': 'Bearer ${await _getAuthToken()}',
           'Content-Type': 'application/json',
         },
       );
       
+      print('🔍 채팅방 API 응답: ${response.statusCode}');
+      
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        print('🔍 채팅방 API 데이터: $data');
         if (data['success'] == true) {
           final rooms = (data['data'] as List)
-              .map((json) => ChatRoom.fromJson(json))
+              .map((json) => _convertBackendRoomToChatRoom(json, currentUser))
               .toList();
           
           // 서버 방 목록을 로컬에도 저장 (UX 향상)
@@ -139,7 +184,7 @@ class ChatService {
       final response = await http.post(
         Uri.parse('http://10.0.2.2:3000/api/chat/rooms/direct'),
         headers: {
-          'Authorization': 'Bearer temp_jwt_token',
+          'Authorization': 'Bearer ${await _getAuthToken()}',
           'Content-Type': 'application/json',
         },
         body: json.encode({
@@ -249,7 +294,7 @@ class ChatService {
           },
         ),
         headers: {
-          'Authorization': 'Bearer temp_jwt_token',
+          'Authorization': 'Bearer ${await _getAuthToken()}',
           'Content-Type': 'application/json',
         },
       );
@@ -289,7 +334,7 @@ class ChatService {
       final response = await http.post(
         Uri.parse('http://10.0.2.2:3000/api/chat/rooms/$roomId/messages'),
         headers: {
-          'Authorization': 'Bearer temp_jwt_token',
+          'Authorization': 'Bearer ${await _getAuthToken()}',
           'Content-Type': 'application/json',
         },
         body: json.encode({

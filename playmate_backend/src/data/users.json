@@ -1,0 +1,19 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "email": "user1@playmate.com",
+      "password": "$2b$10$uXu/YgXuJw1LUhkaMO5XOOUcy6L6CRQyNSP0z4qd5iUVlm.3X9VJm",
+      "nickname": "user1",
+      "profileImage": null,
+      "bio": "",
+      "birthYear": 1990,
+      "gender": "male",
+      "location": "",
+      "isVerified": false,
+      "createdAt": "2025-09-16T02:37:15.161Z",
+      "updatedAt": "2025-09-16T02:37:15.161Z"
+    }
+  ],
+  "nextId": 2
+}

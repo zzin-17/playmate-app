@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { registerUser, loginUser, getMe } = require('../controllers/authController');
+const { registerUser, loginUser, getCurrentUser, getMe, updateProfile } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
 // 인증 관련 라우트
@@ -11,6 +11,9 @@ router.route('/login')
   .post(loginUser);
 
 router.route('/me')
-  .get(protect, getMe);
+  .get(protect, getCurrentUser);
+
+router.route('/profile')
+  .put(protect, updateProfile);
 
 module.exports = router;

@@ -7,6 +7,7 @@ import '../../widgets/common/app_button.dart';
 import '../../services/matching_service.dart';
 import '../../services/matching_state_service.dart';
 import '../../services/matching_data_service.dart';
+import '../../services/user_service.dart';
 
 import '../chat/chat_screen.dart';
 import '../profile/user_profile_screen.dart';
@@ -38,6 +39,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   bool _isHost = false; // 호스트 여부
   String _currentMatchingStatus = 'recruiting'; // 현재 매칭 상태
   List<int> _confirmedUserIds = []; // 확정된 사용자 ID 목록
+  bool _isFollowingHost = false; // 호스트 팔로우 상태
 
   @override
   void initState() {
@@ -51,11 +53,8 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     // MatchingStateService에서 현재 상태 가져오기
     _currentMatchingStatus = stateService.getMatchingStatus(widget.matching.id);
     
-    // 확정된 상태라면 모든 신청자를 확정된 사용자로 설정
-    if (_currentMatchingStatus == 'confirmed' && _applicants.isNotEmpty) {
-      _confirmedUserIds = _applicants.map((applicant) => applicant['user'].id as int).toList();
-      print('초기화: 확정된 사용자 설정: ${_confirmedUserIds}');
-    }
+    // 신청자 데이터 로드
+    _loadApplicants();
     
     stateService.addStateChangeListener(widget.matching.id, _onMatchingStateChanged);
     
@@ -73,11 +72,64 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     }
   }
 
+  // 호스트 팔로우 상태 확인
+  Future<void> _checkFollowStatus() async {
+    try {
+      final userService = UserService();
+      _isFollowingHost = await userService.isFollowing(widget.matching.host.id);
+      print('호스트 팔로우 상태: $_isFollowingHost');
+    } catch (e) {
+      print('팔로우 상태 확인 실패: $e');
+      _isFollowingHost = false;
+    }
+  }
+
+  // 호스트 팔로우하기
+  Future<void> _followHost() async {
+    try {
+      final userService = UserService();
+      final success = await userService.followUser(widget.matching.host.id);
+      
+      if (success) {
+        setState(() {
+          _isFollowingHost = true;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${widget.matching.host.nickname}님을 팔로우했습니다.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('팔로우에 실패했습니다.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      print('팔로우 실패: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('팔로우에 실패했습니다.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
   // 사용자의 매칭 참여 상태 확인
   void _checkUserStatus() async {
     setState(() {
       _isLoading = true;
     });
+    
+    // 팔로워 전용 매칭인 경우에만 팔로우 상태 확인
+    if (widget.matching.isFollowersOnly) {
+      await _checkFollowStatus();
+    }
 
     try {
       final currentUserId = widget.currentUser.id;
@@ -141,47 +193,38 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     return isConfirmed;
   }
   
-  // 임시 신청자 데이터
-  final List<Map<String, dynamic>> _applicants = [
-    {
-      'user': User(
-        id: 3,
-        email: 'applicant1@example.com',
-        nickname: '테니스러버',
-        skillLevel: 3,
-        gender: 'male',
-        birthYear: 1992,
-        startYearMonth: '2020-03',
-        mannerScore: 4.2,
-        ntrpScore: 3.8,
-        reviewCount: 15,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      'status': 'pending', // pending, approved, rejected
-      'message': '안녕하세요! 같이 테니스 치고 싶습니다.',
-      'appliedAt': DateTime.now().subtract(const Duration(hours: 2)),
-    },
-    {
-      'user': User(
-        id: 4,
-        email: 'applicant2@example.com',
-        nickname: '테니스초보',
-        skillLevel: 2,
-        gender: 'female',
-        birthYear: 1995,
-        startYearMonth: '2023-01',
-        mannerScore: 4.5,
-        ntrpScore: 2.5,
-        reviewCount: 8,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
-      'status': 'pending',
-      'message': '초보지만 열심히 하겠습니다!',
-      'appliedAt': DateTime.now().subtract(const Duration(hours: 1)),
-    },
-  ];
+  // 신청자 목록 (API에서 로드)
+  List<Map<String, dynamic>> _applicants = [];
+
+  // 신청자 데이터 로드
+  Future<void> _loadApplicants() async {
+    try {
+      // 현재는 매칭의 guests 데이터를 사용
+      // 실제로는 별도의 신청자 API가 있어야 함
+      if (widget.matching.guests != null && widget.matching.guests!.isNotEmpty) {
+        _applicants = widget.matching.guests!.map((guest) => {
+          'user': guest,
+          'status': 'pending',
+          'message': '신청했습니다.',
+          'appliedAt': DateTime.now(),
+        }).toList();
+      } else {
+        _applicants = [];
+      }
+      
+      // 확정된 상태라면 모든 신청자를 확정된 사용자로 설정
+      if (_currentMatchingStatus == 'confirmed' && _applicants.isNotEmpty) {
+        _confirmedUserIds = _applicants.map((applicant) => applicant['user'].id as int).toList();
+        print('신청자 로드: 확정된 사용자 설정: ${_confirmedUserIds}');
+      }
+      
+      setState(() {});
+      print('신청자 데이터 로드 완료: ${_applicants.length}명');
+    } catch (e) {
+      print('신청자 데이터 로드 실패: $e');
+      _applicants = [];
+    }
+  }
 
   Widget _buildMatchingInfo() {
     return Container(
@@ -371,7 +414,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   // 호스트 정보 섹션
   Widget _buildHostInfo() {
     final host = widget.matching.host;
-    final isHost = widget.currentUser.id == host.id;
+    final isHost = widget.currentUser.email == host.email;
     
     return Container(
       margin: const EdgeInsets.only(top: 16),
@@ -612,12 +655,62 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   }
 
   Widget _buildApplicantsSection() {
-    // 호스트인지 확인
-    final isHost = widget.currentUser.id == widget.matching.host.id;
+    // 호스트인지 확인 (이메일 기반으로 변경)
+    final isHost = widget.currentUser.email == widget.matching.host.email;
     
-    // 호스트가 아니면 빈 컨테이너 반환
+    print('🔍 신청자 목록 권한 체크:');
+    print('  - 현재 사용자 ID: ${widget.currentUser.id}');
+    print('  - 현재 사용자 이메일: ${widget.currentUser.email}');
+    print('  - 현재 사용자 닉네임: ${widget.currentUser.nickname}');
+    print('  - 호스트 ID: ${widget.matching.host.id}');
+    print('  - 호스트 이메일: ${widget.matching.host.email}');
+    print('  - 호스트 닉네임: ${widget.matching.host.nickname}');
+    print('  - isHost: $isHost');
+    print('  - 신청자 수: ${_applicants.length}');
+    
+    // 호스트가 아니면 신청자 수만 표시
     if (!isHost) {
-      return const SizedBox.shrink();
+      return Container(
+        margin: const EdgeInsets.only(top: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.cardBorder),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.people,
+              color: AppColors.primary,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '신청자 목록',
+              style: AppTextStyles.h3.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_applicants.length}명 신청',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
     }
     
     return Container(
@@ -841,7 +934,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
             ),
             
             // 호스트만 채팅하기 버튼 표시 (상태와 관계없이)
-            if (widget.currentUser.id == widget.matching.host.id) ...[
+            if (widget.currentUser.email == widget.matching.host.email) ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -879,7 +972,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   // 확정된 게스트 목록 섹션
   Widget _buildConfirmedGuestsSection() {
     // 호스트인지 확인
-    final isHost = widget.currentUser.id == widget.matching.host.id;
+    final isHost = widget.currentUser.email == widget.matching.host.email;
     
     // 호스트가 아니거나 확정된 게스트가 없으면 빈 컨테이너 반환
     if (!isHost || widget.matching.confirmedCount == 0) {
@@ -1432,7 +1525,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
       );
     }
 
-    final isHost = widget.currentUser.id == widget.matching.host.id;
+    final isHost = widget.currentUser.email == widget.matching.host.email;
     
     // 매칭 상태 확인
     final matchingStatus = widget.matching.status;
@@ -1561,13 +1654,72 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
 
 
   // 채팅 시작 함수
-  void _startChat() {
+  Future<void> _startChat() async {
+    final isHost = widget.currentUser.email == widget.matching.host.email;
+    final isApplicant = _applicants.any((applicant) => applicant['user'].email == widget.currentUser.email);
+    
+    print('🔍 채팅 권한 체크:');
+    print('  - 현재 사용자 ID: ${widget.currentUser.id}');
+    print('  - 현재 사용자 이메일: ${widget.currentUser.email}');
+    print('  - 현재 사용자 닉네임: ${widget.currentUser.nickname}');
+    print('  - 호스트 ID: ${widget.matching.host.id}');
+    print('  - 호스트 이메일: ${widget.matching.host.email}');
+    print('  - 호스트 닉네임: ${widget.matching.host.nickname}');
+    print('  - isHost: $isHost');
+    print('  - isApplicant: $isApplicant');
+    
+    // 권한 체크: 
+    // 1. 호스트는 항상 채팅 가능
+    // 2. 팔로워만 모집인 경우: 팔로워이거나 신청자여야 함
+    // 3. 일반 모집인 경우: 누구나 호스트와 1:1 채팅 가능
+    if (!isHost) {
+      if (widget.matching.isFollowersOnly) {
+        // 팔로워만 모집인 경우: 팔로워이거나 신청자여야 함
+        if (!_isFollowingHost && !isApplicant) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('팔로워만 모집입니다. 호스트를 팔로우하거나 신청해주세요.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+          return;
+        }
+      }
+      // 일반 모집인 경우: 추가 권한 체크 없음 (누구나 호스트와 1:1 채팅 가능)
+    }
+    
+    // 호스트인 경우: 첫 번째 신청자와 채팅 (신청자가 있는 경우)
+    // 게스트인 경우: 호스트와 채팅
+    User? chatPartner;
+    
+    if (isHost) {
+      // 호스트: 첫 번째 신청자와 채팅
+      if (_applicants.isNotEmpty) {
+        chatPartner = _applicants.first['user'] as User;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('신청자가 없습니다.'),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+        return;
+      }
+    } else {
+      // 게스트: 호스트와 채팅
+      chatPartner = widget.matching.host;
+      
+      // 게스트가 채팅을 시작하면 신청자로 등록
+      await _applyToMatching();
+    }
+    
     // 채팅 화면으로 이동
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ChatScreen(
           matching: widget.matching,
           currentUser: widget.currentUser,
+          chatPartner: chatPartner, // 채팅 상대방 정보 전달
         ),
       ),
     );
@@ -1580,7 +1732,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   // 상태별 안내 메시지 생성
   Widget _buildStatusMessage() {
     final status = _currentMatchingStatus;
-    final isHost = widget.matching.host.id == widget.currentUser.id;
+    final isHost = widget.matching.host.email == widget.currentUser.email;
     
     switch (status) {
       case 'recruiting':
@@ -1727,40 +1879,139 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   // 상태별 액션 버튼 생성
   List<Widget> _buildActionButtons() {
     final status = _currentMatchingStatus;
-    final isHost = widget.matching.host.id == widget.currentUser.id;
+    final isHost = widget.matching.host.email == widget.currentUser.email;
     
     switch (status) {
       case 'recruiting':
-        // 모집중: 호스트와 게스트 모두 채팅 가능
-        return [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () => _startChat(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.buttonChat,
-                foregroundColor: AppColors.textSurface,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+        // 모집중: 호스트는 항상 채팅 가능, 게스트는 매칭 타입에 따라
+        if (isHost) {
+          return [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _startChat(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.buttonChat,
+                  foregroundColor: AppColors.textSurface,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.chat, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      '채팅하기',
+                      style: AppTextStyles.body.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.chat, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    '채팅하기',
-                    style: AppTextStyles.body.copyWith(
-                      fontWeight: FontWeight.w600,
+            ),
+          ];
+        } else {
+          // 게스트: 팔로워 전용 매칭인지 확인
+          if (widget.matching.isFollowersOnly) {
+            // 팔로워 전용 매칭: 팔로우 상태에 따라 채팅 버튼 활성화/비활성화
+            if (_isFollowingHost) {
+              return [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _startChat(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.buttonChat,
+                      foregroundColor: AppColors.textSurface,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.chat, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          '채팅하기',
+                          style: AppTextStyles.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
+              ];
+            } else {
+              return [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _followHost(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.person_add, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          '팔로우하기',
+                          style: AppTextStyles.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ];
+            }
+          } else {
+            // 일반 매칭: 팔로우 상태와 관계없이 채팅 가능
+            return [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => _startChat(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.buttonChat,
+                    foregroundColor: AppColors.textSurface,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.chat, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        '채팅하기',
+                        style: AppTextStyles.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-        ];
+            ];
+          }
+        }
         
       case 'confirmed':
         // 확정: 호스트와 게스트 모두 채팅 가능, 호스트는 완료 처리도 가능
@@ -1803,35 +2054,102 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
             ),
           ];
         } else {
-          return [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () => _startChat(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.buttonChat,
-                  foregroundColor: AppColors.textSurface,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.chat, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      '채팅하기',
-                      style: AppTextStyles.body.copyWith(
-                        fontWeight: FontWeight.w600,
+          // 게스트: 팔로워 전용 매칭인지 확인
+          if (widget.matching.isFollowersOnly) {
+            // 팔로워 전용 매칭: 팔로우 상태에 따라 채팅 버튼 활성화/비활성화
+            if (_isFollowingHost) {
+              return [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _startChat(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.buttonChat,
+                      foregroundColor: AppColors.textSurface,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                  ],
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.chat, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          '채팅하기',
+                          style: AppTextStyles.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ];
+            } else {
+              return [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _followHost(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.person_add, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          '팔로우하기',
+                          style: AppTextStyles.body.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ];
+            }
+          } else {
+            // 일반 매칭: 팔로우 상태와 관계없이 채팅 가능
+            return [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => _startChat(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.buttonChat,
+                    foregroundColor: AppColors.textSurface,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.chat, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        '채팅하기',
+                        style: AppTextStyles.body.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ];
+            ];
+          }
         }
         
       case 'completed':
@@ -1971,7 +2289,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   void _writeReview() {
     // 후기 작성 화면으로 이동
     // 현재 사용자가 호스트인지 게스트인지에 따라 대상자 결정
-    final isHost = widget.matching.host.id == widget.currentUser.id;
+    final isHost = widget.matching.host.email == widget.currentUser.email;
     final targetUser = isHost 
         ? (widget.matching.guests?.isNotEmpty == true ? widget.matching.guests!.first : widget.currentUser)
         : widget.matching.host;
@@ -1984,6 +2302,31 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
         ),
       ),
     );
+  }
+
+  // 매칭 신청 함수 (채팅 시작 시 자동 호출)
+  Future<void> _applyToMatching() async {
+    try {
+      // 이미 신청자인지 확인
+      final isAlreadyApplied = _applicants.any((applicant) => 
+        applicant['user'].email == widget.currentUser.email);
+      
+      if (!isAlreadyApplied) {
+        // 신청자 목록에 추가
+        _applicants.add({
+          'user': widget.currentUser,
+          'message': '채팅을 통해 참여 신청',
+          'appliedAt': DateTime.now(),
+        });
+        
+        // UI 업데이트
+        setState(() {});
+        
+        print('✅ 매칭 신청 완료: ${widget.currentUser.nickname}');
+      }
+    } catch (e) {
+      print('❌ 매칭 신청 실패: $e');
+    }
   }
 
   // 매칭 참여 함수

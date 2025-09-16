@@ -188,7 +188,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
     
     // 2. AuthProvider 인증 상태 확인
     final authProvider = context.read<AuthProvider>();
-    await authProvider.checkAuthStatus();
+    
+    // 개발 중: 로그인 시도 횟수 초기화
+    await authProvider.resetAllLoginAttempts();
+    
+    await authProvider.loadCurrentUser();
     
     // 3. 인증 확인 완료 후 상태 업데이트 (mounted 체크로 안전성 확보)
     if (mounted) {

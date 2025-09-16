@@ -4,7 +4,7 @@ class AppColors {
   // Energetic Mint Palette (기획문서 v1.4 기준)
   static const Color primary = Color(0xFF00C49A); // Mint Green - 메인 컬러
   static const Color secondary = Color(0xFFFFB347); // Light Orange - 강조 버튼
-  static const Color accent = Color(0xFFFFF3B0); // Cream Yellow - 배경 강조
+  static const Color accent = Color(0xFF1890FF); // Blue - 정보 강조
   static const Color textSurface = Color(0xFF2F3E46); // Charcoal Navy - 기본 텍스트
   
   // Background Colors

@@ -91,15 +91,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.updateProfile({
-      'nickname': _nicknameController.text.trim(),
-      'region': _selectedRegion,
-      'skill_level': _selectedSkillLevel,
-      'play_style': _selectedPlayStyle,
-      'preferred_time': _selectedPreferredTimes,
-      'preferred_court': _selectedPreferredCourt,
-      'has_lesson': _hasLesson,
-    });
+    final success = await authProvider.updateProfile(
+      nickname: _nicknameController.text.trim(),
+      location: _selectedRegion,
+    );
 
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

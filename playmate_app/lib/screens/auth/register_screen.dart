@@ -49,8 +49,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       email: _emailController.text.trim(),
       password: _passwordController.text,
       nickname: _nicknameController.text.trim(),
-      gender: _selectedGender == '남성' ? 'male' : _selectedGender == '여성' ? 'female' : null,
-      birthYear: _selectedBirthYear,
+      gender: _selectedGender == '남성' ? 'male' : _selectedGender == '여성' ? 'female' : 'male',
+      birthYear: _selectedBirthYear ?? 1990,
       startYearMonth: _startYear != null && _startMonth != null
           ? '${_startYear!}-${_startMonth!.toString().padLeft(2, '0')}'
           : null,

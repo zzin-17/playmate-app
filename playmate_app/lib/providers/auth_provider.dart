@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
-import '../services/mock_auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -9,8 +8,22 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   
+  AuthProvider() {
+    // 앱 시작 시 현재 사용자 정보 로드
+    _initializeAuth();
+  }
+  
+  Future<void> _initializeAuth() async {
+    print('🔍 AuthProvider 초기화 시작');
+    try {
+      await loadCurrentUser();
+      print('🔍 AuthProvider 초기화 완료');
+    } catch (e) {
+      print('🔍 AuthProvider 초기화 실패: $e');
+    }
+  }
+  
   // 보안 관련 상수
-  static const int _tokenExpiryHours = 24; // 토큰 만료 시간 (24시간)
   static const int _maxLoginAttempts = 5; // 최대 로그인 시도 횟수
   static const Duration _lockoutDuration = Duration(minutes: 30); // 계정 잠금 시간
 
@@ -31,91 +44,143 @@ class AuthProvider extends ChangeNotifier {
       final lockoutTime = DateTime.parse(lockoutUntil);
       if (DateTime.now().isBefore(lockoutTime)) {
         final remainingMinutes = lockoutTime.difference(DateTime.now()).inMinutes;
-        throw Exception('계정이 잠겼습니다. $remainingMinutes분 후에 다시 시도해주세요.');
+        _setError('로그인 시도 횟수를 초과했습니다. ${remainingMinutes}분 후에 다시 시도해주세요.');
+        return false;
       } else {
-        // 잠금 해제
+        // 잠금 시간이 지났으면 잠금 해제
         await prefs.remove(lockoutKey);
         await prefs.remove(attemptsKey);
       }
     }
     
-    // 로그인 시도 횟수 체크
-    final attempts = prefs.getInt(attemptsKey) ?? 0;
-    if (attempts >= _maxLoginAttempts) {
-      // 계정 잠금
-      final lockoutTime = DateTime.now().add(_lockoutDuration);
-      await prefs.setString(lockoutKey, lockoutTime.toIso8601String());
-      throw Exception('로그인 시도 횟수를 초과했습니다. 30분 후에 다시 시도해주세요.');
-    }
-    
     return true;
   }
-  
+
   // 로그인 시도 횟수 증가
   Future<void> _incrementLoginAttempts(String email) async {
     final prefs = await SharedPreferences.getInstance();
     final attemptsKey = 'login_attempts_$email';
-    final attempts = (prefs.getInt(attemptsKey) ?? 0) + 1;
-    await prefs.setInt(attemptsKey, attempts);
+    final lockoutKey = 'lockout_until_$email';
+    
+    final currentAttempts = prefs.getInt(attemptsKey) ?? 0;
+    final newAttempts = currentAttempts + 1;
+    
+    await prefs.setInt(attemptsKey, newAttempts);
+    
+    if (newAttempts >= _maxLoginAttempts) {
+      // 계정 잠금
+      final lockoutUntil = DateTime.now().add(_lockoutDuration);
+      await prefs.setString(lockoutKey, lockoutUntil.toIso8601String());
+    }
   }
-  
+
   // 로그인 시도 횟수 초기화
   Future<void> _resetLoginAttempts(String email) async {
     final prefs = await SharedPreferences.getInstance();
     final attemptsKey = 'login_attempts_$email';
+    final lockoutKey = 'lockout_until_$email';
+    
     await prefs.remove(attemptsKey);
+    await prefs.remove(lockoutKey);
+  }
+
+  // 로그인 시도 횟수 초기화 (공개 메서드)
+  Future<void> resetLoginAttempts(String email) async {
+    await _resetLoginAttempts(email);
+  }
+
+  // 모든 로그인 시도 횟수 초기화 (개발용)
+  Future<void> resetAllLoginAttempts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys();
+    
+    for (String key in keys) {
+      if (key.startsWith('login_attempts_') || key.startsWith('lockout_until_')) {
+        await prefs.remove(key);
+      }
+    }
+  }
+
+  // 토큰 저장
+  Future<void> _saveToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('playmate_auth_token', token);
+  }
+
+  // 토큰 가져오기
+  Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('playmate_auth_token');
+  }
+
+  // 토큰 제거
+  Future<void> _clearToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('playmate_auth_token');
+  }
+
+  // 로딩 상태 설정
+  void _setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
+
+  // 에러 설정
+  void _setError(String error) {
+    _error = error;
+    notifyListeners();
+  }
+
+  // 에러 제거
+  void _clearError() {
+    _error = null;
+    notifyListeners();
   }
 
   // 로그인
   Future<bool> login(String email, String password) async {
     _setLoading(true);
-    // _clearError() 제거 - 에러 메시지가 사라지지 않도록
+    _clearError();
 
     try {
       // 로그인 시도 횟수 체크
-      await _checkLoginAttempts(email);
-      
-      // 1) 실제 API 로그인 시도
-      try {
-        final response = await ApiService.login(email, password);
-        final token = response['token'] as String;
-        await _saveToken(token);
-        await _loadCurrentUser();
-        
-        // 로그인 성공 시 시도 횟수 초기화
-        await _resetLoginAttempts(email);
-        
+      if (!await _checkLoginAttempts(email)) {
         _setLoading(false);
-        return true;
-      } catch (_) {
-        // 2) 실패 시 Mock 계정으로 폴백 (개발/테스트 용)
-        final res = await MockAuthService.login(email, password);
-        await _saveToken(res['token'] as String);
-        _currentUser = res['user'] as User;
-        
-        // 로그인 성공 시 시도 횟수 초기화
-        await _resetLoginAttempts(email);
-        
-        _setLoading(false);
-        notifyListeners();
-        return true;
+        return false;
       }
+
+      // 실제 API 호출
+      final response = await ApiService.login(email, password);
+      
+      // API 응답 구조에 맞게 수정
+      if (response['success'] == true && response['data'] != null) {
+        final data = response['data'] as Map<String, dynamic>;
+        
+        await _saveToken(data['token'] as String);
+        
+        // API 응답에 누락된 필드 추가
+        final userData = Map<String, dynamic>.from(data);
+        userData['createdAt'] = userData['createdAt'] ?? DateTime.now().toIso8601String();
+        userData['updatedAt'] = userData['updatedAt'] ?? DateTime.now().toIso8601String();
+        
+        _currentUser = User.fromJson(userData);
+      } else {
+        throw Exception('로그인 실패: ${response['message'] ?? '알 수 없는 오류'}');
+      }
+      
+      // 로그인 성공 시 시도 횟수 초기화
+      await _resetLoginAttempts(email);
+      
+      _setLoading(false);
+      notifyListeners();
+      return true;
     } catch (e) {
       // 로그인 실패 시 시도 횟수 증가
       await _incrementLoginAttempts(email);
       
       final errorMessage = '로그인 실패: $e';
-
       _setError(errorMessage);
       _setLoading(false);
-      
-      // 로그인 실패 시에는 notifyListeners() 호출하지 않음
-      // (화면이 새로 로드되는 것을 방지)
-
-      
-      // 로그인 실패 시에도 현재 사용자 상태 유지 (화면 재로드 방지)
-
-      
       return false;
     }
   }
@@ -125,15 +190,15 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String password,
     required String nickname,
-    String? gender,
-    int? birthYear,
+    required String gender,
+    required int birthYear,
     String? startYearMonth,
   }) async {
     _setLoading(true);
     _clearError();
 
     try {
-      // 실제 API 호출 (백엔드 스펙 확정 시 startYearMonth 전달)
+      // 실제 API 호출
       final response = await ApiService.register(
         email: email,
         password: password,
@@ -144,30 +209,10 @@ class AuthProvider extends ChangeNotifier {
       
       // 회원가입 후 자동 로그인
       await _saveToken(response['token'] as String);
-      await _loadCurrentUser();
-      // Mock 환경에서는 startYearMonth를 현재 사용자에 반영
-      if (_currentUser != null && startYearMonth != null) {
-        _currentUser = User(
-          id: _currentUser!.id,
-          email: _currentUser!.email,
-          nickname: _currentUser!.nickname,
-          gender: _currentUser!.gender,
-          birthYear: _currentUser!.birthYear,
-          region: _currentUser!.region,
-          skillLevel: _currentUser!.skillLevel,
-          startYearMonth: startYearMonth,
-          preferredCourt: _currentUser!.preferredCourt,
-          preferredTime: _currentUser!.preferredTime,
-          playStyle: _currentUser!.playStyle,
-          hasLesson: _currentUser!.hasLesson,
-          mannerScore: _currentUser!.mannerScore,
-          profileImage: _currentUser!.profileImage,
-          createdAt: _currentUser!.createdAt,
-          updatedAt: _currentUser!.updatedAt,
-        );
-      }
+      await loadCurrentUser();
       
       _setLoading(false);
+      notifyListeners();
       return true;
     } catch (e) {
       _setError(e.toString());
@@ -183,7 +228,6 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _clearToken();
       _currentUser = null;
-              // 토큰 제거 (정적 메서드에서는 불필요)
       _setLoading(false);
       notifyListeners();
     } catch (e) {
@@ -194,252 +238,31 @@ class AuthProvider extends ChangeNotifier {
 
   // 현재 사용자 정보 로드
   Future<void> loadCurrentUser() async {
-    if (!isLoggedIn) return;
-    
     try {
       final token = await _getToken();
       if (token != null) {
-        if (token == 'temp_jwt_token') {
-          // 개발 환경에서 임시 사용자 정보 설정
-          _currentUser = User(
-            id: 1, // 임시 사용자 ID
-            email: 'dev@playmate.com',
-            nickname: '개발자',
-            gender: 'male',
-            birthYear: 1990,
-            region: '서울',
-            skillLevel: 3,
-            startYearMonth: '2020-01',
-            preferredCourt: '실내',
-            preferredTime: ['18:00~20:00', '20:00~22:00'],
-            playStyle: '공격적',
-            hasLesson: false,
-            mannerScore: 4.5,
-            ntrpScore: 3.5,
-            profileImage: null,
-            followingIds: [],
-            followerIds: [],
-            bio: '개발 환경 테스트 사용자',
-            reviewCount: 0,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          );
-          notifyListeners();
-        } else if (token.startsWith('mock_token_')) {
-          // 데모/소셜(Mock) 토큰인 경우 Mock 서비스로 유저 로드
-          final user = await MockAuthService.getCurrentUser(token);
-          _currentUser = user;
-          notifyListeners();
-        } else {
-          final user = await ApiService.getCurrentUser(token);
-          _currentUser = user;
-          notifyListeners();
-        }
-      }
-    } catch (e) {
-      // 토큰이 만료되었을 수 있음
-      await logout();
-    }
-  }
-
-  // 프로필 업데이트
-  Future<bool> updateProfile(Map<String, dynamic> profileData) async {
-    _setLoading(true);
-    _clearError();
-
-    try {
-      final token = await _getToken();
-      if (token != null) {
-        final updatedUser = await ApiService.updateProfile(profileData, token);
-        _currentUser = updatedUser;
-        _setLoading(false);
+        // 실제 JWT 토큰 사용
+        _currentUser = await ApiService.getCurrentUser(token);
         notifyListeners();
-        return true;
-      }
-      return false;
-    } catch (e) {
-      _setError(e.toString());
-      _setLoading(false);
-      return false;
-    }
-  }
-
-  // 앱 시작 시 토큰 확인
-  Future<void> checkAuthStatus() async {
-    final token = await _getToken();
-    
-    if (token != null) {
-      await _loadCurrentUser();
-    } else {
-      // 토큰이 없으면 저장된 자격 증명으로 자동 로그인 시도
-      await _tryAutoLogin();
-    }
-  }
-
-  // 자동로그인 보안 검증 (개발/테스트 환경에서는 완화)
-  Future<bool> _isAutoLoginSecure(String email) async {
-    // 개발/테스트 환경에서는 보안 완화
-    // TODO: 프로덕션 환경에서는 보안 검증 로직 추가
-    return true;
-  }
-
-  // 저장된 자격 증명으로 자동 로그인 시도 (보안 강화)
-  Future<void> _tryAutoLogin() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      final rememberMe = prefs.getBool('playmate_rememberMe') ?? false;
-      
-      if (rememberMe) {
-        final savedEmail = prefs.getString('playmate_savedEmail');
-        
-        if (savedEmail != null) {
-          // 자동로그인 보안 체크
-          if (!await _isAutoLoginSecure(savedEmail)) {
-            return;
-          }
-          
-          // Mock 서비스로 자동 로그인 (실제 저장된 비밀번호 사용)
-          final savedPassword = prefs.getString('playmate_savedPassword');
-          if (savedPassword != null) {
-            final res = await MockAuthService.login(savedEmail, savedPassword);
-            
-            if (res['success'] == true) {
-              await _saveToken(res['token'] as String);
-              _currentUser = res['user'] as User;
-              notifyListeners();
-            } else {
-              // Mock 서비스에서 로그인 실패
-            }
-          } else {
-            // 저장된 비밀번호가 없음
-          }
-        } else {
-          // 저장된 이메일이 없음
-        }
       } else {
-        // rememberMe가 false
-      }
-    } catch (e) {
-      // 자동 로그인 실패
-    }
-  }
-  
-
-  // Private methods
-  Future<void> _loadCurrentUser() async {
-    try {
-      final token = await _getToken();
-      if (token != null) {
-        if (token == 'temp_jwt_token') {
-          // 개발 환경에서 임시 사용자 정보 설정
-          _currentUser = User(
-            id: 1, // 임시 사용자 ID
-            email: 'dev@playmate.com',
-            nickname: '개발자',
-            gender: 'male',
-            birthYear: 1990,
-            region: '서울',
-            skillLevel: 3,
-            startYearMonth: '2020-01',
-            preferredCourt: '실내',
-            preferredTime: ['18:00~20:00', '20:00~22:00'],
-            playStyle: '공격적',
-            hasLesson: false,
-            mannerScore: 4.5,
-            ntrpScore: 3.5,
-            profileImage: null,
-            followingIds: [],
-            followerIds: [],
-            bio: '개발 환경 테스트 사용자',
-            reviewCount: 0,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          );
-          notifyListeners();
-        } else if (token.startsWith('mock_token_')) {
-          // Mock 토큰인 경우 Mock 서비스로 유저 로드
-          final user = await MockAuthService.getCurrentUser(token);
-          _currentUser = user;
-          notifyListeners();
-        } else {
-          // 실제 API 토큰인 경우
-          final user = await ApiService.getCurrentUser(token);
-          _currentUser = user;
-          notifyListeners();
-        }
-      }
-    } catch (e) {
-      _setError(e.toString());
-    }
-  }
-
-
-  
-  // 토큰 저장 (만료 시간 포함)
-  Future<void> _saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    final now = DateTime.now();
-    await prefs.setString('auth_token', token);
-    await prefs.setString('token_created_at', now.toIso8601String());
-    await prefs.setString('token_expires_at', now.add(Duration(hours: _tokenExpiryHours)).toIso8601String());
-  }
-
-  Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    
-    if (token == null) return null;
-    
-    // 토큰 만료 체크
-    final expiresAt = prefs.getString('token_expires_at');
-    if (expiresAt != null) {
-      final expiryDate = DateTime.parse(expiresAt);
-      if (DateTime.now().isAfter(expiryDate)) {
-
-        await _clearToken();
         _currentUser = null;
-        notifyListeners();
-        return null;
       }
+    } catch (e) {
+      _currentUser = null;
     }
-    
-    return token;
   }
 
-  Future<void> _clearToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
-  }
-
-  void _setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
-  }
-
-  void _setError(String error) {
-    _error = error;
-    // 에러 설정 시에는 notifyListeners() 호출하지 않음
-    // (화면이 새로 로드되는 것을 방지)
-  }
-
-  void _clearError() {
-    _error = null;
-    notifyListeners();
-  }
-
-  // 소셜 로그인 (Mock 기반) - 향후 실제 SDK 연동 시 교체
+  // 카카오 로그인 (임시 구현)
   Future<bool> loginWithKakao() async {
     _setLoading(true);
     _clearError();
+
     try {
-      // TODO: 실제 Kakao SDK 연동으로 교체
-      final res = await MockAuthService.loginWithKakao();
-      await _saveToken(res['token'] as String);
-      _currentUser = res['user'] as User;
+      // TODO: 실제 카카오 로그인 구현
+      await Future.delayed(const Duration(seconds: 1));
+      _setError('카카오 로그인은 아직 구현되지 않았습니다.');
       _setLoading(false);
-      notifyListeners();
-      return true;
+      return false;
     } catch (e) {
       _setError(e.toString());
       _setLoading(false);
@@ -447,17 +270,17 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // 애플 로그인 (임시 구현)
   Future<bool> loginWithApple() async {
     _setLoading(true);
     _clearError();
+
     try {
-      // TODO: 실제 Apple Sign-In 연동으로 교체
-      final res = await MockAuthService.loginWithApple();
-      await _saveToken(res['token'] as String);
-      _currentUser = res['user'] as User;
+      // TODO: 실제 애플 로그인 구현
+      await Future.delayed(const Duration(seconds: 1));
+      _setError('애플 로그인은 아직 구현되지 않았습니다.');
       _setLoading(false);
-      notifyListeners();
-      return true;
+      return false;
     } catch (e) {
       _setError(e.toString());
       _setLoading(false);
@@ -465,9 +288,24 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // 현재 사용자 정보 업데이트
-  void updateCurrentUser(User updatedUser) {
-    _currentUser = updatedUser;
-    notifyListeners();
+  // 프로필 업데이트 (임시 구현)
+  Future<bool> updateProfile({
+    String? nickname,
+    String? location,
+  }) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      // TODO: 실제 프로필 업데이트 구현
+      await Future.delayed(const Duration(seconds: 1));
+      _setError('프로필 업데이트는 아직 구현되지 않았습니다.');
+      _setLoading(false);
+      return false;
+    } catch (e) {
+      _setError(e.toString());
+      _setLoading(false);
+      return false;
+    }
   }
-} 
+}

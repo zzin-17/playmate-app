@@ -1,6 +1,6 @@
 class ApiConfig {
   // 개발 환경 설정 (Android 에뮬레이터용)
-  static const String devBaseUrl = 'http://10.0.2.2:3000';
+  static const String devBaseUrl = 'http://192.168.6.100:3000';
   static const String stagingBaseUrl = 'https://staging-api.playmate.com';
   static const String prodBaseUrl = 'https://api.playmate.com';
   

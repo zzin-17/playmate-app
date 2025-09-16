@@ -63,32 +63,6 @@ class UserService {
     }
   }
 
-  /// 프로필 업데이트
-  Future<User?> updateProfile(Map<String, dynamic> profileData) async {
-    try {
-      final token = await _getAuthToken();
-      if (token == null) throw Exception('인증 토큰이 없습니다');
-
-      final response = await ApiService.put(
-        '/users/me',
-        body: json.encode(profileData),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return User.fromJson(data);
-      } else {
-        throw Exception('프로필 업데이트 실패: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('프로필 업데이트 오류: $e');
-      return null;
-    }
-  }
 
   /// 사용자 검색
   Future<List<User>> searchUsers(String query) async {
@@ -218,21 +192,6 @@ class UserService {
     }
   }
 
-  /// 프로필 이미지 업로드
-  Future<String?> uploadProfileImage(String imagePath) async {
-    try {
-      final token = await _getAuthToken();
-      if (token == null) throw Exception('인증 토큰이 없습니다');
-
-      // 실제 구현에서는 multipart/form-data로 이미지 업로드
-      // 여기서는 임시로 성공 응답 시뮬레이션
-      await Future.delayed(const Duration(seconds: 1));
-      return 'https://example.com/profile-images/uploaded-image.jpg';
-    } catch (e) {
-      print('프로필 이미지 업로드 오류: $e');
-      return null;
-    }
-  }
 
   /// 계정 삭제
   Future<bool> deleteAccount() async {
@@ -249,6 +208,49 @@ class UserService {
     } catch (e) {
       print('계정 삭제 오류: $e');
       return false;
+    }
+  }
+
+  /// 프로필 업데이트
+  Future<bool> updateProfile(Map<String, dynamic> updateData) async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) throw Exception('인증 토큰이 없습니다');
+
+      final response = await ApiService.put(
+        '/users/me',
+        body: json.encode(updateData),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      } else {
+        throw Exception('프로필 업데이트 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('프로필 업데이트 오류: $e');
+      return false;
+    }
+  }
+
+  /// 프로필 이미지 업로드
+  Future<String?> uploadProfileImage(String imagePath) async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) throw Exception('인증 토큰이 없습니다');
+
+      // 실제 구현에서는 multipart/form-data로 이미지 업로드
+      // 여기서는 임시로 성공 응답 시뮬레이션
+      await Future.delayed(const Duration(seconds: 1));
+      return 'https://example.com/profile-images/uploaded-profile.jpg';
+    } catch (e) {
+      print('프로필 이미지 업로드 오류: $e');
+      return null;
     }
   }
 }

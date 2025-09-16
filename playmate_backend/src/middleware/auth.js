@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
 const asyncHandler = require('express-async-handler');
+
+// 메모리 스토어에서 사용자 조회
+const { memoryStore } = require('../controllers/authController');
 
 const protect = asyncHandler(async (req, res, next) => {
   let token;
@@ -10,27 +12,29 @@ const protect = asyncHandler(async (req, res, next) => {
       // 토큰 추출
       token = req.headers.authorization.split(' ')[1];
       
-      // 임시로 MongoDB 없이 작동하도록 수정
-      if (token === 'temp_jwt_token') {
-        req.user = {
-          id: 'temp_id_1',
-          email: 'dev@playmate.com',
-          nickname: '개발자'
-        };
-        next();
-        return;
-      }
-      
-      // 실제 JWT 토큰 검증 (MongoDB 연결 시 사용)
+      // JWT 토큰 검증
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
-      // 사용자 정보 가져오기
-      req.user = await User.findById(decoded.id).select('-password');
+      // 메모리 스토어에서 사용자 정보 조회
+      const user = memoryStore.users.get(decoded.id);
       
-      if (!req.user) {
+      if (!user) {
         res.status(401);
         throw new Error('Not authorized, user not found');
       }
+      
+      // 비밀번호 제외하고 사용자 정보 설정
+      req.user = {
+        id: user.id,
+        email: user.email,
+        nickname: user.nickname,
+        profileImage: user.profileImage,
+        bio: user.bio,
+        birthYear: user.birthYear,
+        gender: user.gender,
+        location: user.location,
+        isVerified: user.isVerified
+      };
       
       next();
     } catch (error) {

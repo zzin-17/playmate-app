@@ -407,37 +407,84 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.error_outline,
-                            color: AppColors.error,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _errorMessage!,
-                              style: AppTextStyles.body.copyWith(
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline,
                                 color: AppColors.error,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: AppTextStyles.body.copyWith(
+                                    color: AppColors.error,
+                                  ),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _errorMessage = null;
+                                    // 에러 메시지 닫기 시에도 비밀번호만 초기화
+                                    _passwordController.clear();
+                                  });
+                                  
+                                },
+                                child: Icon(
+                                  Icons.close,
+                                  color: AppColors.error,
+                                  size: 20,
+                                ),
+                              ),
+                            ],
+                          ),
+                          // 로그인 시도 횟수 초과 오류인 경우 초기화 버튼 표시
+                          if (_errorMessage!.contains('로그인 시도 횟수를 초과했습니다'))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: TextButton(
+                                onPressed: () async {
+                                  try {
+                                    final authProvider = context.read<AuthProvider>();
+                                    await authProvider.resetLoginAttempts(_emailController.text.trim());
+                                    setState(() {
+                                      _errorMessage = null;
+                                    });
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('로그인 시도 횟수가 초기화되었습니다.'),
+                                        backgroundColor: AppColors.success,
+                                      ),
+                                    );
+                                  } catch (e) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('초기화 중 오류가 발생했습니다: $e'),
+                                        backgroundColor: AppColors.error,
+                                      ),
+                                    );
+                                  }
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  '시도 횟수 초기화',
+                                  style: AppTextStyles.body.copyWith(
+                                    color: AppColors.primary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _errorMessage = null;
-                                // 에러 메시지 닫기 시에도 비밀번호만 초기화
-                                _passwordController.clear();
-                              });
-                              
-                            },
-                            child: Icon(
-                              Icons.close,
-                              color: AppColors.error,
-                              size: 20,
-                            ),
-                          ),
                         ],
                     ),
                   ),

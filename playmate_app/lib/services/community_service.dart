@@ -45,7 +45,7 @@ class CommunityService {
           queryParameters: queryParams,
         ),
         headers: {
-          'Authorization': 'Bearer temp_jwt_token',
+          'Authorization': 'Bearer ${await _getAuthToken()}',
           'Content-Type': 'application/json',
         },
       );
@@ -72,7 +72,7 @@ class CommunityService {
       final response = await http.get(
         Uri.parse('http://10.0.2.2:3000/api/community/posts/$postId'),
         headers: {
-          'Authorization': 'Bearer temp_jwt_token',
+          'Authorization': 'Bearer ${await _getAuthToken()}',
           'Content-Type': 'application/json',
         },
       );
@@ -128,61 +128,6 @@ class CommunityService {
     }
   }
 
-  /// 게시글 수정
-  Future<Post?> updatePost({
-    required int postId,
-    required String content,
-    List<String>? hashtags,
-    List<String>? imageUrls,
-  }) async {
-    try {
-      final token = await _getAuthToken();
-      if (token == null) throw Exception('인증 토큰이 없습니다');
-
-      final postData = {
-        'content': content,
-        if (hashtags != null) 'hashtags': hashtags,
-        if (imageUrls != null) 'image_urls': imageUrls,
-      };
-
-      final response = await ApiService.put(
-        '/posts/$postId',
-        body: json.encode(postData),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return Post.fromJson(data);
-      } else {
-        throw Exception('게시글 수정 실패: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('게시글 수정 오류: $e');
-      return null;
-    }
-  }
-
-  /// 게시글 삭제
-  Future<bool> deletePost(int postId) async {
-    try {
-      final token = await _getAuthToken();
-      if (token == null) throw Exception('인증 토큰이 없습니다');
-
-      final response = await ApiService.delete(
-        '/posts/$postId',
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      return response.statusCode == 200;
-    } catch (e) {
-      print('게시글 삭제 오류: $e');
-      return false;
-    }
-  }
 
   /// 게시글 좋아요/좋아요 취소
   Future<bool> toggleLike(int postId) async {
@@ -454,6 +399,55 @@ class CommunityService {
     } catch (e) {
       print('이미지 업로드 오류: $e');
       return null;
+    }
+  }
+
+  /// 게시글 수정
+  Future<bool> updatePost(int postId, Map<String, dynamic> updateData) async {
+    try {
+      final response = await http.put(
+        Uri.parse('http://10.0.2.2:3000/api/community/posts/$postId'),
+        headers: {
+          'Authorization': 'Bearer ${await _getAuthToken()}',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(updateData),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      } else {
+        print('게시글 수정 실패: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('게시글 수정 오류: $e');
+      return false;
+    }
+  }
+
+  /// 게시글 삭제
+  Future<bool> deletePost(int postId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('http://10.0.2.2:3000/api/community/posts/$postId'),
+        headers: {
+          'Authorization': 'Bearer ${await _getAuthToken()}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true;
+      } else {
+        print('게시글 삭제 실패: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('게시글 삭제 오류: $e');
+      return false;
     }
   }
 }

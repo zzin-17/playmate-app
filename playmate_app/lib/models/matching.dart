@@ -1,4 +1,5 @@
 import 'package:json_annotation/json_annotation.dart';
+import 'package:intl/intl.dart';
 import 'user.dart';
 
 part 'matching.g.dart';
@@ -296,6 +297,14 @@ class Matching {
   int get remainingCount {
     final total = maleRecruitCount + femaleRecruitCount;
     return total - confirmedCount;
+  }
+
+  // 게스트 비용 표시 텍스트
+  String get guestCostText {
+    if (guestCost == null || guestCost == 0) {
+      return '무료';
+    }
+    return '${NumberFormat('#,###').format(guestCost)}원';
   }
   
   // 모집 완료 여부

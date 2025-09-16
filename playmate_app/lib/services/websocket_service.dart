@@ -50,7 +50,7 @@ class WebSocketService {
     
     try {
       // 플메 Socket.io 서버 URL (Android 에뮬레이터용)
-      final serverUrl = 'http://10.0.2.2:8080';
+      final serverUrl = 'http://10.0.2.2:3000';
       
       // Socket.io 클라이언트 생성
       _socket = IO.io(serverUrl, <String, dynamic>{

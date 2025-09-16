@@ -6,6 +6,9 @@ import '../../constants/app_text_styles.dart';
 import '../../models/user.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_text_field.dart';
+import '../../services/user_service.dart';
+import '../../providers/auth_provider.dart';
+import 'package:provider/provider.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final User currentUser;
@@ -421,17 +424,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     });
 
     try {
-      // 임시로 성공 처리 (API 연동은 나중에)
-      await Future.delayed(const Duration(seconds: 1));
+      final userService = UserService();
+      String? profileImageUrl;
+
+      // 프로필 이미지 업로드
+      if (_selectedImagePath != null) {
+        profileImageUrl = await userService.uploadProfileImage(_selectedImagePath!);
+      }
+
+      // 프로필 업데이트 데이터 준비
+      final updateData = {
+        'nickname': _nicknameController.text.trim(),
+        'bio': _bioController.text.trim(),
+        if (profileImageUrl != null) 'profileImage': profileImageUrl,
+      };
+
+      // API 호출
+      final success = await userService.updateProfile(updateData);
       
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('프로필이 성공적으로 저장되었습니다!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        Navigator.pop(context);
+      if (success) {
+        // AuthProvider 업데이트
+        final authProvider = context.read<AuthProvider>();
+        await authProvider.loadCurrentUser();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('프로필이 성공적으로 저장되었습니다!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } else {
+        throw Exception('프로필 업데이트에 실패했습니다.');
       }
     } catch (e) {
       if (mounted) {

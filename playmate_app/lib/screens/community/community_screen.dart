@@ -7,6 +7,7 @@ import '../../models/user.dart';
 import 'follow_list_screen.dart';
 import 'comment_screen.dart';
 import 'create_post_screen.dart';
+import 'edit_post_screen.dart';
 import '../../models/post.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/share_service.dart';
@@ -30,10 +31,10 @@ class _CommunityScreenState extends State<CommunityScreen>
   final CommunityService _communityService = CommunityService();
   
   // 게시글 데이터
-  final List<PostData> _feedPosts = [];
-  final List<PostData> _followingPosts = [];
-  final List<PostData> _trendingPosts = [];
-  final List<PostData> _myPosts = []; // 내 게시글 추가
+  final List<Post> _feedPosts = [];
+  final List<Post> _followingPosts = [];
+  final List<Post> _trendingPosts = [];
+  final List<Post> _myPosts = []; // 내 게시글 추가
   
   // 로딩 상태
   bool _isLoading = false;
@@ -149,23 +150,24 @@ class _CommunityScreenState extends State<CommunityScreen>
   void _refreshFeedAfterPostCreation(Map<String, dynamic>? postData) {
     if (postData != null) {
       // 새로 등록된 게시글을 피드 맨 위에 추가
-      final newPost = PostData(
+      final newPost = Post(
         id: DateTime.now().millisecondsSinceEpoch, // 고유 ID 생성
-        title: '새 게시글', // 제목 없음
-        author: postData['author'] ?? '현재 사용자',
         authorId: postData['authorId'] ?? 999,
-        content: postData['content'] ?? '내용 없음',
-        likes: 0,
-        comments: 0,
-        timeAgo: '방금 전',
-        category: '일반', // 기본 카테고리
+        authorNickname: postData['author'] ?? '현재 사용자',
         authorProfileImage: 'https://via.placeholder.com/40x40',
-        isFollowing: false,
-        isLiked: false,
-        isBookmarked: false,
-        shareCount: 0,
-        isSharedByCurrentUser: false,
+        title: '새 게시글', // 제목 없음
+        content: postData['content'] ?? '내용 없음',
+        images: [],
         hashtags: _extractHashtagsFromContent(postData['content'] ?? ''),
+        category: '일반', // 기본 카테고리
+        likeCount: 0,
+        commentCount: 0,
+        shareCount: 0,
+        isLikedByCurrentUser: false,
+        isBookmarkedByCurrentUser: false,
+        isSharedByCurrentUser: false,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
       
       setState(() {
@@ -450,7 +452,7 @@ class _CommunityScreenState extends State<CommunityScreen>
     );
   }
 
-  List<PostData> _getFilteredPosts() {
+  List<Post> _getFilteredPosts() {
     switch (_currentFilter) {
       case '팔로잉':
         return _followingPosts;
@@ -516,7 +518,7 @@ class _CommunityScreenState extends State<CommunityScreen>
 
 
 
-  Widget _buildSocialPostCard(PostData post) {
+  Widget _buildSocialPostCard(Post post) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -546,7 +548,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                   backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                   child: post.authorProfileImage == null
                       ? Text(
-                          post.author[0],
+                          post.authorNickname[0],
                           style: TextStyle(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w600,
@@ -560,7 +562,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        post.author,
+                        post.authorNickname,
                         style: AppTextStyles.body.copyWith(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.w600,
@@ -575,7 +577,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                     ],
                   ),
                 ),
-                if (!post.isFollowing)
+                if (false) // Post 모델에는 isFollowing 필드가 없으므로 항상 팔로우 버튼 표시
                   TextButton(
                     onPressed: () {
                       // 팔로우 기능
@@ -632,12 +634,12 @@ class _CommunityScreenState extends State<CommunityScreen>
                     // 좋아요 기능
                   },
                   icon: Icon(
-                    post.likes > 0 ? Icons.favorite : Icons.favorite_border,
-                    color: post.likes > 0 ? Colors.red : Colors.grey,
+                    post.likeCount > 0 ? Icons.favorite : Icons.favorite_border,
+                    color: post.likeCount > 0 ? Colors.red : Colors.grey,
                   ),
                 ),
                 Text(
-                  post.likes.toString(),
+                  post.likeCount.toString(),
                   style: AppTextStyles.body.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -679,7 +681,7 @@ class _CommunityScreenState extends State<CommunityScreen>
     );
   }
 
-  Widget _buildPostCard(PostData post) {
+  Widget _buildPostCard(Post post) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -710,7 +712,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                     : null,
                   child: post.authorProfileImage == null 
                     ? Text(
-                        post.author[0],
+                        post.authorNickname[0],
                         style: TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -725,7 +727,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        post.author,
+                        post.authorNickname,
                         style: AppTextStyles.body.copyWith(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.w600,
@@ -748,38 +750,70 @@ class _CommunityScreenState extends State<CommunityScreen>
                     color: Colors.grey,
                   ),
                   onSelected: (value) => _handleMenuAction(value, post),
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'report',
-                      child: Row(
-                        children: [
-                          Icon(Icons.report, size: 16),
-                          SizedBox(width: 8),
-                          Text('신고하기'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'block',
-                      child: Row(
-                        children: [
-                          Icon(Icons.block, size: 16),
-                          SizedBox(width: 8),
-                          Text('사용자 차단'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'hide',
-                      child: Row(
-                        children: [
-                          Icon(Icons.visibility_off, size: 16),
-                          SizedBox(width: 8),
-                          Text('게시글 숨기기'),
-                        ],
-                      ),
-                    ),
-                  ],
+                  itemBuilder: (context) {
+                    final currentUser = context.read<AuthProvider>().currentUser;
+                    final isMyPost = post.authorId == currentUser?.id;
+                    
+                    if (isMyPost) {
+                      // 내 게시글인 경우
+                      return [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, size: 16),
+                              SizedBox(width: 8),
+                              Text('수정하기'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, size: 16, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('삭제하기', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      ];
+                    } else {
+                      // 다른 사람의 게시글인 경우
+                      return [
+                        const PopupMenuItem(
+                          value: 'report',
+                          child: Row(
+                            children: [
+                              Icon(Icons.report, size: 16),
+                              SizedBox(width: 8),
+                              Text('신고하기'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'block',
+                          child: Row(
+                            children: [
+                              Icon(Icons.block, size: 16),
+                              SizedBox(width: 8),
+                              Text('사용자 차단'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'hide',
+                          child: Row(
+                            children: [
+                              Icon(Icons.visibility_off, size: 16),
+                              SizedBox(width: 8),
+                              Text('게시글 숨기기'),
+                            ],
+                          ),
+                        ),
+                      ];
+                    }
+                  },
                 ),
               ],
             ),
@@ -798,13 +832,13 @@ class _CommunityScreenState extends State<CommunityScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        post.isLiked ? Icons.favorite : Icons.favorite_border,
+                        post.isLikedByCurrentUser ? Icons.favorite : Icons.favorite_border,
                         size: 20,
-                        color: post.isLiked ? Colors.red : Colors.grey,
+                        color: post.isLikedByCurrentUser ? Colors.red : Colors.grey,
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        post.likes.toString(),
+                        post.likeCount.toString(),
                         style: AppTextStyles.body.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -830,7 +864,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        post.comments.toString(),
+                        post.commentCount.toString(),
                         style: AppTextStyles.body.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -845,9 +879,9 @@ class _CommunityScreenState extends State<CommunityScreen>
                 InkWell(
                   onTap: () => _toggleBookmark(post),
                   child: Icon(
-                    post.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                    post.isBookmarkedByCurrentUser ? Icons.bookmark : Icons.bookmark_border,
                     size: 20,
-                    color: post.isBookmarked ? AppColors.primary : Colors.grey,
+                    color: post.isBookmarkedByCurrentUser ? AppColors.primary : Colors.grey,
                   ),
                 ),
                 
@@ -955,25 +989,7 @@ class _CommunityScreenState extends State<CommunityScreen>
     );
   }
 
-  void _navigateToComments(PostData postData) {
-    // PostData를 Post로 변환
-    final post = Post(
-      id: postData.id,
-      authorId: 1, // TODO: 실제 작성자 ID로 변경
-      authorNickname: postData.author,
-      authorProfileImage: postData.authorProfileImage,
-      title: postData.title,
-      content: postData.content,
-      category: postData.category,
-      likeCount: postData.likes,
-      commentCount: postData.comments,
-      shareCount: postData.shareCount,
-      isLikedByCurrentUser: postData.isLiked,
-      isBookmarkedByCurrentUser: postData.isBookmarked,
-      isSharedByCurrentUser: postData.isSharedByCurrentUser,
-      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
-    );
+  void _navigateToComments(Post post) {
 
     Navigator.push(
       context,
@@ -985,23 +1001,17 @@ class _CommunityScreenState extends State<CommunityScreen>
 
 
 
-  void _toggleLike(PostData post) async {
+  void _toggleLike(Post post) async {
     try {
       // 실제 API 호출
       final success = await _communityService.toggleLike(post.id);
       
       if (success) {
-        setState(() {
-          post.isLiked = !post.isLiked;
-          if (post.isLiked) {
-            post.likes++;
-          } else {
-            post.likes--;
-          }
-        });
-
+        // 좋아요 상태는 API에서 처리됨
+        // UI는 API 응답에 따라 업데이트됨
+        
         // 좋아요 시 알림 표시
-        if (post.isLiked) {
+        if (!post.isLikedByCurrentUser) {
           await NotificationService().showLikeNotification(
             postTitle: post.content,
             likerName: '현재 사용자', // TODO: 실제 사용자 이름으로 변경
@@ -1021,21 +1031,20 @@ class _CommunityScreenState extends State<CommunityScreen>
     }
   }
 
-  Future<void> _toggleBookmark(PostData post) async {
+  Future<void> _toggleBookmark(Post post) async {
     try {
       // 실제 API 호출
       final success = await _communityService.toggleBookmark(post.id);
       
       if (success) {
-        setState(() {
-          post.isBookmarked = !post.isBookmarked;
-        });
+        // 북마크 상태는 API에서 처리됨
+        // UI는 API 응답에 따라 업데이트됨
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(post.isBookmarked ? '북마크에 추가되었습니다' : '북마크에서 제거되었습니다'),
-              backgroundColor: post.isBookmarked ? Colors.green : Colors.orange,
+              content: Text(!post.isBookmarkedByCurrentUser ? '북마크에 추가되었습니다' : '북마크에서 제거되었습니다'),
+              backgroundColor: !post.isBookmarkedByCurrentUser ? Colors.green : Colors.orange,
               duration: const Duration(seconds: 2),
             ),
           );
@@ -1055,34 +1064,12 @@ class _CommunityScreenState extends State<CommunityScreen>
     }
   }
 
-  void _sharePost(PostData post) async {
-    // PostData를 Post로 변환
-    final postModel = Post(
-      id: post.id,
-      authorId: 1, // TODO: 실제 작성자 ID로 변경
-      authorNickname: post.author,
-      authorProfileImage: post.authorProfileImage,
-      title: post.title,
-      content: post.content,
-      category: post.category,
-      likeCount: post.likes,
-      commentCount: post.comments,
-      shareCount: post.shareCount,
-      isLikedByCurrentUser: post.isLiked,
-      isBookmarkedByCurrentUser: post.isBookmarked,
-      isSharedByCurrentUser: post.isSharedByCurrentUser,
-      createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-      updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
-    );
+  void _sharePost(Post post) async {
 
     // 공유 서비스 호출
-    await ShareService().sharePost(postModel, context);
+    await ShareService().sharePost(post, context);
     
-    // 공유 상태 업데이트
-    setState(() {
-      post.isSharedByCurrentUser = true;
-      post.shareCount++;
-    });
+    // 공유 상태 업데이트는 API에서 처리됨
 
     // 공유 시 알림 표시
     await NotificationService().showShareNotification(
@@ -1176,7 +1163,7 @@ class _CommunityScreenState extends State<CommunityScreen>
   }
 
   /// 페이지별 게시글 데이터 로드 (API 우선, 실패 시 Mock 데이터)
-  Future<List<PostData>> _getPostsForPage(int page) async {
+  Future<List<Post>> _getPostsForPage(int page) async {
     try {
       // 실제 API 호출
       final posts = await _communityService.getPosts(
@@ -1184,8 +1171,8 @@ class _CommunityScreenState extends State<CommunityScreen>
         limit: _pageSize,
       );
       
-      // Post를 PostData로 변환
-      return posts.map((post) => _convertPostToPostData(post)).toList();
+      // Post 모델을 그대로 반환
+      return posts;
     } catch (e) {
       print('API 호출 실패, Mock 데이터 사용: $e');
       // API 실패 시 Mock 데이터 사용
@@ -1194,7 +1181,7 @@ class _CommunityScreenState extends State<CommunityScreen>
   }
 
   /// 페이지별 목업 데이터 생성 (폴백용)
-  List<PostData> _getMockPostsForPage(int page) {
+  List<Post> _getMockPostsForPage(int page) {
     if (page > 3) return []; // 3페이지까지만 데이터 제공
     
     final startIndex = (page - 1) * _pageSize;
@@ -1207,31 +1194,34 @@ class _CommunityScreenState extends State<CommunityScreen>
   }
 
   /// 모든 목업 데이터 (폴백용)
-  List<PostData> _getAllMockPosts() {
-    return MockPostService.getAllMockPosts();
+  List<Post> _getAllMockPosts() {
+    final postDataList = MockPostService.getAllMockPosts();
+    return postDataList.map((postData) => _convertPostDataToPost(postData)).toList();
   }
 
-  /// Post를 PostData로 변환
-  PostData _convertPostToPostData(Post post) {
-    return PostData(
-      id: post.id,
-      authorId: post.authorId,
-      author: post.authorNickname, // PostData는 author 필드 사용
-      authorProfileImage: post.authorProfileImage,
-      content: post.content,
-      hashtags: post.hashtags ?? [],
-      likes: post.likeCount, // PostData는 likes 필드 사용
-      comments: post.commentCount, // PostData는 comments 필드가 int
-      isLiked: post.isLikedByCurrentUser,
-      isBookmarked: post.isBookmarkedByCurrentUser,
-      shareCount: post.shareCount,
-      isSharedByCurrentUser: post.isSharedByCurrentUser,
-      title: post.title, // Post 모델의 title 필드 사용
-      timeAgo: _getTimeAgo(post.createdAt),
-      category: post.category,
-      isFollowing: false, // 기본값
+  /// PostData를 Post로 변환
+  Post _convertPostDataToPost(PostData postData) {
+    return Post(
+      id: postData.id,
+      authorId: postData.authorId,
+      authorNickname: postData.author,
+      authorProfileImage: postData.authorProfileImage,
+      title: postData.title,
+      content: postData.content,
+      images: [], // PostData에는 images 필드가 없으므로 빈 배열
+      hashtags: postData.hashtags,
+      category: postData.category,
+      likeCount: postData.likes,
+      commentCount: postData.comments,
+      shareCount: postData.shareCount,
+      isLikedByCurrentUser: postData.isLiked,
+      isBookmarkedByCurrentUser: postData.isBookmarked,
+      isSharedByCurrentUser: postData.isSharedByCurrentUser,
+      createdAt: DateTime.now().subtract(Duration(hours: int.parse(postData.timeAgo.split('시간')[0]))),
+      updatedAt: DateTime.now().subtract(Duration(hours: int.parse(postData.timeAgo.split('시간')[0]))),
     );
   }
+
 
   /// 시간 차이를 문자열로 변환
   String _getTimeAgo(DateTime dateTime) {
@@ -1257,9 +1247,7 @@ class _CommunityScreenState extends State<CommunityScreen>
       
       setState(() {
         _myPosts.clear();
-        _myPosts.addAll(
-          posts.map((post) => _convertPostToPostData(post)).toList(),
-        );
+        _myPosts.addAll(posts);
       });
     } catch (e) {
       print('내 게시글 로드 실패, Mock 데이터 사용: $e');
@@ -1276,30 +1264,98 @@ class _CommunityScreenState extends State<CommunityScreen>
     }
   }
 
-  void _handleMenuAction(String action, PostData post) async {
+  void _handleMenuAction(String action, Post post) async {
     switch (action) {
+      case 'edit':
+        _editPost(post);
+        break;
+      case 'delete':
+        _deletePost(post);
+        break;
       case 'report':
         await ReportService().showReportDialog(
           context: context,
           type: ReportType.post,
           targetId: post.id,
-          targetTitle: post.title,
+          targetTitle: post.title ?? '게시글',
         );
         break;
       case 'block':
         final shouldBlock = await BlockService().showBlockConfirmDialog(
           context,
-          1, // TODO: 실제 작성자 ID로 변경
-          post.author,
+          post.authorId,
+          post.authorNickname,
         );
         if (shouldBlock) {
-          await BlockService().blockUser(1, post.author, context);
+          await BlockService().blockUser(post.authorId, post.authorNickname, context);
         }
         break;
       case 'hide':
         await BlockService().hidePost(post.id, context);
         // TODO: 게시글 목록에서 제거
         break;
+    }
+  }
+
+  // 게시글 수정
+  void _editPost(Post post) async {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => EditPostScreen(
+          post: post,
+          onPostUpdated: () {
+            // 게시글 목록 새로고침
+            _loadMyPosts();
+          },
+        ),
+      ),
+    );
+  }
+
+  // 게시글 삭제
+  void _deletePost(Post post) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('게시글 삭제'),
+        content: const Text('이 게시글을 삭제하시겠습니까?\n삭제된 게시글은 복구할 수 없습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('삭제'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        final success = await _communityService.deletePost(post.id);
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('게시글이 삭제되었습니다.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // 게시글 목록 새로고침
+          _loadMyPosts();
+        } else {
+          throw Exception('게시글 삭제에 실패했습니다.');
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('게시글 삭제 중 오류가 발생했습니다: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

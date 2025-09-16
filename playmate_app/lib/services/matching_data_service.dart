@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/matching.dart';
 import '../models/user.dart';
 import 'api_service.dart';
@@ -184,8 +185,9 @@ class MatchingDataService {
   // 인증 토큰 가져오기
   static Future<String?> _getAuthToken() async {
     try {
-      // 임시로 개발용 토큰 사용 (백엔드에서 temp_jwt_token을 허용하도록 설정됨)
-      return 'temp_jwt_token';
+      // 실제 인증 토큰 사용
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('playmate_auth_token') ?? 'temp_jwt_token';
       
       // 실제 운영환경에서는 아래 코드 사용
       /*

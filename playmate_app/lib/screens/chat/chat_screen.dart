@@ -9,7 +9,7 @@ import '../../constants/app_text_styles.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_text_field.dart';
 
-import '../review/review_list_screen.dart';
+import '../review/write_review_screen.dart';
 import '../../services/websocket_service.dart';
 import '../../services/matching_state_service.dart';
 import '../../services/matching_notification_service.dart';
@@ -52,100 +52,49 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _isHost = widget.currentUser.id == widget.matching.host.id;
+    _isHost = widget.currentUser.email == widget.matching.host.email;
+    _validateChatPermission();
     _loadInitialMessages();
-    _checkAndConnectWebSocket();
-    
-    // 매칭 상태 서비스 초기화 및 리스너 등록
-    final stateService = MatchingStateService();
-    stateService.initializeMatchingState(widget.matching.id, widget.matching.status);
-    stateService.addStateChangeListener(widget.matching.id, _onMatchingStateChanged);
-    
-    // 채팅 화면 진입시 백엔드에 채팅방 존재 확인/생성 요청
-    _ensureChatRoomExists();
-    
-    // 채팅 화면이 활성화될 때 읽지 않은 메시지들을 읽음 처리
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _markMessagesAsRead();
-    });
+    _connectWebSocket();
   }
 
-  // WebSocket 연결 상태 확인 및 연결
-  void _checkAndConnectWebSocket() {
-    // 현재 화면의 매칭으로 항상 연결 시도 (다른 매칭에 연결돼 있었다면 내부에서 안전하게 재연결)
-    _connectWebSocket();
+  // 채팅 권한 검증
+  void _validateChatPermission() {
+    final isHost = widget.currentUser.email == widget.matching.host.email;
+    final isChatPartnerHost = widget.chatPartner?.email == widget.matching.host.email;
+    
+    // 권한 체크: 호스트이거나 호스트와의 채팅이어야 함
+    if (!isHost && !isChatPartnerHost) {
+      // 잘못된 채팅 권한 - 뒤로가기
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('채팅 권한이 없습니다.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      });
+    }
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
-    // WebSocket 연결은 유지 (다른 화면에서도 사용)
     super.dispose();
   }
 
-  void _loadInitialMessages() async {
+  // 초기 메시지 로딩
+  Future<void> _loadInitialMessages() async {
     try {
-      // 실제 API에서 메시지 로딩
-      final chatService = ChatService();
-      final roomId = widget.matching.id; // 매칭 ID를 채팅방 ID로 사용
-      
-      final apiMessages = await chatService.getChatMessages(
-        roomId: roomId,
-        limit: 50,
-      );
-      
-      if (apiMessages.isNotEmpty && mounted) {
-        setState(() {
-          _messages
-            ..clear()
-            ..addAll(apiMessages);
-        });
-        
-        // API 메시지를 로컬에도 저장
-        for (final message in apiMessages) {
-          await _localStore.saveMessage(roomId, message);
-        }
-      } else {
-        // API에서 메시지가 없으면 로컬 저장소에서 로드
-        final localMessages = await _localStore.loadMessages(widget.matching.id);
-        if (localMessages.isNotEmpty && mounted) {
-          setState(() {
-            _messages
-              ..clear()
-              ..addAll(localMessages);
-          });
-        }
-      }
-    } catch (e) {
-      print('메시지 로딩 실패: $e');
-      // API 실패시 로컬 저장소에서 로드
+      // 로컬 저장소에서 메시지 가져오기
       final localMessages = await _localStore.loadMessages(widget.matching.id);
-      if (localMessages.isNotEmpty && mounted) {
+      if (localMessages.isNotEmpty) {
         setState(() {
-          _messages
-            ..clear()
-            ..addAll(localMessages);
+          _messages.addAll(localMessages);
         });
-      }
-    }
-  }
-
-  /// 채팅방 존재 확인 및 생성
-  Future<void> _ensureChatRoomExists() async {
-    try {
-      final chatService = ChatService();
-      final partner = _isHost 
-          ? (widget.chatPartner ?? widget.matching.guests?.first)
-          : widget.matching.host;
-      
-      if (partner != null) {
-        // 백엔드에 채팅방 생성 요청 (이미 있으면 무시됨)
-        await chatService.createChatRoom(
-          widget.matching.id, 
-          widget.matching.host, 
-          partner
-        );
+        _scrollToBottom();
       }
     } catch (e) {
       if (kDebugMode) {
@@ -207,8 +156,8 @@ class _ChatScreenState extends State<ChatScreen> {
       // 플메 Socket.io 연결
       wsService.connect(widget.matching.id.toString(), widget.currentUser.id.toString());
       
-      // 연결 상태 수동 확인 (3초 후)
-      Future.delayed(const Duration(seconds: 3), () {
+      // 연결 상태 수동 확인 (1초 후)
+      Future.delayed(const Duration(seconds: 1), () {
         if (wsService.isConnected) {
           print('플메 수동 연결 상태 확인: 연결됨');
           setState(() {
@@ -234,6 +183,11 @@ class _ChatScreenState extends State<ChatScreen> {
   }
   
 
+
+  // WebSocket 재연결
+  void _checkAndConnectWebSocket() {
+    _connectWebSocket();
+  }
 
   // 연결 상태 표시 위젯 (연결이 정상이면 숨김)
   Widget _buildConnectionStatus() {
@@ -291,49 +245,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
 
 
-  Future<void> _writeReview() async {
-    // 채팅 상대방 찾기
-    User? chatPartner;
-    
-    if (_isHost) {
-      // 호스트인 경우: 게스트 중 하나를 채팅 상대방으로 설정
-      if (widget.matching.guests != null && widget.matching.guests!.isNotEmpty) {
-        chatPartner = widget.matching.guests!.first;
-      } else {
-        // 목업 데이터 사용
-        chatPartner = User(
-          id: 999,
-          email: 'test@example.com',
-          nickname: '테니스러버',
-          birthYear: 1990,
-          gender: 'male',
-          skillLevel: 3,
-          region: '서울',
-          preferredCourt: '잠실종합운동장',
-          preferredTime: ['오후', '저녁'],
-          playStyle: '공격적',
-          hasLesson: false,
-          mannerScore: 4.5,
-          startYearMonth: '2020-03',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-      }
-    } else {
-      // 게스트인 경우: 호스트를 채팅 상대방으로 설정
-      chatPartner = widget.matching.host;
-    }
-    
-    // 후기 목록 화면으로 이동 (채팅 상대방 정보 포함)
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => ReviewListScreen(
-          targetUser: chatPartner,
-          reviews: [], // TODO: 실제 리뷰 데이터 가져오기
-        ),
-      ),
-    );
-  }
 
 
 
@@ -363,6 +274,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 color: AppColors.textSecondary,
               ),
             ),
+            if (widget.chatPartner != null)
+              Text(
+                '${widget.chatPartner!.nickname}님과의 채팅',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
           ],
         ),
         backgroundColor: AppColors.surface,
@@ -446,61 +365,130 @@ class _ChatScreenState extends State<ChatScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                                  child: ElevatedButton(
-                  onPressed: _confirmMatching,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle, size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        '매칭확정',
-                        style: AppTextStyles.body.copyWith(
-                          fontWeight: FontWeight.w600,
+            // 호스트만 매칭확정 버튼 표시
+            if (widget.currentUser.email == widget.matching.host.email) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _confirmMatching,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                    ],
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            '매칭확정',
+                            style: AppTextStyles.body.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ] else ...[
-            // 확정 취소 버튼을 먼저 표시
-            Row(
-              children: [
-                Expanded(
-                  child: AppButton(
-                    text: '확정 취소',
-                    icon: Icons.cancel,
-                    type: ButtonType.secondary,
-                    onPressed: _cancelMatchingConfirmation,
-                  ),
+            // 게스트용 상태 표시
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.3),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: AppButton(
-                    text: '후기 작성',
-                    icon: Icons.rate_review,
-                    type: ButtonType.primary,
-                    onPressed: _writeReview,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: AppColors.accent,
+                    size: 16,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _getGuestStatusMessage(),
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+            // 일정 완료 시 후기 작성 버튼 표시
+            if (widget.matching.status == 'confirmed' && _isScheduleCompleted()) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      text: '후기 작성',
+                      icon: Icons.rate_review,
+                      type: ButtonType.primary,
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => WriteReviewScreen(
+                              targetUser: widget.matching.host,
+                              matching: widget.matching,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              // 확정 취소 버튼을 먼저 표시
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      text: '확정 취소',
+                      icon: Icons.cancel,
+                      type: ButtonType.secondary,
+                      onPressed: _cancelMatchingConfirmation,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: AppButton(
+                      text: '후기 작성',
+                      icon: Icons.rate_review,
+                      type: ButtonType.primary,
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => WriteReviewScreen(
+                              targetUser: widget.matching.host,
+                              matching: widget.matching,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 16),
             // 확정 완료 메시지를 버튼 아래에 표시
             Container(
@@ -904,15 +892,15 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Row(
         children: [
-          // 이미지 첨부 버튼
+          // 통합 첨부 버튼
           Container(
             decoration: BoxDecoration(
-              color: AppColors.accent,
+              color: AppColors.primary,
               borderRadius: BorderRadius.circular(8),
             ),
             child: PopupMenuButton<String>(
-              icon: const Icon(Icons.image, color: AppColors.textPrimary),
-              tooltip: '이미지 첨부',
+              icon: const Icon(Icons.attach_file, color: Colors.white),
+              tooltip: '첨부',
               onSelected: (value) {
                 if (_isLoading) return;
                 switch (value) {
@@ -921,6 +909,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     break;
                   case 'camera':
                     _pickImage(ImageSource.camera);
+                    break;
+                  case 'location':
+                    _shareLocation();
+                    break;
+                  case 'file':
+                    _pickFile();
                     break;
                 }
               },
@@ -931,7 +925,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       Icon(Icons.photo_library, size: 20),
                       SizedBox(width: 8),
-                      Text('갤러리에서 선택'),
+                      Text('이미지'),
                     ],
                   ),
                 ),
@@ -941,37 +935,31 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       Icon(Icons.camera_alt, size: 20),
                       SizedBox(width: 8),
-                      Text('카메라로 촬영'),
+                      Text('카메라'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'location',
+                  child: Row(
+                    children: [
+                      Icon(Icons.location_on, size: 20),
+                      SizedBox(width: 8),
+                      Text('위치'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'file',
+                  child: Row(
+                    children: [
+                      Icon(Icons.attach_file, size: 20),
+                      SizedBox(width: 8),
+                      Text('파일'),
                     ],
                   ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // 위치 공유 버튼
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.secondary,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.location_on, color: Colors.white),
-              onPressed: _isLoading ? null : _shareLocation,
-              tooltip: '위치 공유',
-            ),
-          ),
-          const SizedBox(width: 8),
-          // 파일 첨부 버튼
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.warning,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.attach_file, color: Colors.white),
-              onPressed: _isLoading ? null : _pickFile,
-              tooltip: '파일 첨부',
             ),
           ),
           const SizedBox(width: 8),
@@ -1071,8 +1059,46 @@ class _ChatScreenState extends State<ChatScreen> {
       
     } catch (e) {
       print('WebSocket 메시지 전송 실패: $e');
-      // 전송 실패 시 상태를 'sent'로 유지
+      
+      // 전송 실패 시 상태를 'failed'로 업데이트
+      setState(() {
+        final index = _messages.indexWhere((m) => m.id == message.id);
+        if (index != -1) {
+          _messages[index] = message.copyWith(
+            status: 'failed',
+          );
+        }
+      });
+      
+      // 사용자에게 실패 알림
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('메시지 전송에 실패했습니다. 네트워크를 확인해주세요.'),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: '재시도',
+              textColor: Colors.white,
+              onPressed: () => _retryFailedMessage(message),
+            ),
+          ),
+        );
+      }
     }
+  }
+
+  // 실패한 메시지 재시도
+  Future<void> _retryFailedMessage(ChatMessage message) async {
+    setState(() {
+      final index = _messages.indexWhere((m) => m.id == message.id);
+      if (index != -1) {
+        _messages[index] = message.copyWith(
+          status: 'sent',
+        );
+      }
+    });
+    
+    await _sendMessageViaWebSocket(message);
   }
 
   void _scrollToBottom() {
@@ -1351,6 +1377,52 @@ class _ChatScreenState extends State<ChatScreen> {
 
 
 
+  // 게스트용 상태 메시지 생성
+  String _getGuestStatusMessage() {
+    final status = widget.matching.status;
+    final isScheduleCompleted = _isScheduleCompleted();
+    
+    switch (status) {
+      case 'recruiting':
+        return '현재 매칭 진행 중입니다. 호스트가 참여자를 확정할 때까지 기다려주세요.';
+      case 'confirmed':
+        if (isScheduleCompleted) {
+          return '일정이 완료되었습니다. 후기를 작성해보세요!';
+        } else {
+          return '매칭이 확정되었습니다! 일정에 맞춰 참여해주세요.';
+        }
+      case 'completed':
+        return '매칭이 완료되었습니다.';
+      case 'cancelled':
+        return '매칭이 취소되었습니다.';
+      default:
+        return '매칭 상태를 확인 중입니다.';
+    }
+  }
+
+  // 일정 완료 여부 확인
+  bool _isScheduleCompleted() {
+    final now = DateTime.now();
+    final matchingDate = DateTime.parse(widget.matching.date.toString());
+    final timeSlot = widget.matching.timeSlot;
+    
+    // 시간 슬롯에서 종료 시간 추출 (예: "18:00~20:00" -> "20:00")
+    final endTimeStr = timeSlot.split('~')[1];
+    final endHour = int.parse(endTimeStr.split(':')[0]);
+    final endMinute = int.parse(endTimeStr.split(':')[1]);
+    
+    // 일정 종료 시간 계산
+    final scheduleEndTime = DateTime(
+      matchingDate.year,
+      matchingDate.month,
+      matchingDate.day,
+      endHour,
+      endMinute,
+    );
+    
+    return now.isAfter(scheduleEndTime);
+  }
+
   // 매칭 확정 함수
   void _confirmMatching() {
     showDialog(
@@ -1437,43 +1509,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // 매칭 상태 변경 리스너
-  void _onMatchingStateChanged(String newStatus) {
-    setState(() {
-      _isMatchingConfirmed = newStatus == 'confirmed';
-    });
-  }
-
-    // 읽지 않은 메시지들을 읽음 처리
-  void _markMessagesAsRead() {
-    final now = DateTime.now();
-    bool hasChanges = false;
-
-    for (int i = 0; i < _messages.length; i++) {
-      final message = _messages[i];
-
-      // 내가 보낸 메시지가 아니고, 아직 읽지 않은 메시지인 경우
-      if (message.senderId != widget.currentUser.id &&
-          message.status != 'read' &&
-          message.messageType != 'system') {
-
-        _messages[i] = message.copyWith(
-          status: 'read',
-          readAt: now,
-        );
-        hasChanges = true;
-      }
-    }
-
-    if (hasChanges) {
-      setState(() {});
-
-      // WebSocket이 연결된 경우에만 읽음 상태 전송
-      if (_isWebSocketConnected) {
-        _sendReadReceipt();
-      }
-    }
-  }
 
 
 

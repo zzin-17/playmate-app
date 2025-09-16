@@ -7,18 +7,36 @@ const path = require('path');
 const STORAGE_FILE = path.join(__dirname, '../../data/matchings.json');
 
 // 저장소 초기화
-let memoryStore = [];
+let memoryStore = {
+  matchings: new Map(),
+  nextId: 1
+};
 
 // 파일에서 데이터 로드
 function loadFromFile() {
   try {
     if (fs.existsSync(STORAGE_FILE)) {
       const data = fs.readFileSync(STORAGE_FILE, 'utf8');
-      memoryStore = JSON.parse(data);
-      console.log(`📁 파일에서 ${memoryStore.length}개 매칭 로드됨`);
+      const loadedData = JSON.parse(data);
+      
+      // Map 구조로 변환
+      memoryStore.matchings = new Map();
+      if (Array.isArray(loadedData)) {
+        loadedData.forEach(matching => {
+          memoryStore.matchings.set(matching.id, matching);
+        });
+        memoryStore.nextId = Math.max(...loadedData.map(m => m.id), 0) + 1;
+      } else if (loadedData.matchings) {
+        Object.entries(loadedData.matchings).forEach(([id, matching]) => {
+          memoryStore.matchings.set(parseInt(id), matching);
+        });
+        memoryStore.nextId = loadedData.nextId || 1;
+      }
+      
+      console.log(`📁 파일에서 ${memoryStore.matchings.size}개 매칭 로드됨`);
       
       // 디버깅: 887887 매칭 상태 확인
-      const matching887887 = memoryStore.find(m => m.id === 1757407253725);
+      const matching887887 = memoryStore.matchings.get(1757407253725);
       if (matching887887) {
         console.log(`🔍 파일에서 로드된 887887 매칭 상태: ${matching887887.status}`);
       } else {
@@ -30,12 +48,18 @@ function loadFromFile() {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      memoryStore = [];
+      memoryStore = {
+        matchings: new Map(),
+        nextId: 1
+      };
       console.log('📁 새로운 저장소 파일 생성됨');
     }
   } catch (error) {
     console.error('📁 파일 로드 오류:', error);
-    memoryStore = [];
+    memoryStore = {
+      matchings: new Map(),
+      nextId: 1
+    };
   }
 }
 
@@ -46,8 +70,15 @@ function saveToFile() {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(STORAGE_FILE, JSON.stringify(memoryStore, null, 2));
-    console.log(`💾 ${memoryStore.length}개 매칭을 파일에 저장됨`);
+    
+    // Map을 일반 객체로 변환하여 저장
+    const dataToSave = {
+      matchings: Object.fromEntries(memoryStore.matchings),
+      nextId: memoryStore.nextId
+    };
+    
+    fs.writeFileSync(STORAGE_FILE, JSON.stringify(dataToSave, null, 2));
+    console.log(`💾 ${memoryStore.matchings.size}개 매칭을 파일에 저장됨`);
   } catch (error) {
     console.error('💾 파일 저장 오류:', error);
   }
@@ -63,7 +94,7 @@ const getMatchings = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, gameType, status } = req.query;
   
   // 메모리 저장소의 데이터만 사용 (하드코딩된 데이터 제거)
-  const allMatchings = [...memoryStore];
+  const allMatchings = Array.from(memoryStore.matchings.values());
   
   // 디버깅: 887887 매칭 상태 확인
   const matching887887 = allMatchings.find(m => m.id === 1757407253725);
@@ -90,15 +121,14 @@ const getMatchings = asyncHandler(async (req, res) => {
 // @route   GET /api/matchings/:id
 // @access  Private
 const getMatching = asyncHandler(async (req, res) => {
-  const matching = await Matching.findById(req.params.id)
-    .populate('host', 'nickname profileImage bio')
-    .populate('guests.user', 'nickname profileImage bio');
+  const matchingId = parseInt(req.params.id);
+  const matching = memoryStore.matchings.get(matchingId);
   
   if (!matching) {
     res.status(404);
     throw new Error('Matching not found');
   }
-  
+
   res.json({
     success: true,
     data: matching

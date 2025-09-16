@@ -7,7 +7,6 @@ import '../../models/user.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../services/matching_data_service.dart';
-import '../../services/tennis_court_service.dart';
 import '../../models/tennis_court.dart';
 import 'court_selection_screen.dart';
 
@@ -29,7 +28,6 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
   
   // 테니스장 선택 관련
   TennisCourt? _selectedCourt;
-  final TennisCourtService _courtService = TennisCourtService();
   
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   String _selectedStartTime = '18:00';
