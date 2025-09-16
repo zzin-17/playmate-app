@@ -4552,8 +4552,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ? aLevel.compareTo(bLevel)
                 : bLevel.compareTo(aLevel);
           case 'participants':
-            final aTotal = (a.maleRecruitCount ?? 0) + (a.femaleRecruitCount ?? 0);
-            final bTotal = (b.maleRecruitCount ?? 0) + (b.femaleRecruitCount ?? 0);
+            final aTotal = a.maleRecruitCount + a.femaleRecruitCount;
+            final bTotal = b.maleRecruitCount + b.femaleRecruitCount;
             return _sortAscending 
                 ? aTotal.compareTo(bTotal)
                 : bTotal.compareTo(aTotal);

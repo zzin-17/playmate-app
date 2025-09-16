@@ -33,7 +33,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nicknameController.text = widget.currentUser.nickname ?? '';
+    _nicknameController.text = widget.currentUser.nickname;
     _bioController.text = widget.currentUser.bio ?? '';
   }
 
@@ -211,7 +211,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           // 이메일 (읽기 전용)
           AppTextField(
             label: '이메일',
-            hint: widget.currentUser.email ?? '',
+            hint: widget.currentUser.email,
             enabled: false,
             suffixIcon: const Icon(Icons.lock),
           ),

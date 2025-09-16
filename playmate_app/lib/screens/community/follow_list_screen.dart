@@ -221,7 +221,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user.nickname ?? '사용자',
+                    user.nickname,
                     style: AppTextStyles.h3.copyWith(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

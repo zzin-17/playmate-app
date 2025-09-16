@@ -1277,7 +1277,7 @@ class _CommunityScreenState extends State<CommunityScreen>
           context: context,
           type: ReportType.post,
           targetId: post.id,
-          targetTitle: post.title ?? '게시글',
+          targetTitle: post.title,
         );
         break;
       case 'block':
@@ -1566,7 +1566,7 @@ class _UserSearchDialogState extends State<UserSearchDialog> {
           backgroundImage: NetworkImage(user.profileImage ?? 'https://via.placeholder.com/40x40'),
           onBackgroundImageError: (_, __) {},
         ),
-        title: Text(user.nickname ?? '사용자'),
+        title: Text(user.nickname),
         subtitle: Text('${user.skillLevel}년차 • ${user.region}'),
         trailing: ElevatedButton(
           onPressed: () => _followUser(user),
