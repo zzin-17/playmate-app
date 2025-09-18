@@ -27,6 +27,9 @@ class CommunityService {
     String? search,
   }) async {
     try {
+      final token = await _getAuthToken();
+      if (token == null) throw Exception('인증 토큰이 없습니다');
+
       final queryParams = <String, String>{
         'page': page.toString(),
         'limit': limit.toString(),
@@ -40,26 +43,29 @@ class CommunityService {
         queryParams['search'] = search;
       }
 
+      // 쿼리 파라미터를 URL에 직접 추가
+      final uri = Uri.parse('${ApiService.baseUrl}/community/posts').replace(
+        queryParameters: queryParams,
+      );
+      
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:3000/api/community/posts').replace(
-          queryParameters: queryParams,
-        ),
+        uri,
         headers: {
-          'Authorization': 'Bearer ${await _getAuthToken()}',
+          'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['success'] == true) {
-          return (data['data'] as List)
-              .map((json) => Post.fromJson(json))
-              .toList();
+        if (data['success'] == true && data['data'] != null) {
+          return (data['data'] as List).map((json) => _convertApiPostToPost(json)).toList();
+        } else {
+          throw Exception('게시글 목록 조회 실패: ${data['message'] ?? 'Unknown error'}');
         }
+      } else {
+        throw Exception('게시글 목록 조회 실패: ${response.statusCode}');
       }
-      
-      throw Exception('게시글 목록 조회 실패: ${response.statusCode}');
     } catch (e) {
       print('게시글 목록 조회 오류: $e');
       return [];
@@ -108,7 +114,7 @@ class CommunityService {
       };
 
       final response = await ApiService.post(
-        '/posts',
+        '/community/posts',
         body: json.encode(postData),
         headers: {
           'Authorization': 'Bearer $token',
@@ -117,8 +123,12 @@ class CommunityService {
       );
 
       if (response.statusCode == 201) {
-        final data = json.decode(response.body);
-        return Post.fromJson(data);
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true && responseData['data'] != null) {
+          return _convertApiPostToPost(responseData['data']);
+        } else {
+          throw Exception('게시글 작성 응답 형식 오류');
+        }
       } else {
         throw Exception('게시글 작성 실패: ${response.statusCode}');
       }
@@ -370,13 +380,17 @@ class CommunityService {
       if (token == null) throw Exception('인증 토큰이 없습니다');
 
       final response = await ApiService.get(
-        '/posts/my-posts',
+        '/community/posts/my-posts',
         headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return (data as List).map((json) => Post.fromJson(json)).toList();
+        if (data['success'] == true && data['data'] != null) {
+          return (data['data'] as List).map((json) => _convertApiPostToPost(json)).toList();
+        } else {
+          throw Exception('내 게시글 조회 실패: ${data['message'] ?? 'Unknown error'}');
+        }
       } else {
         throw Exception('내 게시글 조회 실패: ${response.statusCode}');
       }
@@ -384,6 +398,36 @@ class CommunityService {
       print('내 게시글 조회 오류: $e');
       return [];
     }
+  }
+
+  /// API 응답을 Post 모델로 변환
+  Post _convertApiPostToPost(Map<String, dynamic> apiData) {
+    print('🔍 _convertApiPostToPost 호출됨: ${apiData['id']} - ${apiData['content']}');
+    
+    final post = Post(
+      id: apiData['id'] ?? 0,
+      authorId: apiData['authorId'] ?? 0,
+      authorNickname: apiData['authorNickname'] ?? '',
+      authorProfileImage: apiData['authorProfileImage'],
+      content: apiData['content'] ?? '',
+      images: apiData['images'] != null ? List<String>.from(apiData['images']) : null,
+      videoUrl: apiData['videoUrl'],
+      hashtags: apiData['hashtags'] != null ? List<String>.from(apiData['hashtags']) : null,
+      location: apiData['location'],
+      category: apiData['category'] ?? 'general',
+      likeCount: apiData['likes'] ?? 0,
+      commentCount: apiData['comments'] ?? 0,
+      shareCount: apiData['shares'] ?? 0,
+      isLikedByCurrentUser: apiData['isLiked'] ?? false,
+      isBookmarkedByCurrentUser: apiData['isBookmarked'] ?? false,
+      isSharedByCurrentUser: apiData['isShared'] ?? false,
+      comments: null, // API에서 댓글 목록을 별도로 가져와야 함
+      createdAt: DateTime.parse(apiData['createdAt'] ?? DateTime.now().toIso8601String()),
+      updatedAt: DateTime.parse(apiData['updatedAt'] ?? DateTime.now().toIso8601String()),
+    );
+    
+    print('🔍 Post 객체 생성 완료: ${post.id} - ${post.content}');
+    return post;
   }
 
   /// 이미지 업로드

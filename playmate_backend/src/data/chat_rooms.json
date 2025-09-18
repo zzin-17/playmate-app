@@ -1,24 +1,46 @@
 [
   {
-    "id": 1,
+    "id": 1758098127231,
     "type": "direct",
     "name": null,
     "participants": [
       {
-        "userId": "temp_id_1",
-        "joinedAt": "2025-09-15T01:45:26.351Z",
-        "lastReadAt": "2025-09-15T01:45:26.351Z"
+        "userId": 912738,
+        "joinedAt": "2025-09-17T08:35:27.231Z",
+        "lastReadAt": "2025-09-17T08:35:27.231Z"
       },
       {
-        "userId": 3,
-        "joinedAt": "2025-09-15T01:45:26.351Z",
-        "lastReadAt": "2025-09-15T01:45:26.351Z"
+        "userId": 974640,
+        "joinedAt": "2025-09-17T08:35:27.231Z",
+        "lastReadAt": "2025-09-17T08:35:27.231Z"
       }
     ],
     "lastMessage": null,
     "isActive": true,
-    "matchingId": 1757655133385,
-    "createdAt": "2025-09-15T01:45:26.351Z",
-    "updatedAt": "2025-09-15T01:45:26.351Z"
+    "matchingId": 1758094285772,
+    "createdAt": "2025-09-17T08:35:27.231Z",
+    "updatedAt": "2025-09-17T08:35:27.231Z"
+  },
+  {
+    "id": 1758098127232,
+    "type": "direct",
+    "name": null,
+    "participants": [
+      {
+        "userId": 912738,
+        "joinedAt": "2025-09-18T02:28:20.660Z",
+        "lastReadAt": "2025-09-18T02:28:20.660Z"
+      },
+      {
+        "userId": 974640,
+        "joinedAt": "2025-09-18T02:28:20.660Z",
+        "lastReadAt": "2025-09-18T02:28:20.660Z"
+      }
+    ],
+    "lastMessage": null,
+    "isActive": true,
+    "matchingId": 1758095574165,
+    "createdAt": "2025-09-18T02:28:20.660Z",
+    "updatedAt": "2025-09-18T02:28:20.660Z"
   }
 ]

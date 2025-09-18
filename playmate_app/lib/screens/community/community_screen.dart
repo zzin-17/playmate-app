@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
@@ -14,12 +15,18 @@ import '../../services/share_service.dart';
 import '../../services/report_service.dart';
 import '../../services/block_service.dart';
 import '../../services/notification_service.dart';
-import '../../services/mock_post_service.dart';
 import '../../services/community_service.dart';
 import 'package:provider/provider.dart';
 
 class CommunityScreen extends StatefulWidget {
-  const CommunityScreen({super.key});
+  final int initialTabIndex; // 초기 탭 인덱스 (0: All, 1: My)
+  final bool showBackButton; // 뒤로가기 버튼 표시 여부
+  
+  const CommunityScreen({
+    super.key,
+    this.initialTabIndex = 0,
+    this.showBackButton = false,
+  });
 
   @override
   State<CommunityScreen> createState() => _CommunityScreenState();
@@ -31,13 +38,18 @@ class _CommunityScreenState extends State<CommunityScreen>
   final CommunityService _communityService = CommunityService();
   
   // 게시글 데이터
-  final List<Post> _feedPosts = [];
-  final List<Post> _followingPosts = [];
-  final List<Post> _trendingPosts = [];
-  final List<Post> _myPosts = []; // 내 게시글 추가
+  final List<Post> _feedPosts = [];      // 전체 게시글 (All 탭용)
+  final List<Post> _followingPosts = []; // 팔로잉 게시글
+  final List<Post> _trendingPosts = [];  // 인기 게시글
+  final List<Post> _myPosts = [];        // 내 게시글 (My 탭용)
   
   // 로딩 상태
   bool _isLoading = false;
+  bool _hasTriedLoadingMyPosts = false; // 내 게시글 로딩 시도 여부
+  
+  // 자동 새로고침 타이머
+  Timer? _autoRefreshTimer;
+  final Duration _refreshInterval = const Duration(seconds: 15); // 실시간 (15초마다)
 
   
   // 필터 상태
@@ -52,22 +64,33 @@ class _CommunityScreenState extends State<CommunityScreen>
     @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this); // 2개 탭으로 변경
+    _tabController = TabController(
+      length: 2, 
+      vsync: this,
+      initialIndex: widget.initialTabIndex, // 초기 탭 설정
+    );
+    
+    // 탭 변경 리스너 추가
+    _tabController.addListener(() {
+      print('🔍 탭 변경됨: ${_tabController.index}');
+      if (_tabController.index == 1) { // My 탭
+        print('🔍 My 탭 선택됨 - _myPosts 길이: ${_myPosts.length}');
+      }
+    });
     
     // 스크롤 리스너 추가
     _scrollController.addListener(_onScroll);
     
-    // 초기 데이터 로딩
-    _loadInitialData();
-    _loadMyPosts(); // 내 게시글 로드 추가
+    // 초기 데이터 로드 (비동기로 처리)
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadAllPosts();  // 전체 게시글 로드
+      // _loadMyPosts는 필요할 때만 호출 (탭 선택 시)
+    });
+    
+    // 자동 새로고침 타이머 시작 (새로운 게시글 업데이트)
+    _startAutoRefreshTimer();
   }
 
-  // 본문에서 해시태그 추출
-  List<String> _extractHashtagsFromContent(String content) {
-    final hashtagRegex = RegExp(r'#(\w+)');
-    final matches = hashtagRegex.allMatches(content);
-    return matches.map((match) => match.group(1)!).toList();
-  }
 
   // 본문과 해시태그를 함께 표시 (해시태그는 칩으로 변환)
   Widget _buildContentWithHashtags(String content) {
@@ -146,34 +169,37 @@ class _CommunityScreenState extends State<CommunityScreen>
     );
   }
 
-  // 게시글 등록 후 피드 새로고침
+  // 게시글 등록 후 피드 새로고침 (실제 환경에 적합)
   void _refreshFeedAfterPostCreation(Map<String, dynamic>? postData) {
-    if (postData != null) {
-      // 새로 등록된 게시글을 피드 맨 위에 추가
-      final newPost = Post(
-        id: DateTime.now().millisecondsSinceEpoch, // 고유 ID 생성
-        authorId: postData['authorId'] ?? 999,
-        authorNickname: postData['author'] ?? '현재 사용자',
-        authorProfileImage: 'https://via.placeholder.com/40x40',
-        title: '새 게시글', // 제목 없음
-        content: postData['content'] ?? '내용 없음',
-        images: [],
-        hashtags: _extractHashtagsFromContent(postData['content'] ?? ''),
-        category: '일반', // 기본 카테고리
-        likeCount: 0,
-        commentCount: 0,
-        shareCount: 0,
-        isLikedByCurrentUser: false,
-        isBookmarkedByCurrentUser: false,
-        isSharedByCurrentUser: false,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-      
-      setState(() {
-        _feedPosts.insert(0, newPost); // 맨 위에 새 게시글 추가
-        _myPosts.insert(0, newPost); // 내 게시글에도 추가
-      });
+    // 게시글 작성 후 전체 데이터 새로고침 (API에서 최신 데이터 가져오기)
+    _hasTriedLoadingMyPosts = false; // 플래그 리셋
+    _loadAllPosts();
+    _loadMyPosts();
+  }
+
+  // 실시간 새로고침 타이머 시작
+  void _startAutoRefreshTimer() {
+    print('🔄 커뮤니티 실시간 새로고침 활성화 (15초 주기)');
+    _autoRefreshTimer = Timer.periodic(_refreshInterval, (timer) {
+      if (mounted) {
+        _refreshCommunityData();
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+  
+  // 커뮤니티 데이터 새로고침 (기존 게시글 보존)
+  void _refreshCommunityData() {
+    print('🔄 커뮤니티 데이터 자동 새로고침 시작');
+    
+    // 기존 게시글은 보존하고 새로운 게시글만 추가
+    _loadAllPosts();  // 전체 게시글 새로고침
+    
+    // 현재 탭이 "My"이면 내 게시글도 새로고침
+    if (_tabController.index == 1) {
+      _hasTriedLoadingMyPosts = false; // 플래그 리셋
+      _loadMyPosts();
     }
   }
 
@@ -181,6 +207,7 @@ class _CommunityScreenState extends State<CommunityScreen>
   void dispose() {
     _tabController.dispose();
     _scrollController.dispose();
+    _autoRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -245,22 +272,28 @@ class _CommunityScreenState extends State<CommunityScreen>
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.surface,
         elevation: 0,
-        leading: IconButton(
-          icon: _isLoading 
-            ? SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.surface),
-                ),
-              )
-            : const Icon(Icons.refresh),
-          onPressed: _isLoading ? null : () {
-            _refreshFeedAfterPostCreation(null);
-          },
-          tooltip: '새로고침',
-        ),
+        leading: widget.showBackButton 
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
+              tooltip: '뒤로가기',
+            )
+          : IconButton(
+              icon: _isLoading 
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.surface),
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+              onPressed: _isLoading ? null : () {
+                _refreshFeedAfterPostCreation(null);
+              },
+              tooltip: '새로고침',
+            ),
         actions: [
           // 팔로우 관리 버튼
           IconButton(
@@ -459,6 +492,7 @@ class _CommunityScreenState extends State<CommunityScreen>
       case '인기':
         return _trendingPosts;
       default:
+        // "All" 탭에서는 전체 게시글 표시
         return _feedPosts;
     }
   }
@@ -468,8 +502,19 @@ class _CommunityScreenState extends State<CommunityScreen>
 
 
   Widget _buildMyPostsTab() {
+    print('🔍 _buildMyPostsTab 호출됨 - _myPosts 길이: ${_myPosts.length}');
+    
+    // 무한 루프 방지: 이미 로딩 중이거나 한 번 로드를 시도했으면 스킵
+    if (_myPosts.isEmpty && !_isLoading && !_hasTriedLoadingMyPosts) {
+      _hasTriedLoadingMyPosts = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadMyPosts();
+      });
+    }
+    
     return RefreshIndicator(
       onRefresh: () async {
+        _hasTriedLoadingMyPosts = false; // 새로고침 시 플래그 리셋
         _loadMyPosts(); // 내 게시글 새로고침
       },
       child: _myPosts.isEmpty
@@ -477,7 +522,16 @@ class _CommunityScreenState extends State<CommunityScreen>
           : ListView.builder(
               itemCount: _myPosts.length,
               itemBuilder: (context, index) {
-                return _buildPostCard(_myPosts[index]);
+                try {
+                  print('🔍 게시글 ${index} 렌더링: ${_myPosts[index].content}');
+                  return _buildPostCard(_myPosts[index]);
+                } catch (e) {
+                  print('❌ 게시글 ${index} 렌더링 오류: $e');
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('게시글을 불러올 수 없습니다: $e'),
+                  );
+                }
               },
             ),
     );
@@ -684,7 +738,8 @@ class _CommunityScreenState extends State<CommunityScreen>
   */
 
   Widget _buildPostCard(Post post) {
-    return Container(
+    try {
+      return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -918,6 +973,22 @@ class _CommunityScreenState extends State<CommunityScreen>
         ),
       ),
     );
+    } catch (e) {
+      print('❌ _buildPostCard 오류: $e');
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red[200]!),
+        ),
+        child: Text(
+          '게시글을 표시할 수 없습니다: $e',
+          style: TextStyle(color: Colors.red[700]),
+        ),
+      );
+    }
   }
 
   void _showFollowManagement() {
@@ -1075,7 +1146,7 @@ class _CommunityScreenState extends State<CommunityScreen>
 
     // 공유 시 알림 표시
     await NotificationService().showShareNotification(
-      postTitle: post.title,
+      postTitle: post.content.length > 30 ? '${post.content.substring(0, 30)}...' : post.content,
       sharerName: '현재 사용자', // TODO: 실제 사용자 이름으로 변경
     );
   }
@@ -1093,8 +1164,9 @@ class _CommunityScreenState extends State<CommunityScreen>
     );
   }
 
-  /// 초기 데이터 로딩
-  Future<void> _loadInitialData() async {
+  /// 전체 게시글 로딩 (All 탭용)
+  Future<void> _loadAllPosts() async {
+    print('🔍 _loadAllPosts 시작 - 전체 게시글 로드');
     if (_isLoading) return;
     
     setState(() {
@@ -1104,18 +1176,20 @@ class _CommunityScreenState extends State<CommunityScreen>
     });
 
     try {
-      // 초기 데이터를 바로 추가
-      final initialPosts = _getMockPostsForPage(1);
+      print('🔍 API에서 전체 게시글 로드 시작');
+      final posts = await _communityService.getPosts();
+      print('🔍 API에서 받은 전체 게시글 수: ${posts.length}');
       setState(() {
         _feedPosts.clear();
-        _feedPosts.addAll(initialPosts);
+        _feedPosts.addAll(posts);
         _currentPage = 2; // 다음 페이지부터 시작
       });
-      
-      // 추가 데이터 로딩 시뮬레이션
-      await Future.delayed(const Duration(milliseconds: 500));
+      print('🔍 _feedPosts에 추가된 게시글 수: ${_feedPosts.length}');
     } catch (e) {
-      print('초기 데이터 로딩 실패: $e');
+      print('전체 게시글 로딩 실패: $e');
+      setState(() {
+        _feedPosts.clear();
+      });
     } finally {
       setState(() {
         _isLoading = false;
@@ -1197,34 +1271,11 @@ class _CommunityScreenState extends State<CommunityScreen>
     return allPosts.sublist(startIndex, endIndex);
   }
 
-  /// 모든 목업 데이터 (폴백용)
+  /// 모든 목업 데이터 (폴백용) - 실제 환경에서는 사용하지 않음
   List<Post> _getAllMockPosts() {
-    final postDataList = MockPostService.getAllMockPosts();
-    return postDataList.map((postData) => _convertPostDataToPost(postData)).toList();
+    return []; // 실제 환경에서는 빈 목록 반환
   }
 
-  /// PostData를 Post로 변환
-  Post _convertPostDataToPost(PostData postData) {
-    return Post(
-      id: postData.id,
-      authorId: postData.authorId,
-      authorNickname: postData.author,
-      authorProfileImage: postData.authorProfileImage,
-      title: postData.title,
-      content: postData.content,
-      images: [], // PostData에는 images 필드가 없으므로 빈 배열
-      hashtags: postData.hashtags,
-      category: postData.category,
-      likeCount: postData.likes,
-      commentCount: postData.comments,
-      shareCount: postData.shareCount,
-      isLikedByCurrentUser: postData.isLiked,
-      isBookmarkedByCurrentUser: postData.isBookmarked,
-      isSharedByCurrentUser: postData.isSharedByCurrentUser,
-      createdAt: DateTime.now().subtract(Duration(hours: int.parse(postData.timeAgo.split('시간')[0]))),
-      updatedAt: DateTime.now().subtract(Duration(hours: int.parse(postData.timeAgo.split('시간')[0]))),
-    );
-  }
 
 
   /// 시간 차이를 문자열로 변환
@@ -1248,24 +1299,23 @@ class _CommunityScreenState extends State<CommunityScreen>
   /// 내 게시글 로드
   Future<void> _loadMyPosts() async {
     try {
+      print('🔍 _loadMyPosts 시작');
       // 실제 API 호출
       final posts = await _communityService.getMyPosts();
+      print('🔍 API에서 받은 게시글 수: ${posts.length}');
       
       setState(() {
+        // 기존 데이터를 새로운 데이터로 교체 (올바른 방식)
         _myPosts.clear();
         _myPosts.addAll(posts);
+        print('🔍 _myPosts에 추가된 게시글 수: ${_myPosts.length}');
       });
     } catch (e) {
-      print('내 게시글 로드 실패, Mock 데이터 사용: $e');
-      // API 실패 시 Mock 데이터 사용
-      final currentUserId = context.read<AuthProvider>().currentUser?.id ?? 1;
-      final allPosts = _getAllMockPosts();
-      
+      print('내 게시글 로드 실패: $e');
+      // API 실패 시에도 기존 데이터를 유지
       setState(() {
-        _myPosts.clear();
-        _myPosts.addAll(
-          allPosts.where((post) => post.authorId == currentUserId).toList(),
-        );
+        // 에러 발생 시에도 기존 데이터 유지
+        print('🔍 API 실패로 인해 기존 데이터 유지: ${_myPosts.length}개');
       });
     }
   }
@@ -1283,7 +1333,7 @@ class _CommunityScreenState extends State<CommunityScreen>
           context: context,
           type: ReportType.post,
           targetId: post.id,
-          targetTitle: post.title,
+          targetTitle: post.content.length > 30 ? '${post.content.substring(0, 30)}...' : post.content,
         );
         break;
       case 'block':
@@ -1410,7 +1460,6 @@ class _CommunityScreenState extends State<CommunityScreen>
 
 class PostData {
   final int id;
-  final String title;
   final String author;
   final int authorId;
   final String content;
@@ -1428,7 +1477,6 @@ class PostData {
 
   PostData({
     required this.id,
-    required this.title,
     required this.author,
     required this.authorId,
     required this.content,
@@ -1569,8 +1617,19 @@ class _UserSearchDialogState extends State<UserSearchDialog> {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundImage: NetworkImage(user.profileImage ?? 'https://via.placeholder.com/40x40'),
-          onBackgroundImageError: (_, __) {},
+          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+          backgroundImage: user.profileImage != null 
+            ? NetworkImage(user.profileImage!) 
+            : null,
+          child: user.profileImage == null 
+            ? Text(
+                user.nickname.isNotEmpty ? user.nickname[0].toUpperCase() : '?',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              )
+            : null,
         ),
         title: Text(user.nickname),
         subtitle: Text('${user.skillLevel}년차 • ${user.region}'),

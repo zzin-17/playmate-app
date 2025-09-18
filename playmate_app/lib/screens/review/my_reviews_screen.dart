@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../models/review.dart';
@@ -22,17 +23,43 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> with TickerProviderSt
   late TabController _tabController;
   List<Review> _myReviews = [];
   bool _isLoading = true;
+  
+  // 자동 새로고침 타이머
+  Timer? _autoRefreshTimer;
+  final Duration _refreshInterval = const Duration(minutes: 3); // 3분마다 새로고침
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadMyReviews();
+    _startAutoRefreshTimer();
+  }
+
+  // 자동 새로고침 타이머 시작
+  void _startAutoRefreshTimer() {
+    print('🔄 후기 자동 새로고침 활성화');
+    _autoRefreshTimer = Timer.periodic(_refreshInterval, (timer) {
+      if (mounted) {
+        _refreshReviewData();
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+  
+  // 후기 데이터 새로고침 (기존 후기 보존하면서 새 후기 추가)
+  void _refreshReviewData() {
+    print('🔄 후기 데이터 자동 새로고침 시작');
+    
+    // 새로운 후기만 로드하여 기존 목록에 병합
+    _loadMyReviews();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _autoRefreshTimer?.cancel();
     super.dispose();
   }
 

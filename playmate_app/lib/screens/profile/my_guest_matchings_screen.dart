@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../models/matching.dart';
 import '../../models/user.dart';
+import '../../services/api_service.dart';
 import '../matching/matching_detail_screen.dart';
 import '../review/write_review_screen.dart';
 
@@ -38,123 +40,45 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
   }
 
   // 게스트로 참여한 매칭 데이터 로드
-  void _loadMyGuestMatchings() {
-    // TODO: 실제 API 호출로 대체
-    setState(() {
-      _isLoading = false;
-      // 홈 화면의 모의 데이터를 사용하여 테스트
-      _myGuestMatchings = [
-        // 잠실종합운동장 (참여중)
-        Matching(
-          id: 101,
-          type: 'guest',
-          courtName: '잠실종합운동장',
-          courtLat: 37.512,
-          courtLng: 127.102,
-          date: DateTime.now().add(const Duration(days: 1)),
-          timeSlot: '18:00~20:00',
-          minLevel: 2,
-          maxLevel: 4,
-          gameType: 'mixed',
-          maleRecruitCount: 1,
-          femaleRecruitCount: 1,
-          status: 'recruiting',
-          guestCost: 15000,
-          host: User(
-            id: 101,
-            email: 'host101@example.com',
-            nickname: '잠실테니스',
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-          recoveryCount: 0,
-        ),
-        // 양재시민의숲 (확정)
-        Matching(
-          id: 102,
-          type: 'guest',
-          courtName: '양재시민의숲',
-          courtLat: 37.469,
-          courtLng: 127.038,
-          date: DateTime.now().add(const Duration(days: 2)),
-          timeSlot: '20:00~22:00',
-          minLevel: 3,
-          maxLevel: 5,
-          gameType: 'male_doubles',
-          maleRecruitCount: 2,
-          femaleRecruitCount: 0,
-          status: 'confirmed',
-          guestCost: 20000,
-          host: User(
-            id: 102,
-            email: 'player102@example.com',
-            nickname: '양재마스터',
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-          recoveryCount: 0,
-        ),
-        // 올림픽공원 테니스장 (완료)
-        Matching(
-          id: 103,
-          type: 'guest',
-          courtName: '올림픽공원 테니스장',
-          courtLat: 37.521,
-          courtLng: 127.128,
-          date: DateTime.now().subtract(const Duration(days: 1)),
-          timeSlot: '14:00~16:00',
-          minLevel: 1,
-          maxLevel: 3,
-          gameType: 'mixed',
-          maleRecruitCount: 1,
-          femaleRecruitCount: 1,
-          status: 'completed',
-          guestCost: 12000,
-          host: User(
-            id: 103,
-            email: 'tennis103@example.com',
-            nickname: '올림픽테니스',
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-          recoveryCount: 0,
-        ),
-        // 한강공원 테니스장 (취소)
-        Matching(
-          id: 104,
-          type: 'guest',
-          courtName: '한강공원 테니스장',
-          courtLat: 37.528,
-          courtLng: 126.933,
-          date: DateTime.now().add(const Duration(days: 3)),
-          timeSlot: '16:00~18:00',
-          minLevel: 4,
-          maxLevel: 6,
-          gameType: 'singles',
-          maleRecruitCount: 0,
-          femaleRecruitCount: 1,
-          status: 'cancelled',
-          guestCost: 18000,
-          host: User(
-            id: 104,
-            email: 'pro104@example.com',
-            nickname: '한강프로',
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          ),
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-          recoveryCount: 0,
-        ),
-      ];
-    });
+  void _loadMyGuestMatchings() async {
+    try {
+      setState(() => _isLoading = true);
+      
+      // 실제 API 호출로 교체 - 게스트로 참여한 매칭만 필터링
+      final token = await _getAuthToken();
+      if (token != null) {
+        final matchings = await ApiService.getMyMatchings(token);
+        setState(() {
+          _myGuestMatchings = matchings.where((m) => 
+            m.guests?.any((guest) => guest.id == widget.currentUser.id) ?? false
+          ).toList();
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _myGuestMatchings = [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('게스트 매칭 로드 실패: $e');
+      setState(() {
+        _myGuestMatchings = [];
+        _isLoading = false;
+      });
+    }
   }
+  
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('playmate_auth_token');
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  // Mock 데이터 완전 제거됨
 
   // 상태별 매칭 필터링
   List<Matching> _getMatchingsByStatus(String status) {

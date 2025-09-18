@@ -33,8 +33,10 @@ class MatchingService {
         await ApiService.requestMatching(matching.id, '참여 신청합니다!', token);
         
         // 성공시 채팅방 생성 요청
+        print('🔍 채팅방 생성 요청 시작: 매칭 ID ${matching.id}, 호스트 ${matching.host.id}, 게스트 ${user.id}');
         final chatService = ChatService();
-        await chatService.createChatRoom(matching.id, matching.host, user);
+        final chatRoomCreated = await chatService.createChatRoom(matching.id, matching.host, user);
+        print('🔍 채팅방 생성 결과: $chatRoomCreated');
         
         return true;
       }
@@ -157,7 +159,7 @@ class MatchingService {
           id: 1,
           email: 'test@playmate.com',
           nickname: '테스트유저',
-          profileImage: 'https://via.placeholder.com/40x40',
+          profileImage: null,
           createdAt: now.subtract(const Duration(days: 30)),
           updatedAt: now,
         ),
@@ -166,7 +168,7 @@ class MatchingService {
             id: 3,
             email: 'tennis@example.com',
             nickname: '테니스러버',
-            profileImage: 'https://via.placeholder.com/40x40',
+            profileImage: null,
             createdAt: now.subtract(const Duration(days: 20)),
             updatedAt: now,
           ),
@@ -174,7 +176,7 @@ class MatchingService {
             id: 4,
             email: 'beginner@example.com',
             nickname: '테니스초보',
-            profileImage: 'https://via.placeholder.com/40x40',
+            profileImage: null,
             createdAt: now.subtract(const Duration(days: 15)),
             updatedAt: now,
           ),
@@ -200,7 +202,7 @@ class MatchingService {
           id: 2,
           email: 'yangjae@example.com',
           nickname: '양재러버',
-          profileImage: 'https://via.placeholder.com/40x40',
+          profileImage: null,
           createdAt: now.subtract(const Duration(days: 25)),
           updatedAt: now,
         ),
@@ -226,7 +228,7 @@ class MatchingService {
           id: 5,
           email: 'olympic@example.com',
           nickname: '올림픽러버',
-          profileImage: 'https://via.placeholder.com/40x40',
+          profileImage: null,
           createdAt: now.subtract(const Duration(days: 40)),
           updatedAt: now,
         ),
@@ -235,7 +237,7 @@ class MatchingService {
             id: 6,
             email: 'advanced@example.com',
             nickname: '고급러버',
-            profileImage: 'https://via.placeholder.com/40x40',
+            profileImage: null,
             createdAt: now.subtract(const Duration(days: 35)),
             updatedAt: now,
           ),
@@ -243,7 +245,7 @@ class MatchingService {
             id: 7,
             email: 'intermediate@example.com',
             nickname: '중급러버',
-            profileImage: 'https://via.placeholder.com/40x40',
+            profileImage: null,
             createdAt: now.subtract(const Duration(days: 30)),
             updatedAt: now,
           ),
@@ -270,7 +272,7 @@ class MatchingService {
           id: 8,
           email: 'hangang@example.com',
           nickname: '한강러버',
-          profileImage: 'https://via.placeholder.com/40x40',
+          profileImage: null,
           createdAt: now.subtract(const Duration(days: 45)),
           updatedAt: now,
         ),

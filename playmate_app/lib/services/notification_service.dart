@@ -229,9 +229,6 @@ class NotificationService {
   /// 알림 권한 요청
   Future<bool> requestPermissions() async {
     try {
-      // Android는 권한이 필요하지 않음 (로컬 알림)
-      bool androidGranted = true;
-      
       // iOS 권한 요청
       final iosGranted = await _notifications
           .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
@@ -241,7 +238,8 @@ class NotificationService {
             sound: true,
           );
       
-      return androidGranted || (iosGranted ?? false);
+      // Android는 권한이 필요하지 않음 (로컬 알림), iOS만 체크
+      return iosGranted ?? true;
     } catch (e) {
       print('알림 권한 요청 실패: $e');
       return false;

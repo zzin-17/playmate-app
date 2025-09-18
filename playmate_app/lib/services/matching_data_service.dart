@@ -1,6 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/matching.dart';
-import '../models/user.dart';
 import 'api_service.dart';
 
 class MatchingDataService {
@@ -185,30 +184,12 @@ class MatchingDataService {
   // 인증 토큰 가져오기
   static Future<String?> _getAuthToken() async {
     try {
-      // 개발 중: JWT 토큰 문제로 인해 temp_jwt_token 사용
-      return 'temp_jwt_token';
-      
-      // 실제 운영환경에서는 아래 코드 사용
-      /*
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
+      final token = prefs.getString('playmate_auth_token');
       
       if (token == null) return null;
       
-      // 토큰 만료 체크
-      final expiresAt = prefs.getString('token_expires_at');
-      if (expiresAt != null) {
-        final expiryDate = DateTime.parse(expiresAt);
-        if (DateTime.now().isAfter(expiryDate)) {
-          // 토큰이 만료된 경우 제거
-          await prefs.remove('auth_token');
-          await prefs.remove('token_expires_at');
-          return null;
-        }
-      }
-      
       return token;
-      */
     } catch (e) {
       print('토큰 가져오기 오류: $e');
       return null;

@@ -132,7 +132,7 @@ class ShareService {
 
   /// 카카오톡으로 공유
   Future<void> _shareToKakaoTalk(Post post) async {
-    final text = '${post.title}\n\n${post.content}\n\n#플메 #테니스';
+    final text = '${post.content}\n\n#플메 #테니스';
     final url = 'https://playmate.app/post/${post.id}';
     
     // 카카오톡 URL 스킴으로 공유
@@ -162,7 +162,7 @@ class ShareService {
 
   /// 기타 앱으로 공유
   Future<void> _shareToOtherApps(Post post) async {
-    final text = '${post.title}\n\n${post.content}\n\n#플메 #테니스';
+    final text = '${post.content}\n\n#플메 #테니스';
     final url = 'https://playmate.app/post/${post.id}';
     
     // 시스템 공유 다이얼로그 호출

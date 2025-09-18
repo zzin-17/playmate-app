@@ -69,7 +69,7 @@ class _CourtScreenState extends State<CourtScreen> {
               location: '송파구 올림픽로 25',
               rating: 4.8,
               price: '20,000원/시간',
-              imageUrl: 'https://via.placeholder.com/300x200',
+              imageUrl: null,
             ),
             
             const SizedBox(height: 16),
@@ -79,7 +79,7 @@ class _CourtScreenState extends State<CourtScreen> {
               location: '송파구 올림픽로 25',
               rating: 4.6,
               price: '25,000원/시간',
-              imageUrl: 'https://via.placeholder.com/300x200',
+              imageUrl: null,
             ),
             
             const SizedBox(height: 16),
@@ -89,7 +89,7 @@ class _CourtScreenState extends State<CourtScreen> {
               location: '영등포구 여의대로',
               rating: 4.5,
               price: '15,000원/시간',
-              imageUrl: 'https://via.placeholder.com/300x200',
+              imageUrl: null,
             ),
             
             const SizedBox(height: 24),
@@ -129,7 +129,7 @@ class _CourtScreenState extends State<CourtScreen> {
     required String location,
     required double rating,
     required String price,
-    required String imageUrl,
+    String? imageUrl,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -148,12 +148,23 @@ class _CourtScreenState extends State<CourtScreen> {
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            child: Image.network(
-              imageUrl,
-              height: 150,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
+            child: imageUrl != null 
+              ? Image.network(
+                  imageUrl,
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                )
+              : Container(
+                  height: 150,
+                  width: double.infinity,
+                  color: Colors.grey[300],
+                  child: Icon(
+                    Icons.sports_tennis,
+                    size: 50,
+                    color: Colors.grey[600],
+                  ),
+                ),
           ),
           Padding(
             padding: const EdgeInsets.all(16),

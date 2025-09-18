@@ -96,23 +96,65 @@ const getMatchings = asyncHandler(async (req, res) => {
   // 메모리 저장소의 데이터만 사용 (하드코딩된 데이터 제거)
   const allMatchings = Array.from(memoryStore.matchings.values());
   
-  // 디버깅: 887887 매칭 상태 확인
-  const matching887887 = allMatchings.find(m => m.id === 1757407253725);
-  if (matching887887) {
-    console.log(`🔍 887887 매칭 상태: ${matching887887.status}`);
-  } else {
-    console.log('🔍 887887 매칭을 찾을 수 없음');
-  }
+  // 모든 매칭 데이터를 안전하게 처리
+  const safeMatchings = allMatchings.map(matching => ({
+    ...matching,
+    // 숫자 필드들 null 안전성 보장
+    minLevel: matching.minLevel ?? 1,
+    maxLevel: matching.maxLevel ?? 5,
+    minAge: matching.minAge ?? 20,
+    maxAge: matching.maxAge ?? 60,
+    maleRecruitCount: matching.maleRecruitCount ?? 0,
+    femaleRecruitCount: matching.femaleRecruitCount ?? 0,
+    guestCost: matching.guestCost ?? 0,
+    recoveryCount: matching.recoveryCount ?? 0,
+    
+    // 배열 필드들 null 안전성 보장
+    appliedUserIds: matching.appliedUserIds ?? [],
+    confirmedUserIds: matching.confirmedUserIds ?? [],
+    guests: matching.guests ?? [],
+    
+    // DateTime 필드들 null 안전성 보장
+    completedAt: matching.completedAt || null,
+    cancelledAt: matching.cancelledAt || null,
+    
+    // Boolean 필드들 null 안전성 보장
+    isFollowersOnly: matching.isFollowersOnly ?? false,
+    
+    // String 필드들 기본값 보장
+    type: matching.type || 'host',
+    courtName: matching.courtName || '테니스장',
+    timeSlot: matching.timeSlot || '18:00~20:00',
+    gameType: matching.gameType || 'mixed',
+    status: matching.status || 'recruiting',
+    message: matching.message || '',
+    
+    // Double 필드들 기본값 보장
+    courtLat: matching.courtLat ?? 37.5665,
+    courtLng: matching.courtLng ?? 126.978,
+    
+    // Host 객체 안전성 보장
+    host: {
+      ...matching.host,
+      id: matching.host?.id ?? 0,
+      nickname: matching.host?.nickname || 'Unknown',
+      email: matching.host?.email || 'unknown@example.com',
+      profileImage: matching.host?.profileImage || null,
+      createdAt: matching.host?.createdAt || new Date().toISOString(),
+      updatedAt: matching.host?.updatedAt || new Date().toISOString(),
+    }
+  }));
   
-  console.log(`📊 총 ${allMatchings.length}개 매칭 반환`);
+  console.log(`📊 총 ${safeMatchings.length}개 안전한 매칭 데이터 반환`);
   
   res.json({
     success: true,
-    data: allMatchings,
+    data: safeMatchings,
     pagination: {
-      current: parseInt(page),
-      pages: 1,
-      total: allMatchings.length
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total: safeMatchings.length,
+      totalPages: Math.ceil(safeMatchings.length / parseInt(limit))
     }
   });
 });
@@ -122,16 +164,67 @@ const getMatchings = asyncHandler(async (req, res) => {
 // @access  Private
 const getMatching = asyncHandler(async (req, res) => {
   const matchingId = parseInt(req.params.id);
-  const matching = memoryStore.matchings.get(matchingId);
+  let matching = memoryStore.matchings.get(matchingId);
   
   if (!matching) {
     res.status(404);
     throw new Error('Matching not found');
   }
 
+  // null 값들을 안전하게 처리하여 Flutter에서 파싱 오류 방지
+  const safeMatching = {
+    ...matching,
+    // 숫자 필드들 null 안전성 보장
+    minLevel: matching.minLevel ?? 1,
+    maxLevel: matching.maxLevel ?? 5,
+    minAge: matching.minAge ?? 20,
+    maxAge: matching.maxAge ?? 60,
+    maleRecruitCount: matching.maleRecruitCount ?? 0,
+    femaleRecruitCount: matching.femaleRecruitCount ?? 0,
+    guestCost: matching.guestCost ?? 0,
+    recoveryCount: matching.recoveryCount ?? 0,
+    
+    // 배열 필드들 null 안전성 보장
+    appliedUserIds: matching.appliedUserIds ?? [],
+    confirmedUserIds: matching.confirmedUserIds ?? [],
+    guests: matching.guests ?? [],
+    
+    // DateTime 필드들 null 안전성 보장
+    completedAt: matching.completedAt || null,
+    cancelledAt: matching.cancelledAt || null,
+    
+    // Boolean 필드들 null 안전성 보장
+    isFollowersOnly: matching.isFollowersOnly ?? false,
+    
+    // String 필드들 기본값 보장
+    type: matching.type || 'host',
+    courtName: matching.courtName || '테니스장',
+    timeSlot: matching.timeSlot || '18:00~20:00',
+    gameType: matching.gameType || 'mixed',
+    status: matching.status || 'recruiting',
+    message: matching.message || '',
+    
+    // Double 필드들 기본값 보장
+    courtLat: matching.courtLat ?? 37.5665,
+    courtLng: matching.courtLng ?? 126.978,
+    
+    // Host 객체 안전성 보장
+    host: {
+      ...matching.host,
+      id: matching.host?.id ?? 0,
+      nickname: matching.host?.nickname || 'Unknown',
+      email: matching.host?.email || 'unknown@example.com',
+      profileImage: matching.host?.profileImage || null,
+      createdAt: matching.host?.createdAt || new Date().toISOString(),
+      updatedAt: matching.host?.updatedAt || new Date().toISOString(),
+    }
+  };
+
+  console.log(`✅ 안전한 매칭 데이터 반환: ${safeMatching.courtName} (ID: ${safeMatching.id})`);
+
   res.json({
     success: true,
-    data: matching
+    data: safeMatching
   });
 });
 
@@ -139,7 +232,9 @@ const getMatching = asyncHandler(async (req, res) => {
 // @route   POST /api/matchings
 // @access  Private
 const createMatching = asyncHandler(async (req, res) => {
-  console.log('🔍 백엔드에서 받은 요청 데이터:', JSON.stringify(req.body, null, 2));
+  // 클라이언트 데이터에서 host 정보 제거 (보안상 무시)
+  const { host, ...safeBody } = req.body;
+  console.log('🔍 백엔드에서 받은 요청 데이터 (host 제외):', JSON.stringify(safeBody, null, 2));
   
   const {
     courtName,
@@ -159,13 +254,19 @@ const createMatching = asyncHandler(async (req, res) => {
     minAge,
     maxAge,
     isFollowersOnly
-  } = req.body;
+    // host 정보는 클라이언트에서 받지 않고 req.user 사용
+  } = safeBody;
   
   console.log('🔍 추출된 값들:');
   console.log('  - maleRecruitCount:', maleRecruitCount);
   console.log('  - femaleRecruitCount:', femaleRecruitCount);
   console.log('  - guestCost:', guestCost);
   console.log('  - isFollowersOnly:', isFollowersOnly);
+  
+  console.log('🔍 인증된 사용자 정보:');
+  console.log('  - ID:', req.user.id);
+  console.log('  - 이메일:', req.user.email);
+  console.log('  - 닉네임:', req.user.nickname);
   
   // Flutter 모델과 호환되는 데이터 구조로 변환
   const newMatching = {
@@ -188,7 +289,7 @@ const createMatching = asyncHandler(async (req, res) => {
     guestCost: guestCost ?? 0,
     isFollowersOnly: isFollowersOnly || false,
     host: {
-      id: parseInt(req.user.id.replace('temp_id_', '')),
+      id: req.user.id, // 6자리 고유 ID 시스템 사용
       nickname: req.user.nickname,
       email: req.user.email,
       profileImage: null,
@@ -205,10 +306,10 @@ const createMatching = asyncHandler(async (req, res) => {
     cancelledAt: null
   };
   
-  // 메모리 저장소에 새 매칭 저장
-  memoryStore.push(newMatching);
+  // 메모리 저장소에 새 매칭 저장 (Map 구조 사용)
+  memoryStore.matchings.set(newMatching.id, newMatching);
   console.log(`💾 새 매칭이 메모리 저장소에 저장됨: ${newMatching.courtName} (ID: ${newMatching.id})`);
-  console.log(`📊 현재 메모리 저장소 매칭 개수: ${memoryStore.length}`);
+  console.log(`📊 현재 메모리 저장소 매칭 개수: ${memoryStore.matchings.size}`);
   
   // 파일에 저장
   saveToFile();
@@ -228,15 +329,13 @@ const updateMatching = asyncHandler(async (req, res) => {
   
   const matchingId = parseInt(req.params.id);
   
-  // 메모리 저장소에서 매칭 찾기
-  const matchingIndex = memoryStore.findIndex(m => m.id === matchingId);
+  // 메모리 저장소에서 매칭 찾기 (Map 구조 사용)
+  const matching = memoryStore.matchings.get(matchingId);
   
-  if (matchingIndex === -1) {
+  if (!matching) {
     res.status(404);
     throw new Error('Matching not found');
   }
-  
-  const matching = memoryStore[matchingIndex];
   
   // 호스트만 수정 가능 (임시로 모든 사용자 허용)
   // if (matching.host.id !== parseInt(req.user.id.replace('temp_id_', ''))) {
@@ -252,8 +351,8 @@ const updateMatching = asyncHandler(async (req, res) => {
     updatedAt: new Date().toISOString()
   };
   
-  // 메모리 저장소 업데이트
-  memoryStore[matchingIndex] = updatedMatching;
+  // 메모리 저장소 업데이트 (Map 구조 사용)
+  memoryStore.matchings.set(matchingId, updatedMatching);
   
   // 파일에 저장
   saveToFile();
@@ -274,24 +373,22 @@ const deleteMatching = asyncHandler(async (req, res) => {
   
   const matchingId = parseInt(req.params.id);
   
-  // 메모리 저장소에서 매칭 찾기
-  const matchingIndex = memoryStore.findIndex(m => m.id === matchingId);
+  // 메모리 저장소에서 매칭 찾기 (Map 구조 사용)
+  const matching = memoryStore.matchings.get(matchingId);
   
-  if (matchingIndex === -1) {
+  if (!matching) {
     res.status(404);
     throw new Error('Matching not found');
   }
   
-  const matching = memoryStore[matchingIndex];
-  
   // 호스트만 삭제 가능 (임시로 모든 사용자 허용)
-  // if (matching.host.id !== parseInt(req.user.id.replace('temp_id_', ''))) {
+  // if (matching.host.id !== req.user.id) {
   //   res.status(403);
   //   throw new Error('Not authorized to delete this matching');
   // }
   
-  // 메모리 저장소에서 매칭 제거
-  memoryStore.splice(matchingIndex, 1);
+  // 메모리 저장소에서 매칭 제거 (Map 구조 사용)
+  memoryStore.matchings.delete(matchingId);
   
   // 파일에 저장
   saveToFile();
@@ -308,42 +405,65 @@ const deleteMatching = asyncHandler(async (req, res) => {
 // @route   POST /api/matchings/:id/join
 // @access  Private
 const joinMatching = asyncHandler(async (req, res) => {
-  const matching = await Matching.findById(req.params.id);
-  
-  if (!matching) {
-    res.status(404);
-    throw new Error('Matching not found');
+  try {
+    const matchingId = parseInt(req.params.id);
+    const userId = req.user.id;
+    
+    console.log(`🔍 매칭 참여 요청: 사용자 ${userId} -> 매칭 ${matchingId}`);
+    
+    // 메모리에서 매칭 찾기
+    const matching = memoryStore.matchings.get(matchingId);
+    
+    if (!matching) {
+      console.log(`❌ 매칭을 찾을 수 없음: ${matchingId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Matching not found'
+      });
+    }
+    
+    // 이미 참여한 사용자인지 확인
+    const isAlreadyApplied = matching.appliedUserIds && matching.appliedUserIds.includes(userId);
+    
+    if (isAlreadyApplied) {
+      console.log(`⚠️ 이미 신청한 사용자: ${userId}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Already applied to this matching'
+      });
+    }
+    
+    // 신청자 목록에 추가
+    if (!matching.appliedUserIds) {
+      matching.appliedUserIds = [];
+    }
+    matching.appliedUserIds.push(userId);
+    
+    // 메모리 업데이트
+    memoryStore.matchings.set(matchingId, matching);
+    
+    // 파일에 저장
+    saveToFile();
+    
+    console.log(`✅ 매칭 참여 완료: 사용자 ${userId} -> 매칭 ${matchingId}`);
+    
+    res.json({
+      success: true,
+      message: 'Successfully requested to join matching',
+      data: {
+        matchingId: matchingId,
+        userId: userId,
+        appliedUserIds: matching.appliedUserIds
+      }
+    });
+  } catch (error) {
+    console.error('❌ 매칭 참여 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to join matching',
+      error: error.message
+    });
   }
-  
-  // 이미 참여한 사용자인지 확인
-  const existingGuest = matching.guests.find(
-    guest => guest.user.toString() === req.user.id
-  );
-  
-  if (existingGuest) {
-    res.status(400);
-    throw new Error('Already joined this matching');
-  }
-  
-  // 최대 참여자 수 확인
-  if (matching.currentParticipants >= matching.maxParticipants) {
-    res.status(400);
-    throw new Error('Matching is full');
-  }
-  
-  matching.guests.push({
-    user: req.user.id,
-    status: 'pending'
-  });
-  
-  matching.currentParticipants += 1;
-  
-  await matching.save();
-  
-  res.json({
-    success: true,
-    message: 'Successfully requested to join matching'
-  });
 });
 
 // @desc    Leave matching
@@ -377,12 +497,140 @@ const leaveMatching = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get my matchings (hosted + applied)
+// @route   GET /api/matchings/my
+// @access  Private
+const getMyMatchings = asyncHandler(async (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.log(`🔍 내 매칭 목록 조회: 사용자 ${userId}`);
+    
+    const allMatchings = Array.from(memoryStore.matchings.values());
+    const myMatchings = [];
+    
+    for (const matching of allMatchings) {
+      // 내가 호스트인 매칭
+      if (matching.host && matching.host.id === userId) {
+        myMatchings.push({
+          ...matching,
+          myRole: 'host'
+        });
+      }
+      // 내가 신청한 매칭
+      else if (matching.appliedUserIds && matching.appliedUserIds.includes(userId)) {
+        myMatchings.push({
+          ...matching,
+          myRole: 'guest'
+        });
+      }
+      // 내가 확정된 매칭
+      else if (matching.confirmedUserIds && matching.confirmedUserIds.includes(userId)) {
+        myMatchings.push({
+          ...matching,
+          myRole: 'confirmed_guest'
+        });
+      }
+    }
+    
+    // 최신 순으로 정렬
+    myMatchings.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    console.log(`✅ 내 매칭 ${myMatchings.length}개 반환 (호스트/게스트 포함)`);
+    
+    res.json({
+      success: true,
+      data: myMatchings,
+      count: myMatchings.length
+    });
+  } catch (error) {
+    console.error('❌ 내 매칭 목록 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '내 매칭 목록 조회에 실패했습니다.',
+      error: error.message
+    });
+  }
+});
+
+// @desc    Confirm matching
+// @route   POST /api/matchings/:id/confirm
+// @access  Private (Host only)
+const confirmMatching = asyncHandler(async (req, res) => {
+  try {
+    const matchingId = parseInt(req.params.id);
+    const userId = req.user.id;
+    
+    console.log(`🔍 매칭 확정 요청: 사용자 ${userId} -> 매칭 ${matchingId}`);
+    
+    // 메모리에서 매칭 찾기
+    const matching = memoryStore.matchings.get(matchingId);
+    
+    if (!matching) {
+      console.log(`❌ 매칭을 찾을 수 없음: ${matchingId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Matching not found'
+      });
+    }
+    
+    // 호스트 권한 확인
+    if (matching.host.id !== userId) {
+      console.log(`❌ 매칭 확정 권한 없음: 사용자 ${userId}, 호스트 ${matching.host.id}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Only host can confirm matching'
+      });
+    }
+    
+    // 매칭 상태를 confirmed로 변경
+    matching.status = 'confirmed';
+    matching.updatedAt = new Date().toISOString();
+    
+    // 신청자들을 확정자로 이동
+    if (matching.appliedUserIds && matching.appliedUserIds.length > 0) {
+      if (!matching.confirmedUserIds) {
+        matching.confirmedUserIds = [];
+      }
+      matching.confirmedUserIds.push(...matching.appliedUserIds);
+      matching.appliedUserIds = []; // 신청자 목록 초기화
+    }
+    
+    // 메모리 업데이트
+    memoryStore.matchings.set(matchingId, matching);
+    
+    // 파일에 저장
+    saveToFile();
+    
+    console.log(`✅ 매칭 확정 완료: 매칭 ${matchingId}, 확정자 ${matching.confirmedUserIds?.length || 0}명`);
+    
+    res.json({
+      success: true,
+      message: 'Matching confirmed successfully',
+      data: {
+        matchingId: matchingId,
+        status: matching.status,
+        confirmedUserIds: matching.confirmedUserIds,
+        appliedUserIds: matching.appliedUserIds
+      }
+    });
+  } catch (error) {
+    console.error('❌ 매칭 확정 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to confirm matching',
+      error: error.message
+    });
+  }
+});
+
 module.exports = {
   getMatchings,
   getMatching,
+  getMyMatchings,
   createMatching,
   updateMatching,
   deleteMatching,
   joinMatching,
-  leaveMatching
+  leaveMatching,
+  confirmMatching
 };

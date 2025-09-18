@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/bookmark_service.dart';
-import '../../services/mock_post_service.dart';
+import '../../services/community_service.dart';
+import '../../models/post.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../community/community_screen.dart';
@@ -38,28 +39,28 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
         final bookmarkedIds = await BookmarkService.getBookmarks(currentUser.id);
         
         if (bookmarkedIds.isNotEmpty) {
-          // 북마크된 게시글들을 실제 데이터로 가져오기
-          final List<PostData?> actualPosts = MockPostService.getPostsByIds(bookmarkedIds.toList());
+          // 북마크된 게시글들을 실제 API로 가져오기
+          final communityService = CommunityService();
+          final List<Post> actualPosts = await communityService.getMyBookmarks();
           
-          // null이 아닌 게시글들만 필터링하고 북마크 상태를 true로 설정
-          _bookmarkedPosts = actualPosts.where((post) => post != null).map((PostData? post) {
+          // Post를 PostData로 변환
+          _bookmarkedPosts = actualPosts.map((post) {
             return PostData(
-              id: post!.id,
-              title: post.title,
-              author: post.author,
+              id: post.id,
+              author: post.authorNickname,
               authorId: post.authorId,
               content: post.content,
-              likes: post.likes,
-              comments: post.comments,
-              timeAgo: post.timeAgo,
+              likes: post.likeCount,
+              comments: post.commentCount,
+              timeAgo: _getTimeAgo(post.createdAt),
               category: post.category,
               authorProfileImage: post.authorProfileImage,
-              isFollowing: post.isFollowing,
-              isLiked: post.isLiked,
+              isFollowing: false, // 기본값으로 설정
+              isLiked: post.isLikedByCurrentUser,
               isBookmarked: true, // 북마크 상태는 true로 설정
               shareCount: post.shareCount,
               isSharedByCurrentUser: post.isSharedByCurrentUser,
-              hashtags: post.hashtags,
+              hashtags: post.hashtags ?? [],
             );
           }).toList();
           
@@ -75,6 +76,22 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  // 시간 차이를 문자열로 변환
+  String _getTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays}일 전';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}시간 전';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}분 전';
+    } else {
+      return '방금 전';
     }
   }
 

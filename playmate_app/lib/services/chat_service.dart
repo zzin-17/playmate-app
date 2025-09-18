@@ -61,23 +61,62 @@ class ChatService {
   }
 
   /// 백엔드 채팅방 데이터를 ChatRoom 모델로 변환
-  ChatRoom _convertBackendRoomToChatRoom(Map<String, dynamic> json, User currentUser) {
-    // 매칭 정보를 가져와서 필요한 데이터 구성
-    final matchingId = json['matchingId'] as int;
+  Future<ChatRoom> _convertBackendRoomToChatRoom(Map<String, dynamic> json, User currentUser) async {
+    // 채팅방 ID와 참여자 정보 추출
+    final roomId = json['id'] as int? ?? 0;
+    final participants = json['participants'] as List? ?? [];
     
-    print('🔍 _convertBackendRoomToChatRoom - matchingId: $matchingId');
+    print('🔍 _convertBackendRoomToChatRoom - roomId: $roomId, participants: ${participants.length}');
     
-    // 임시 데이터 (실제로는 매칭 정보를 조회해야 함)
-    return ChatRoom(
-      matchingId: matchingId,
-      courtName: '테니스장', // 실제로는 매칭 정보에서 가져와야 함
-      date: DateTime.now(),
-      timeSlot: '18:00~20:00',
-      myRole: 'guest', // 실제로는 참여자 정보에서 확인해야 함
-      partner: User(
-        id: 1,
-        email: 'partner@example.com',
-        nickname: '상대방',
+    // 상대방 찾기 (현재 사용자가 아닌 참여자)
+    User? partner;
+    for (final p in participants) {
+      final userId = p['userId'] as int? ?? 0;
+      if (userId != currentUser.id) {
+        // 실제로는 사용자 정보 API를 호출해야 함
+        partner = User(
+          id: userId,
+          email: userId == 974640 ? 'dev@playmate.com' :
+                 userId == 912738 ? 'tennis1@playmate.com' :
+                 userId == 100001 ? 'test1@playmate.com' :
+                 userId == 100002 ? 'test2@playmate.com' :
+                 userId == 100003 ? 'test3@playmate.com' :
+                 userId == 100004 ? 'test4@playmate.com' :
+                 'user${userId}@playmate.com',
+          nickname: userId == 100001 ? '개발자' : 
+                    userId == 974640 ? '개발자' : 
+                    userId == 912738 ? '테니스초보' :
+                    userId == 100002 ? '테니스초보' :
+                    userId == 100003 ? '테니스마니아' :
+                    userId == 100004 ? '테니스프로' :
+                    'User$userId',
+          gender: 'male',
+          birthYear: 1990,
+          region: '서울',
+          skillLevel: 3,
+          startYearMonth: '2020-01',
+          preferredCourt: '실내',
+          preferredTime: ['18:00~20:00'],
+          playStyle: '공격적',
+          hasLesson: false,
+          mannerScore: 4.0,
+          profileImage: null,
+          followingIds: [],
+          followerIds: [],
+          reviewCount: 0,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        break;
+      }
+    }
+    
+    // 기본값 설정
+    if (partner == null) {
+      partner = User(
+        id: 999,
+        email: 'unknown@playmate.com',
+        nickname: '알 수 없음',
         gender: 'male',
         birthYear: 1990,
         region: '서울',
@@ -94,19 +133,71 @@ class ChatService {
         reviewCount: 0,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-      ),
-      lastMessageAt: DateTime.now(),
+      );
+    }
+    
+    // 실제 매칭 ID 추출
+    final matchingId = json['matchingId'] as int? ?? 0;
+    
+    // 매칭 정보 가져오기 (채팅방 제목용)
+    String courtName = '${partner.nickname}님과의 채팅';
+    String timeSlot = '18:00~20:00';
+    DateTime date = DateTime.now();
+    
+    if (matchingId > 0) {
+      try {
+        // 간단한 매칭 정보 조회 (백엔드에서 직접)
+        final token = await _getAuthToken();
+        final matchingResponse = await http.get(
+          Uri.parse('http://192.168.6.100:3000/api/matchings/$matchingId'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+        
+        if (matchingResponse.statusCode == 200) {
+          final matchingData = jsonDecode(matchingResponse.body);
+          if (matchingData['success'] == true && matchingData['data'] != null) {
+            final matching = matchingData['data'];
+            courtName = '${matching['courtName'] ?? '테니스장'} - ${partner.nickname}님';
+            timeSlot = matching['timeSlot'] ?? '18:00~20:00';
+            date = DateTime.tryParse(matching['date'] ?? '') ?? DateTime.now();
+            print('✅ 채팅방 매칭 정보 로드 성공: $courtName');
+            print('📅 매칭 일정: ${matching['date']} ${matching['timeSlot']}');
+          }
+        }
+      } catch (e) {
+        print('⚠️ 매칭 정보 로드 실패, 기본값 사용: $e');
+      }
+    }
+    
+    return ChatRoom(
+      matchingId: matchingId > 0 ? matchingId : roomId,
+      courtName: courtName, // 실제 매칭 정보 기반 제목
+      date: date,
+      timeSlot: timeSlot,
+      myRole: 'guest',
+      partner: partner,
+      lastMessageAt: DateTime.tryParse(json['updatedAt'] as String? ?? '') ?? DateTime.now(),
       unreadCount: 0,
       status: 'recruiting',
     );
   }
 
   /// 실제 채팅방 API에서 조회
-  Future<List<ChatRoom>> _getChatRoomsFromAPI(User currentUser) async {
+  Future<List<ChatRoom>> _getChatRoomsFromAPI(User currentUser, {int page = 1, int limit = 50}) async {
     try {
-      print('🔍 채팅방 API 호출 시작');
+      print('🔍 채팅방 API 호출 시작 (페이지: $page, 제한: $limit)');
+      final uri = Uri.parse('http://10.0.2.2:3000/api/chat/rooms').replace(
+        queryParameters: {
+          'page': page.toString(),
+          'limit': limit.toString(),
+        },
+      );
+      
       final response = await http.get(
-        Uri.parse('http://192.168.6.100:3000/api/chat/rooms'),
+        uri,
         headers: {
           'Authorization': 'Bearer ${await _getAuthToken()}',
           'Content-Type': 'application/json',
@@ -119,9 +210,11 @@ class ChatService {
         final data = json.decode(response.body);
         print('🔍 채팅방 API 데이터: $data');
         if (data['success'] == true) {
-          final rooms = (data['data'] as List)
-              .map((json) => _convertBackendRoomToChatRoom(json, currentUser))
-              .toList();
+          final List<ChatRoom> rooms = [];
+          for (final roomData in data['data'] as List) {
+            final room = await _convertBackendRoomToChatRoom(roomData, currentUser);
+            rooms.add(room);
+          }
           
           // 서버 방 목록을 로컬에도 저장 (UX 향상)
           for (final r in rooms) {
@@ -183,6 +276,8 @@ class ChatService {
   /// 매칭 참여시 백엔드에 채팅방 생성 요청
   Future<bool> createChatRoom(int matchingId, User host, User guest) async {
     try {
+      print('🔍 채팅방 생성 API 호출: 매칭 ID $matchingId, 호스트 ID ${host.id}');
+      
       final response = await http.post(
         Uri.parse('http://10.0.2.2:3000/api/chat/rooms/direct'),
         headers: {
@@ -190,44 +285,87 @@ class ChatService {
           'Content-Type': 'application/json',
         },
         body: json.encode({
-          'targetUserId': guest.id,
+          'targetUserId': host.id,
           'matchingId': matchingId,
         }),
       );
 
+      print('🔍 채팅방 생성 API 응답: ${response.statusCode}');
+      print('🔍 응답 본문: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
+          print('✅ 채팅방 생성 성공!');
           // 채팅방 생성 이벤트 전파 (리스트 즉시 갱신)
           ChatEventBus.instance.emit(ChatRoomCreated(matchingId));
           return true;
         }
       }
 
+      print('❌ 채팅방 생성 실패: 상태 코드 ${response.statusCode}');
       return false;
     } catch (e) {
-      if (kDebugMode) {
-        print('채팅방 생성 실패: $e');
-      }
+      print('❌ 채팅방 생성 오류: $e');
       return false;
     }
   }
 
-  /// 채팅 진입을 위해 매칭 상세를 가져온다
-  Future<Matching?> getMatchingForRoom(int matchingId) async {
+  /// 채팅 진입을 위한 기본 매칭 정보 생성 (API 실패 시 대체)
+  Matching createFallbackMatching(int matchingId, String courtName, String timeSlot, DateTime date, User host) {
+    return Matching(
+      id: matchingId,
+      type: 'host',
+      courtName: courtName,
+      courtLat: 37.5665,
+      courtLng: 126.978,
+      date: date,
+      timeSlot: timeSlot,
+      gameType: 'mixed',
+      maleRecruitCount: 1,
+      femaleRecruitCount: 1,
+      status: 'recruiting',
+      host: host,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  /// 채팅 진입을 위해 매칭 상세를 가져온다 (실패 시 fallback 생성)
+  Future<Matching> getMatchingForRoom(int matchingId, {String? courtName, String? timeSlot, DateTime? date, User? host}) async {
     try {
       final token = await _getAuthToken();
-      if (token == null) {
-        return _matchingService.getMatchingById(matchingId);
+      if (token != null) {
+        final matching = await ApiService.getMatchingDetail(matchingId, token);
+        print('✅ 매칭 정보 API 로드 성공: ${matching.courtName}');
+        return matching;
       }
       
-      return await ApiService.getMatchingDetail(matchingId, token);
-    } catch (e) {
-      if (kDebugMode) {
-        print('매칭 조회 실패, Mock으로 폴백: $e');
+      // API 실패 시 MockService 시도
+      final mockMatching = await _matchingService.getMatchingById(matchingId);
+      if (mockMatching != null) {
+        print('✅ 매칭 정보 Mock 로드 성공: ${mockMatching.courtName}');
+        return mockMatching;
       }
-      return _matchingService.getMatchingById(matchingId);
+    } catch (e) {
+      print('⚠️ 매칭 정보 로드 실패: $e');
     }
+    
+    // 모든 방법이 실패한 경우 fallback 생성
+    print('🔄 Fallback 매칭 객체 생성 중...');
+    return createFallbackMatching(
+      matchingId,
+      courtName ?? '테니스장',
+      timeSlot ?? '18:00~20:00',
+      date ?? DateTime.now(),
+      host ?? User(
+        id: 0,
+        nickname: 'Unknown',
+        email: 'unknown@example.com',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ),
+    );
   }
 
   /// 매칭 리스트를 채팅방 리스트로 변환

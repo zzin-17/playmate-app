@@ -9,7 +9,6 @@ class Post {
   final int authorId;
   final String authorNickname;
   final String? authorProfileImage;
-  final String title; // 게시글 제목
   final String content;
   final List<String>? images;
   final String? videoUrl;
@@ -31,7 +30,6 @@ class Post {
     required this.authorId,
     required this.authorNickname,
     this.authorProfileImage,
-    required this.title,
     required this.content,
     this.images,
     this.videoUrl,

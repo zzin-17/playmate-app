@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/matching.dart';
-import '../models/user.dart';
 import 'matching_data_service.dart';
 
 class MatchingHomeService extends ChangeNotifier {
@@ -10,7 +9,7 @@ class MatchingHomeService extends ChangeNotifier {
   MatchingHomeService._internal();
 
   // 매칭 데이터
-  List<Matching> _mockMatchings = [];
+  List<Matching> _matchings = [];
   List<Matching> _filteredMatchings = [];
   bool _isLoading = false;
   String? _error;
@@ -33,7 +32,7 @@ class MatchingHomeService extends ChangeNotifier {
   bool _showOnlyFollowing = false;
 
   // Getters
-  List<Matching> get mockMatchings => _mockMatchings;
+  List<Matching> get matchings => _matchings;
   List<Matching> get filteredMatchings => _filteredMatchings;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -59,12 +58,12 @@ class MatchingHomeService extends ChangeNotifier {
     notifyListeners();
     
     try {
-      _mockMatchings = await MatchingDataService.getMatchings();
+      _matchings = await MatchingDataService.getMatchings();
       _applyFilters();
     } catch (e) {
       _error = e.toString();
-      // 오류 발생 시 Mock 데이터 사용
-      _mockMatchings = _createMockMatchings();
+      // 오류 발생 시 빈 목록 사용
+      _matchings = [];
       _applyFilters();
     } finally {
       _isLoading = false;
@@ -94,7 +93,7 @@ class MatchingHomeService extends ChangeNotifier {
     notifyListeners();
     
     try {
-      _mockMatchings = await MatchingDataService.getMatchings(
+      _matchings = await MatchingDataService.getMatchings(
         searchQuery: _searchQuery.isNotEmpty ? _searchQuery : null,
         gameTypes: _selectedGameTypes.isNotEmpty ? _selectedGameTypes : null,
         skillLevel: _selectedSkillLevel,
@@ -203,7 +202,7 @@ class MatchingHomeService extends ChangeNotifier {
 
   // 필터 적용
   void _applyFilters() {
-    List<Matching> filtered = List.from(_mockMatchings);
+    List<Matching> filtered = List.from(_matchings);
 
     // 검색어 필터
     if (_searchQuery.isNotEmpty) {
@@ -313,16 +312,16 @@ class MatchingHomeService extends ChangeNotifier {
 
   // 매칭 상태 변경
   void changeMatchingStatus(int matchingId, String newStatus) {
-    final index = _mockMatchings.indexWhere((m) => m.id == matchingId);
+    final index = _matchings.indexWhere((m) => m.id == matchingId);
     if (index != -1) {
-      final matching = _mockMatchings[index];
+      final matching = _matchings[index];
       
       // 취소된 매칭을 모집중으로 복구할 때 복구 횟수 증가
       final newRecoveryCount = newStatus == 'recruiting' && matching.status == 'cancelled' 
           ? (matching.recoveryCount ?? 0) + 1 
           : matching.recoveryCount;
       
-      _mockMatchings[index] = matching.copyWith(
+      _matchings[index] = matching.copyWith(
         status: newStatus,
         recoveryCount: newRecoveryCount,
         updatedAt: DateTime.now(),
@@ -335,7 +334,7 @@ class MatchingHomeService extends ChangeNotifier {
 
   // 새 매칭 추가
   void addNewMatching(Matching newMatching) {
-    _mockMatchings.insert(0, newMatching);
+    _matchings.insert(0, newMatching);
     _applyFilters();
     notifyListeners();
   }
@@ -349,10 +348,10 @@ class MatchingHomeService extends ChangeNotifier {
       // 실제로는 API 호출을 통해 최신 데이터를 가져옴
       await Future.delayed(const Duration(milliseconds: 500));
       
-      // 새로운 매칭이 추가되었는지 시뮬레이션 (10% 확률)
-      if (DateTime.now().millisecondsSinceEpoch % 10 == 0) {
-        _simulateNewMatching();
-      }
+      // 새로운 매칭이 추가되었는지 시뮬레이션 (비활성화)
+      // if (DateTime.now().millisecondsSinceEpoch % 10 == 0) {
+      //   _simulateNewMatching();
+      // }
       
       // 기존 매칭 상태 변경 시뮬레이션 (5% 확률)
       if (DateTime.now().millisecondsSinceEpoch % 20 == 0) {
@@ -371,7 +370,8 @@ class MatchingHomeService extends ChangeNotifier {
     }
   }
 
-  // 새로운 매칭 추가 시뮬레이션
+  // 새로운 매칭 추가 시뮬레이션 (비활성화)
+  /*
   void _simulateNewMatching() {
     final newMatching = _createMockMatching(
       id: DateTime.now().millisecondsSinceEpoch,
@@ -381,12 +381,13 @@ class MatchingHomeService extends ChangeNotifier {
     
     addNewMatching(newMatching);
   }
+  */
 
   // 상태 변경 시뮬레이션
   void _simulateStatusChange() {
-    if (_mockMatchings.isNotEmpty) {
-      final randomIndex = DateTime.now().millisecondsSinceEpoch % _mockMatchings.length;
-      final matching = _mockMatchings[randomIndex];
+    if (_matchings.isNotEmpty) {
+      final randomIndex = DateTime.now().millisecondsSinceEpoch % _matchings.length;
+      final matching = _matchings[randomIndex];
       
       if (matching.status == 'recruiting') {
         changeMatchingStatus(matching.id, 'confirmed');
@@ -399,12 +400,12 @@ class MatchingHomeService extends ChangeNotifier {
     final now = DateTime.now();
     bool hasUpdates = false;
     
-    for (int i = 0; i < _mockMatchings.length; i++) {
-      final matching = _mockMatchings[i];
+    for (int i = 0; i < _matchings.length; i++) {
+      final matching = _matchings[i];
       
       // 자동 확정 체크: 모집중 상태이고 모집 인원이 다 찬 경우
       if (matching.status == 'recruiting' && _shouldAutoConfirm(matching)) {
-        _mockMatchings[i] = matching.copyWith(
+        _matchings[i] = matching.copyWith(
           status: 'confirmed',
           updatedAt: now,
         );
@@ -413,7 +414,7 @@ class MatchingHomeService extends ChangeNotifier {
       
       // 확정 상태이고 게임 시간이 종료된 경우
       if (matching.status == 'confirmed' && _isGameTimeEnded(matching, now)) {
-        _mockMatchings[i] = matching.copyWith(
+        _matchings[i] = matching.copyWith(
           status: 'completed',
           completedAt: now,
           updatedAt: now,
@@ -457,72 +458,7 @@ class MatchingHomeService extends ChangeNotifier {
     );
   }
 
-  // Mock 매칭 데이터 생성
-  List<Matching> _createMockMatchings() {
-    final now = DateTime.now();
-    final List<Matching> matchings = [];
-
-    // 다양한 매칭 데이터 생성
-    for (int i = 1; i <= 20; i++) {
-      final matching = _createMockMatching(
-        id: i,
-        courtName: '테니스 코트 $i',
-        date: now.add(Duration(days: i % 7)),
-        gameType: ['mixed', 'male_doubles', 'female_doubles', 'singles'][i % 4],
-        status: ['recruiting', 'confirmed', 'completed', 'cancelled'][i % 4],
-      );
-      matchings.add(matching);
-    }
-
-    return matchings;
-  }
-
-  // 개별 Mock 매칭 생성
-  Matching _createMockMatching({
-    required int id,
-    required String courtName,
-    required DateTime date,
-    String gameType = 'mixed',
-    String status = 'recruiting',
-    int maleRecruitCount = 2,
-    int femaleRecruitCount = 2,
-    int minLevel = 1,
-    int maxLevel = 5,
-    int? minAge,
-    int? maxAge,
-    bool isFollowersOnly = false,
-  }) {
-    final host = User(
-      id: id + 1000,
-      email: 'host$id@example.com',
-      nickname: '호스트$id',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-
-    return Matching(
-      id: id,
-      type: 'host',
-      courtName: courtName,
-      courtLat: 37.5665 + (id * 0.001),
-      courtLng: 126.9780 + (id * 0.001),
-      date: date,
-      timeSlot: '10:00~12:00',
-      minLevel: minLevel,
-      maxLevel: maxLevel,
-      minAge: minAge,
-      maxAge: maxAge,
-      gameType: gameType,
-      maleRecruitCount: maleRecruitCount,
-      femaleRecruitCount: femaleRecruitCount,
-      status: status,
-      isFollowersOnly: isFollowersOnly,
-      host: host,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      recoveryCount: 0,
-    );
-  }
+  // Mock 데이터 생성 함수 제거됨 - 실제 API 데이터만 사용
 
   // 필터 초기화
   void resetFilters() {

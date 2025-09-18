@@ -23,17 +23,42 @@ class _ChatListScreenState extends State<ChatListScreen> {
   final List<ChatRoom> _chatRooms = [];
   bool _isLoading = true;
   StreamSubscription? _chatEventSub;
+  
+  // 자동 새로고침 타이머
+  Timer? _autoRefreshTimer;
+  final Duration _refreshInterval = const Duration(seconds: 10); // 실시간 (10초마다)
 
   @override
   void initState() {
     super.initState();
     _currentUser = context.read<AuthProvider>().currentUser!;
     _loadChatRooms();
+    _startAutoRefreshTimer();
     _chatEventSub = ChatEventBus.instance.stream.listen((event) {
       if (event is ChatRoomCreated || event is ChatMessageArrived) {
         _loadChatRooms();
       }
     });
+  }
+  
+  // 실시간 새로고침 타이머 시작
+  void _startAutoRefreshTimer() {
+    print('🔄 채팅 목록 실시간 새로고침 활성화 (10초 주기)');
+    _autoRefreshTimer = Timer.periodic(_refreshInterval, (timer) {
+      if (mounted) {
+        _refreshChatRooms();
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+  
+  // 채팅방 목록 새로고침 (기존 채팅방 보존하면서 새 채팅방 추가)
+  void _refreshChatRooms() {
+    print('🔄 채팅방 목록 자동 새로고침 시작');
+    
+    // 기존 채팅방 보존하면서 새로운 채팅방만 추가
+    _loadChatRooms();
   }
 
   Future<void> _loadChatRooms() async {
@@ -68,20 +93,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   User _chatPartner(ChatRoom r) => r.partner;
 
-  void _openChat(ChatRoom r) async {
-    final matching = await _chatService.getMatchingForRoom(r.matchingId);
-    if (matching == null) return;
-    if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => ChatScreen(
-          matching: matching,
-          currentUser: _currentUser,
-          chatPartner: _chatPartner(r),
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +119,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
           final roleColor = _roleColor(r);
 
           return ListTile(
-            onTap: () => _openChat(r),
+            onTap: () {
+              print('🔍 채팅방 클릭: ${r.courtName} (매칭 ID: ${r.matchingId})');
+              _openChatRoom(r);
+            },
             leading: CircleAvatar(
               backgroundColor: roleColor.withValues(alpha: 0.15),
               child: Icon(
@@ -169,6 +183,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   void dispose() {
     _chatEventSub?.cancel();
+    _autoRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -180,6 +195,67 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final h = dt.hour.toString().padLeft(2, '0');
     final m = dt.minute.toString().padLeft(2, '0');
     return '$h:$m';
+  }
+
+  // 채팅방 열기 (강화된 매칭 정보 로딩)
+  void _openChatRoom(ChatRoom room) async {
+    try {
+      print('🔍 채팅방 열기 시도: ${room.courtName} (매칭 ID: ${room.matchingId})');
+      
+      // 로딩 상태 표시
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+      
+      // ChatService를 통해 안전한 매칭 정보 로딩
+      final matching = await _chatService.getMatchingForRoom(
+        room.matchingId,
+        courtName: room.courtName.split(' - ')[0], // "한남테니스장 - 개발자님" → "한남테니스장"
+        timeSlot: room.timeSlot,
+        date: room.date,
+        host: room.partner,
+      );
+      
+      // 로딩 다이얼로그 닫기
+      if (mounted) Navigator.of(context).pop();
+      
+      print('✅ 매칭 정보 로딩 완료: ${matching.courtName} (ID: ${matching.id})');
+      
+      // 채팅 화면으로 이동
+      if (mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              matching: matching,
+              currentUser: _currentUser,
+              chatPartner: room.partner,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // 로딩 다이얼로그 닫기
+      if (mounted) Navigator.of(context).pop();
+      
+      print('❌ 채팅방 열기 실패: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('채팅방을 열 수 없습니다: $e'),
+            backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: '재시도',
+              textColor: Colors.white,
+              onPressed: () => _openChatRoom(room),
+            ),
+          ),
+        );
+      }
+    }
   }
 }
 

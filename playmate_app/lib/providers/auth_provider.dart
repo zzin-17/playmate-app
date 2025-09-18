@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
@@ -8,17 +9,13 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   
-  AuthProvider() {
-    // 앱 시작 시 현재 사용자 정보 로드
-    _initializeAuth();
-  }
+  // 프로필 자동 동기화 타이머
+  Timer? _profileSyncTimer;
+  final Duration _syncInterval = const Duration(minutes: 5); // 5분마다 동기화
   
-  Future<void> _initializeAuth() async {
-    try {
-      await loadCurrentUser();
-    } catch (e) {
-      // 초기화 실패는 조용히 처리
-    }
+  AuthProvider() {
+    // 생성자에서는 자동 로딩하지 않음
+    // main.dart에서 명시적으로 loadCurrentUser() 호출
   }
   
   // 보안 관련 상수
@@ -110,12 +107,12 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('playmate_auth_token');
     
-    // 개발 중: JWT 토큰 문제로 인해 temp_jwt_token 사용
-    if (token != null && token != 'temp_jwt_token') {
-      // JWT 토큰이 있지만 검증에 실패할 경우 temp_jwt_token으로 대체
-      return 'temp_jwt_token';
+    if (token == null) {
+      print('🔍 저장된 토큰이 없음');
+      return null;
     }
     
+    print('🔍 저장된 토큰: ${token.substring(0, 20)}...');
     return token;
   }
 
@@ -217,6 +214,9 @@ class AuthProvider extends ChangeNotifier {
       await _saveToken(response['token'] as String);
       await loadCurrentUser();
       
+      // 프로필 자동 동기화 시작
+      _startProfileSync();
+      
       _setLoading(false);
       notifyListeners();
       return true;
@@ -244,22 +244,39 @@ class AuthProvider extends ChangeNotifier {
 
   // 현재 사용자 정보 로드
   Future<void> loadCurrentUser() async {
+    _setLoading(true);
+    
     try {
       final token = await _getToken();
+      print('🔍 loadCurrentUser - 토큰: ${token != null ? token.substring(0, 20) + "..." : "null"}');
+      
       if (token != null) {
         // 실제 JWT 토큰 사용
+        print('🔍 API에서 사용자 정보 조회 시작');
         _currentUser = await ApiService.getCurrentUser(token);
-        notifyListeners();
+        print('🔍 사용자 정보 로드 성공: ${_currentUser?.email}');
+        
+        // 로그인 성공 시 프로필 자동 동기화 시작
+        if (_currentUser != null) {
+          _startProfileSync();
+        }
       } else {
+        print('🔍 저장된 토큰이 없음');
         _currentUser = null;
+        _stopProfileSync();
       }
     } catch (e) {
+      print('🔍 사용자 정보 로드 실패: $e');
       // 401 오류인 경우 토큰이 만료되었을 가능성이 높으므로 로그아웃 처리
       if (e.toString().contains('401')) {
+        print('🔍 토큰 만료로 인한 자동 로그아웃');
         await _clearToken();
       }
       
       _currentUser = null;
+    } finally {
+      _setLoading(false);
+      notifyListeners();
     }
   }
 
@@ -318,5 +335,63 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     }
+  }
+  
+  // 프로필 자동 동기화 시작
+  void _startProfileSync() {
+    _stopProfileSync(); // 기존 타이머 정리
+    
+    print('🔄 프로필 자동 동기화 활성화');
+    _profileSyncTimer = Timer.periodic(_syncInterval, (timer) {
+      if (_currentUser != null) {
+        _syncProfileData();
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+  
+  // 프로필 자동 동기화 중지
+  void _stopProfileSync() {
+    _profileSyncTimer?.cancel();
+    _profileSyncTimer = null;
+  }
+  
+  // 프로필 데이터 동기화 (백그라운드에서 실행)
+  Future<void> _syncProfileData() async {
+    try {
+      print('🔄 프로필 데이터 동기화 시작');
+      
+      final token = await _getToken();
+      if (token != null) {
+        final updatedUser = await ApiService.getCurrentUser(token);
+        
+        // 프로필 정보가 변경된 경우에만 업데이트
+        if (_hasProfileChanged(_currentUser, updatedUser)) {
+          _currentUser = updatedUser;
+          print('🔄 프로필 정보 업데이트됨: ${updatedUser.nickname}');
+          notifyListeners(); // UI 업데이트 알림
+        }
+      }
+    } catch (e) {
+      print('프로필 동기화 실패: $e');
+      // 동기화 실패는 조용히 처리 (사용자에게 알리지 않음)
+    }
+  }
+  
+  // 프로필 변경 여부 확인
+  bool _hasProfileChanged(User? oldUser, User newUser) {
+    if (oldUser == null) return true;
+    
+    return oldUser.nickname != newUser.nickname ||
+           oldUser.profileImage != newUser.profileImage ||
+           oldUser.bio != newUser.bio ||
+           oldUser.mannerScore != newUser.mannerScore;
+  }
+  
+  @override
+  void dispose() {
+    _stopProfileSync();
+    super.dispose();
   }
 }

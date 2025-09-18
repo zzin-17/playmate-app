@@ -17,61 +17,75 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   Matching? _newMatching; // 새로 생성된 매칭
+  int _communityTabIndex = 0; // 커뮤니티 탭 인덱스 (0: All, 1: My)
   
-  // 새 매칭이 생성되면 HomeScreen을 업데이트
-  Widget _buildHomeScreen() {
-    return HomeScreen(
+  // 화면 인스턴스들 (상태 보존을 위해 한 번만 생성)
+  late final List<Widget> _pages;
+  late final HomeScreen _homeScreen;
+  
+  // HomeScreen 새로고침 콜백
+  VoidCallback? _homeScreenRefreshCallback;
+  
+  @override
+  void initState() {
+    super.initState();
+    
+    // HomeScreen 인스턴스 생성 (상태 보존)
+    _homeScreen = HomeScreen(
       newMatching: _newMatching,
-      onMatchingAdded: () {
-        // setState를 WidgetsBinding.instance.addPostFrameCallback으로 감싸서 build 완료 후 실행
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            setState(() {
-              _newMatching = null; // 매칭이 추가되면 초기화
-            });
-          }
-        });
+      onMatchingAdded: _onMatchingAdded,
+      onRefreshCallbackSet: (callback) {
+        _homeScreenRefreshCallback = callback;
       },
     );
-  }
-
-  // 매칭 생성 화면으로 이동
-  /*
-  Future<void> _navigateToCreateMatching() async { // 사용되지 않음
-    final result = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const CreateMatchingScreen(),
-      ),
-    );
     
-    // 매칭이 생성되면 _newMatching에 저장
-    if (result is Matching) {
-      setState(() {
-        _newMatching = result;
-      });
-    }
+    // 모든 페이지 인스턴스 생성 (메모리 효율 + 빠른 탭 전환)
+    _pages = [
+      _homeScreen,                // index 0: 홈
+      const ChatListScreen(),     // index 1: 채팅
+      CommunityScreen(
+        initialTabIndex: _communityTabIndex, 
+        showBackButton: false, // 메인 화면에서는 뒤로가기 버튼 숨김
+      ), // index 2: 커뮤니티
+      const ProfileScreen(),      // index 3: 마이페이지
+    ];
   }
-  */
   
-  final List<Widget> _pages = [
-    // index 1: 채팅
-    const ChatListScreen(),
-    // index 2: 커뮤니티
-    const CommunityScreen(),
-    // index 3: 마이페이지
-    const ProfileScreen(),
-  ];
-
-  /*
-  String _getTabName(int index) { // 사용되지 않음
-    switch (index) {
-      case 0: return '홈';
-      case 1: return '커뮤니티';
-      case 2: return '마이페이지';
-      default: return '알 수 없음';
+  // 매칭 추가 콜백 (성능 최적화)
+  void _onMatchingAdded() {
+    if (mounted) {
+      setState(() {
+        _newMatching = null;
+      });
+      // HomeScreen에 직접 알림 (불필요한 rebuild 방지)
+      // 추후 Provider나 다른 상태 관리로 개선 가능
     }
   }
-  */
+
+  // 커뮤니티 My 탭으로 이동
+  void navigateToCommunityMyTab() {
+    setState(() {
+      _currentIndex = 2; // 커뮤니티 탭
+      _communityTabIndex = 1; // My 탭
+      // 페이지 다시 생성하여 새로운 탭 인덱스 적용
+      _pages[2] = CommunityScreen(
+        initialTabIndex: _communityTabIndex,
+        showBackButton: false,
+      );
+    });
+  }
+
+  // HomeScreen 강제 새로고침
+  void _refreshHomeScreen() {
+    if (_homeScreenRefreshCallback != null) {
+      print('🔄 MainScreen: HomeScreen 콜백을 통한 새로고침 호출');
+      _homeScreenRefreshCallback!();
+    } else {
+      print('❌ MainScreen: HomeScreen 새로고침 콜백 없음');
+    }
+  }
+
+
 
   Widget? _buildFloatingActionButton() {
     switch (_currentIndex) {
@@ -85,11 +99,31 @@ class _MainScreenState extends State<MainScreen> {
             );
             
             // 매칭이 생성되면 HomeScreen에 알림
-            if (result != null && result is Matching) {
-              setState(() {
-                _newMatching = result; // 새 매칭 상태 업데이트
-              });
-
+            if (result != null) {
+              Matching? createdMatching;
+              bool needsRefresh = false;
+              
+              // 반환 타입에 따른 처리
+              if (result is Matching) {
+                createdMatching = result;
+                needsRefresh = true;
+              } else if (result is Map<String, dynamic>) {
+                createdMatching = result['matching'] as Matching?;
+                needsRefresh = result['needsRefresh'] == true;
+              }
+              
+              if (createdMatching != null) {
+                setState(() {
+                  _newMatching = createdMatching; // 새 매칭 상태 업데이트
+                });
+                
+                // HomeScreen에 즉시 새로고침 요청
+                if (needsRefresh) {
+                  print('🔄 MainScreen: 매칭 생성 완료, HomeScreen 강제 새로고침 요청');
+                  // HomeScreen의 GlobalKey를 통한 직접 새로고침 호출
+                  _refreshHomeScreen();
+                }
+              }
             }
           },
           backgroundColor: Theme.of(context).primaryColor,
@@ -109,7 +143,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _currentIndex == 0 ? _buildHomeScreen() : _pages[_currentIndex - 1],
+      body: _pages[_currentIndex], // 단순한 1:1 인덱스 매칭 (성능 최적화)
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _currentIndex,

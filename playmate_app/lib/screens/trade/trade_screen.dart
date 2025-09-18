@@ -129,12 +129,23 @@ class _TradeScreenState extends State<TradeScreen> {
               topLeft: Radius.circular(12),
               bottomLeft: Radius.circular(12),
             ),
-            child: Image.network(
-              item.imageUrl,
-              width: 120,
-              height: 120,
-              fit: BoxFit.cover,
-            ),
+            child: item.imageUrl != null 
+              ? Image.network(
+                  item.imageUrl!,
+                  width: 120,
+                  height: 120,
+                  fit: BoxFit.cover,
+                )
+              : Container(
+                  width: 120,
+                  height: 120,
+                  color: Colors.grey[300],
+                  child: Icon(
+                    Icons.shopping_bag,
+                    size: 40,
+                    color: Colors.grey[600],
+                  ),
+                ),
           ),
           
           // 상품 정보
@@ -229,7 +240,7 @@ class ProductItem {
   final double price;
   final int likes;
   final String timeAgo;
-  final String imageUrl;
+  final String? imageUrl;
 
   ProductItem({
     required this.title,
@@ -238,7 +249,7 @@ class ProductItem {
     required this.price,
     required this.likes,
     required this.timeAgo,
-    required this.imageUrl,
+    this.imageUrl,
   });
 }
 
@@ -251,7 +262,7 @@ final List<ProductItem> _allProducts = [
     price: 150000,
     likes: 23,
     timeAgo: '1시간 전',
-    imageUrl: 'https://via.placeholder.com/300x300',
+    imageUrl: null,
   ),
   ProductItem(
     title: '나이키 에어 줌 베이퍼 프로',
@@ -260,7 +271,7 @@ final List<ProductItem> _allProducts = [
     price: 80000,
     likes: 45,
     timeAgo: '3시간 전',
-    imageUrl: 'https://via.placeholder.com/300x300',
+    imageUrl: null,
   ),
   ProductItem(
     title: '테니스 가방',
@@ -269,7 +280,7 @@ final List<ProductItem> _allProducts = [
     price: 40000,
     likes: 12,
     timeAgo: '5시간 전',
-    imageUrl: 'https://via.placeholder.com/300x300',
+    imageUrl: null,
   ),
   ProductItem(
     title: '테니스 셔츠',
@@ -278,7 +289,7 @@ final List<ProductItem> _allProducts = [
     price: 25000,
     likes: 8,
     timeAgo: '1일 전',
-    imageUrl: 'https://via.placeholder.com/300x300',
+    imageUrl: null,
   ),
   ProductItem(
     title: '테니스 공 3개',
@@ -287,6 +298,6 @@ final List<ProductItem> _allProducts = [
     price: 15000,
     likes: 31,
     timeAgo: '2일 전',
-    imageUrl: 'https://via.placeholder.com/300x300',
+    imageUrl: null,
   ),
 ];

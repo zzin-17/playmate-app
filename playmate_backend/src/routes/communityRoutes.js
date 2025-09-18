@@ -10,13 +10,18 @@ const {
   togglePostLike,
   getComments,
   createComment,
-  toggleCommentLike
+  toggleCommentLike,
+  getMyPosts
 } = require('../controllers/communityControllerMemory');
 
 // 커뮤니티 관련 라우트
 router.route('/posts')
   .get(protect, getPosts)
   .post(protect, createPost);
+
+// 내 게시글 조회 (특별한 라우트를 먼저 정의)
+router.route('/posts/my-posts')
+  .get(protect, getMyPosts);
 
 router.route('/posts/:id')
   .get(protect, getPostById)

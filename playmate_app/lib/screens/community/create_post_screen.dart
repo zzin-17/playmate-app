@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/community_service.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -16,6 +17,7 @@ class CreatePostScreen extends StatefulWidget {
 class _CreatePostScreenState extends State<CreatePostScreen> {
   final _formKey = GlobalKey<FormState>();
   final _contentController = TextEditingController();
+  final _communityService = CommunityService();
 
   
   
@@ -27,7 +29,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   @override
   void dispose() {
     _contentController.dispose();
-
     super.dispose();
   }
 
@@ -68,9 +69,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     );
   }
 
-
-
-    Widget _buildContentInput() {
+  Widget _buildContentInput() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -315,10 +314,13 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     });
 
     try {
-      // TODO: 실제 API 호출로 변경
-      await Future.delayed(const Duration(seconds: 2)); // 시뮬레이션
+      // 실제 API 호출로 게시글 작성
+      final createdPost = await _communityService.createPost(
+        content: _contentController.text.trim(),
+        hashtags: [],
+      );
       
-      if (mounted) {
+      if (mounted && createdPost != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('게시글이 성공적으로 등록되었습니다!'),
@@ -330,14 +332,17 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final currentUser = authProvider.currentUser;
         
-        final postData = {
+        final resultData = {
           'content': _contentController.text.trim(),
           'hashtags': [], // 해시태그는 본문에서 #으로 처리
           'author': currentUser?.nickname ?? '사용자',
           'authorId': currentUser?.id ?? 0,
+          'postId': createdPost.id,
         };
         
-        Navigator.pop(context, postData); // 게시글 데이터 반환
+        Navigator.pop(context, resultData); // 게시글 데이터 반환
+      } else {
+        throw Exception('게시글 작성에 실패했습니다.');
       }
     } catch (e) {
       if (mounted) {

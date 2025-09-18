@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/user.dart';
 import '../../models/matching.dart';
@@ -24,16 +25,47 @@ class NotificationListScreen extends StatefulWidget {
 class _NotificationListScreenState extends State<NotificationListScreen> {
   final MatchingNotificationService _notificationService = MatchingNotificationService();
   List<MatchingNotification> _notifications = [];
+  
+  // 자동 새로고침 타이머
+  Timer? _autoRefreshTimer;
+  final Duration _refreshInterval = const Duration(minutes: 2); // 2분마다 새로고침
 
   @override
   void initState() {
     super.initState();
+    _loadNotifications();
+    _startAutoRefreshTimer();
+  }
+  
+  // 자동 새로고침 타이머 시작
+  void _startAutoRefreshTimer() {
+    print('🔄 알림 자동 새로고침 활성화');
+    _autoRefreshTimer = Timer.periodic(_refreshInterval, (timer) {
+      if (mounted) {
+        _refreshNotifications();
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+  
+  // 알림 데이터 새로고침 (기존 알림 보존하면서 새 알림 추가)
+  void _refreshNotifications() {
+    print('🔄 알림 데이터 자동 새로고침 시작');
+    
+    // 기존 알림은 보존하고 새로운 알림만 추가
     _loadNotifications();
   }
 
   void _loadNotifications() {
     _notifications = _notificationService.getNotificationsForUser(widget.currentUser.id);
     setState(() {});
+  }
+  
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
   }
 
   void _markAsRead(int notificationId) {

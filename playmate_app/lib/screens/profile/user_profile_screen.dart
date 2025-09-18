@@ -3,7 +3,6 @@ import 'dart:io';
 import '../../models/user.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
-import '../../services/mock_auth_service.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final User user;
@@ -36,8 +35,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Future<void> _loadReviews() async {
-    final data = await MockAuthService.getUserReviews(widget.user.id);
-    if (mounted) setState(() => _reviews = data);
+    // 실제 환경에서는 ReviewService를 사용해야 함
+    // final reviewService = ReviewService();
+    // final data = await reviewService.getUserReviews(widget.user.id);
+    if (mounted) setState(() => _reviews = []);
   }
 
   @override

@@ -26,6 +26,9 @@ class WebSocketService {
   WebSocketService._();
   final ChatLocalStore _localStore = ChatLocalStore();
   
+  // 채팅 상대방 ID (매칭에서 호스트가 아닌 사용자)
+  int? _targetUserId;
+  
   // 메시지 스트림
   Stream<ChatMessage> get messageStream => _messageController?.stream ?? const Stream.empty();
   
@@ -243,6 +246,13 @@ class WebSocketService {
     
     try {
       final messageData = {
+        'roomId': _currentMatchingId,
+        'message': message.message,
+        'sender': {
+          'id': message.senderId,
+          'nickname': message.senderName,
+        },
+        'targetUserId': _getTargetUserId(message), // 채팅 상대방 ID
         'content': message.message,
         'type': message.messageType,
         'imageUrl': message.imageUrl,
@@ -264,6 +274,18 @@ class WebSocketService {
       print('플메 메시지 전송 실패: $e');
       rethrow;
     }
+  }
+  
+  // 채팅 상대방 ID 가져오기
+  int? _getTargetUserId(ChatMessage message) {
+    // TODO: 실제 매칭 정보에서 상대방 ID 추출
+    // 현재는 임시로 호스트 ID 반환 (추후 개선 필요)
+    return _targetUserId ?? 1; // 기본값으로 호스트 ID 사용
+  }
+  
+  // 채팅 상대방 설정 (채팅 화면에서 호출)
+  void setTargetUser(int targetUserId) {
+    _targetUserId = targetUserId;
   }
 
   // 읽음 확인 전송

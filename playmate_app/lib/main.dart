@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/auth_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/main_screen.dart';
@@ -173,62 +172,60 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _checkAuthStatus() async {
-    // 1. 저장된 자격 증명 확인
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedEmail = prefs.getString('playmate_savedEmail');
-      final rememberMe = prefs.getBool('playmate_rememberMe') ?? false;
+      // AuthProvider에서 인증 상태 확인
+      final authProvider = context.read<AuthProvider>();
       
-      if (savedEmail != null && rememberMe) {
-        // 저장된 자격 증명으로 자동 로그인 시도
-      }
+      // 개발 중: 로그인 시도 횟수 초기화
+      await authProvider.resetAllLoginAttempts();
+      
+      // 사용자 정보 로드
+      await authProvider.loadCurrentUser();
+      
+      print('🔍 인증 확인 완료 - 사용자: ${authProvider.currentUser?.email ?? "null"}');
+      
     } catch (e) {
-      // 저장된 자격 증명 로드 실패
-    }
-    
-    // 2. AuthProvider 인증 상태 확인
-    final authProvider = context.read<AuthProvider>();
-    
-    // 개발 중: 로그인 시도 횟수 초기화
-    await authProvider.resetAllLoginAttempts();
-    
-    await authProvider.loadCurrentUser();
-    
-    // 3. 인증 확인 완료 후 상태 업데이트 (mounted 체크로 안전성 확보)
-    if (mounted) {
-      setState(() {
-        _isCheckingAuth = false;
-      });
+      print('🔍 인증 확인 실패: $e');
+    } finally {
+      // 인증 확인 완료 후 상태 업데이트
+      if (mounted) {
+        setState(() {
+          _isCheckingAuth = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Consumer 제거하여 불필요한 리빌드 방지
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    // Consumer 사용으로 필요한 경우에만 리빌드
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
     
-    // 인증 확인이 완료될 때까지 로딩 화면 표시
-    if (_isCheckingAuth || authProvider.isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-    
-    if (authProvider.isLoggedIn) {
-      return const MainScreen();
-    } else {
-      // LoginScreen을 항상 동일한 인스턴스로 유지
-      // (로그인 실패 시에도 화면이 새로 생성되지 않도록)
-      return LoginScreen(
-        key: const ValueKey('login_screen'),
-        // 에러 상태를 전달하지 않음 (화면 재생성 방지)
-        initialError: null,
-        // 로그인 실패 시에도 화면 유지
-        preserveState: true,
-      );
-    }
+        // 인증 확인이 완료될 때까지 로딩 화면 표시
+        if (_isCheckingAuth || authProvider.isLoading) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        
+        if (authProvider.isLoggedIn) {
+          return const MainScreen();
+        } else {
+          // LoginScreen을 항상 동일한 인스턴스로 유지
+          // (로그인 실패 시에도 화면이 새로 생성되지 않도록)
+          return LoginScreen(
+            key: const ValueKey('login_screen'),
+            // 에러 상태를 전달하지 않음 (화면 재생성 방지)
+            initialError: null,
+            // 로그인 실패 시에도 화면 유지
+            preserveState: true,
+          );
+        }
+      },
+    );
   }
 }
 

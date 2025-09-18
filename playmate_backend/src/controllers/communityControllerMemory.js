@@ -1,15 +1,77 @@
 const fs = require('fs');
 const path = require('path');
+const { validateUserId, logUserOperation } = require('../utils/userValidation');
+const {
+  sendSuccessResponse,
+  sendPaginatedResponse,
+  sendCreatedResponse,
+  sendErrorResponse,
+  sendNotFoundResponse,
+  sendBadRequestResponse
+} = require('../utils/responseHelper');
 
 // 커뮤니티 데이터 파일 경로
 const POSTS_FILE = path.join(__dirname, '../data/posts.json');
 const COMMENTS_FILE = path.join(__dirname, '../data/comments.json');
 
-// 메모리 스토어
+// 메모리 스토어 (대규모 데이터 대응)
 let posts = [];
 let comments = [];
 let nextPostId = 1;
 let nextCommentId = 1;
+
+// 성능 최적화를 위한 인덱스
+const postIndexes = {
+  byAuthorId: new Map(), // authorId별 게시글 인덱스
+  byCategory: new Map(), // 카테고리별 게시글 인덱스
+  byDate: new Map()      // 날짜별 게시글 인덱스
+};
+
+// 인덱스 업데이트 함수
+const updatePostIndexes = (post, operation = 'add') => {
+  const authorId = post.authorId;
+  const category = post.category;
+  const date = post.createdAt.split('T')[0]; // YYYY-MM-DD 형식
+  
+  if (operation === 'add') {
+    // authorId 인덱스 업데이트
+    if (!postIndexes.byAuthorId.has(authorId)) {
+      postIndexes.byAuthorId.set(authorId, []);
+    }
+    postIndexes.byAuthorId.get(authorId).push(post);
+    
+    // category 인덱스 업데이트
+    if (!postIndexes.byCategory.has(category)) {
+      postIndexes.byCategory.set(category, []);
+    }
+    postIndexes.byCategory.get(category).push(post);
+    
+    // date 인덱스 업데이트
+    if (!postIndexes.byDate.has(date)) {
+      postIndexes.byDate.set(date, []);
+    }
+    postIndexes.byDate.get(date).push(post);
+  } else if (operation === 'remove') {
+    // 인덱스에서 제거
+    if (postIndexes.byAuthorId.has(authorId)) {
+      const authorPosts = postIndexes.byAuthorId.get(authorId);
+      const index = authorPosts.findIndex(p => p.id === post.id);
+      if (index > -1) authorPosts.splice(index, 1);
+    }
+    
+    if (postIndexes.byCategory.has(category)) {
+      const categoryPosts = postIndexes.byCategory.get(category);
+      const index = categoryPosts.findIndex(p => p.id === post.id);
+      if (index > -1) categoryPosts.splice(index, 1);
+    }
+    
+    if (postIndexes.byDate.has(date)) {
+      const datePosts = postIndexes.byDate.get(date);
+      const index = datePosts.findIndex(p => p.id === post.id);
+      if (index > -1) datePosts.splice(index, 1);
+    }
+  }
+};
 
 // 파일에서 데이터 로드
 function loadFromFile() {
@@ -69,103 +131,7 @@ function saveToFile() {
 
 // 기본 게시글 데이터
 function getDefaultPosts() {
-  return [
-    {
-      id: 1,
-      title: '테니스 초보자 모임 구합니다',
-      content: '테니스를 시작한 지 3개월 된 초보자입니다. 같이 연습할 분들 구합니다! #테니스초보 #모임 #연습',
-      authorId: 1,
-      authorNickname: '테니스러버',
-      authorProfileImage: null,
-      category: '모임',
-      hashtags: ['테니스초보', '모임', '연습'],
-      likes: 12,
-      comments: 8,
-      shares: 2,
-      views: 156,
-      isLiked: false,
-      isBookmarked: false,
-      isShared: false,
-      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2시간 전
-      updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 2,
-      title: '백핸드 스핀 치는 법 알려주세요',
-      content: '백핸드로 스핀을 치려고 하는데 자꾸 실패합니다. 팁 부탁드려요! #백핸드 #스핀 #테니스팁',
-      authorId: 2,
-      authorNickname: '스핀마스터',
-      authorProfileImage: null,
-      category: '테니스팁',
-      hashtags: ['백핸드', '스핀', '테니스팁'],
-      likes: 25,
-      comments: 15,
-      shares: 5,
-      views: 234,
-      isLiked: true,
-      isBookmarked: false,
-      isShared: true,
-      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5시간 전
-      updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 3,
-      title: '주말에 같이 테니스 치실 분?',
-      content: '이번 주말에 잠실에서 테니스 치실 분 구합니다. 초급~중급 수준이에요! #주말 #잠실 #테니스',
-      authorId: 3,
-      authorNickname: '주말테니스',
-      authorProfileImage: null,
-      category: '모임',
-      hashtags: ['주말', '잠실', '테니스'],
-      likes: 18,
-      comments: 12,
-      shares: 3,
-      views: 189,
-      isLiked: false,
-      isBookmarked: true,
-      isShared: false,
-      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1일 전
-      updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 4,
-      title: '테니스 라켓 추천 부탁드려요',
-      content: '초보자용 테니스 라켓 추천해주세요. 예산은 20만원 정도입니다. #라켓추천 #초보자 #테니스',
-      authorId: 4,
-      authorNickname: '라켓고민',
-      authorProfileImage: null,
-      category: '일반',
-      hashtags: ['라켓추천', '초보자', '테니스'],
-      likes: 32,
-      comments: 28,
-      shares: 8,
-      views: 312,
-      isLiked: true,
-      isBookmarked: false,
-      isShared: false,
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2일 전
-      updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 5,
-      title: '코트 예약 팁 공유합니다',
-      content: '잠실 테니스장 예약하는 팁을 공유합니다. 새벽 6시에 예약하면 확률이 높아요! #코트예약 #팁 #잠실',
-      authorId: 5,
-      authorNickname: '코트마스터',
-      authorProfileImage: null,
-      category: '테니스팁',
-      hashtags: ['코트예약', '팁', '잠실'],
-      likes: 45,
-      comments: 35,
-      shares: 12,
-      views: 456,
-      isLiked: false,
-      isBookmarked: false,
-      isShared: false,
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), // 3일 전
-      updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ];
+  return [];
 }
 
 // 게시글 목록 조회
@@ -188,7 +154,6 @@ const getPosts = (req, res) => {
     if (search) {
       const searchLower = search.toLowerCase();
       filteredPosts = filteredPosts.filter(post => 
-        post.title.toLowerCase().includes(searchLower) ||
         post.content.toLowerCase().includes(searchLower) ||
         post.hashtags.some(tag => tag.toLowerCase().includes(searchLower))
       );
@@ -204,23 +169,14 @@ const getPosts = (req, res) => {
 
     console.log(`필터링된 게시글 수: ${paginatedPosts.length}개`);
 
-    res.json({
-      success: true,
-      data: paginatedPosts,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total: filteredPosts.length,
-        totalPages: Math.ceil(filteredPosts.length / limitNum)
-      }
+    sendPaginatedResponse(res, paginatedPosts, {
+      page: pageNum,
+      limit: limitNum,
+      total: filteredPosts.length
     });
   } catch (error) {
     console.error('게시글 목록 조회 오류:', error);
-    res.status(500).json({
-      success: false,
-      message: '게시글 목록 조회에 실패했습니다.',
-      error: error.message
-    });
+    sendErrorResponse(res, '게시글 목록 조회에 실패했습니다.', 500, error);
   }
 };
 
@@ -245,7 +201,7 @@ const getPostById = (req, res) => {
     post.views += 1;
     saveToFile();
 
-    console.log(`게시글 조회 성공: ${post.title}`);
+    console.log(`게시글 조회 성공: ${post.content.substring(0, 30)}...`);
 
     res.json({
       success: true,
@@ -264,21 +220,17 @@ const getPostById = (req, res) => {
 // 게시글 생성
 const createPost = (req, res) => {
   try {
-    const { title, content, category, hashtags } = req.body;
+    const { content, category, hashtags } = req.body;
     const authorId = req.user.id;
 
-    if (!title || !content) {
-      return res.status(400).json({
-        success: false,
-        message: '제목과 내용은 필수입니다.'
-      });
+    if (!content) {
+      return sendBadRequestResponse(res, '내용은 필수입니다.');
     }
 
-    console.log(`게시글 생성 요청: ${title}`);
+    console.log(`게시글 생성 요청: ${content.substring(0, 50)}...`);
 
     const newPost = {
       id: nextPostId++,
-      title: title.trim(),
       content: content.trim(),
       authorId: authorId,
       authorNickname: req.user.nickname || '익명',
@@ -301,17 +253,10 @@ const createPost = (req, res) => {
 
     console.log(`게시글 생성 완료: ID ${newPost.id}`);
 
-    res.status(201).json({
-      success: true,
-      data: newPost
-    });
+    sendCreatedResponse(res, newPost, '게시글이 성공적으로 생성되었습니다.');
   } catch (error) {
     console.error('게시글 생성 오류:', error);
-    res.status(500).json({
-      success: false,
-      message: '게시글 생성에 실패했습니다.',
-      error: error.message
-    });
+    sendErrorResponse(res, '게시글 생성에 실패했습니다.', 500, error);
   }
 };
 
@@ -319,7 +264,7 @@ const createPost = (req, res) => {
 const updatePost = (req, res) => {
   try {
     const { id } = req.params;
-    const { title, content, category, hashtags } = req.body;
+    const { content, category, hashtags } = req.body;
     const authorId = req.user.id;
     const postId = parseInt(id);
 
@@ -347,7 +292,6 @@ const updatePost = (req, res) => {
     // 게시글 수정
     posts[postIndex] = {
       ...post,
-      title: title?.trim() || post.title,
       content: content?.trim() || post.content,
       category: category || post.category,
       hashtags: hashtags || post.hashtags,
@@ -623,6 +567,49 @@ const toggleCommentLike = (req, res) => {
   }
 };
 
+// 내 게시글 조회
+const getMyPosts = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userEmail = req.user.email;
+    
+    console.log('🔍 getMyPosts 호출됨 - userId:', userId, 'userEmail:', userEmail);
+    
+    // 기본 검증 (간단하게)
+    if (!userId || !userEmail) {
+      console.log('❌ 사용자 정보 누락');
+      return res.status(400).json({
+        success: false,
+        message: '사용자 정보가 없습니다.'
+      });
+    }
+    
+    // 사용자 작업 로깅
+    logUserOperation(req, '내 게시글 조회');
+    
+    console.log('🔍 전체 게시글 수:', posts.length);
+    console.log('🔍 전체 게시글 authorId들:', posts.map(p => p.authorId));
+    
+    // 간단한 필터링으로 조회
+    const myPosts = posts.filter(post => post.authorId === userId);
+    
+    console.log('🔍 필터링된 내 게시글 수:', myPosts.length);
+    
+    res.json({
+      success: true,
+      data: myPosts,
+      count: myPosts.length
+    });
+  } catch (error) {
+    console.error('내 게시글 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '내 게시글 조회에 실패했습니다.',
+      error: error.message
+    });
+  }
+};
+
 // 서버 시작 시 데이터 로드
 loadFromFile();
 
@@ -636,6 +623,7 @@ module.exports = {
   getComments,
   createComment,
   toggleCommentLike,
+  getMyPosts,
   loadFromFile,
   saveToFile
 };

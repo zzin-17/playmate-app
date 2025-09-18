@@ -1,17 +1,81 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user.dart';
+import '../../services/api_service.dart';
+import '../../services/community_service.dart';
 import 'my_hosted_matchings_screen.dart';
 import 'my_bookmarks_screen.dart';
 import '../review/my_reviews_screen.dart';
 import '../community/community_screen.dart';
 import '../profile/edit_profile_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  int _matchingCount = 0;
+  int _postCount = 0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileCounts();
+  }
+
+  // 프로필 통계 데이터 로드
+  void _loadProfileCounts() async {
+    try {
+      final user = context.read<AuthProvider>().currentUser;
+      if (user == null) return;
+
+      final token = await _getAuthToken();
+      if (token == null) return;
+
+      // 매칭 수 조회 (호스트 + 게스트)
+      final matchings = await ApiService.getMyMatchings(token);
+      final hostMatchings = matchings.where((m) => m.host.id == user.id).toList();
+      final guestMatchings = matchings.where((m) => 
+        m.guests?.any((guest) => guest.id == user.id) ?? false
+      ).toList();
+      
+      // 게시글 수 조회
+      final communityService = CommunityService();
+      final posts = await communityService.getMyPosts();
+
+      setState(() {
+        _matchingCount = hostMatchings.length + guestMatchings.length;
+        _postCount = posts.length;
+        _isLoading = false;
+      });
+
+      print('📊 프로필 통계 로드 완료: 매칭 ${_matchingCount}개, 게시글 ${_postCount}개');
+    } catch (e) {
+      print('프로필 통계 로드 실패: $e');
+      setState(() {
+        _matchingCount = 0;
+        _postCount = 0;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('playmate_auth_token');
+    } catch (e) {
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -287,7 +351,7 @@ class ProfileScreen extends StatelessWidget {
               Expanded(
                 child: _buildStatCard(
                   icon: Icons.people,
-                  value: '12',
+                  value: _isLoading ? '-' : '$_matchingCount',
                   label: '매칭',
                   onTap: () => _navigateToMatching(context),
                 ),
@@ -296,7 +360,7 @@ class ProfileScreen extends StatelessWidget {
               Expanded(
                 child: _buildStatCard(
                   icon: Icons.article,
-                  value: '8',
+                  value: _isLoading ? '-' : '$_postCount',
                   label: '게시글',
                   onTap: () => _navigateToPosts(context),
                 ),
@@ -378,10 +442,13 @@ class ProfileScreen extends StatelessWidget {
   }
 
   void _navigateToPosts(BuildContext context) {
-    // 내 게시글 페이지로 이동 (내가 작성한 글)
+    // 커뮤니티 My 탭으로 직접 이동
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const CommunityScreen(),
+        builder: (context) => const CommunityScreen(
+          initialTabIndex: 1, // My 탭으로 시작
+          showBackButton: true, // 뒤로가기 버튼 표시
+        ),
       ),
     );
   }

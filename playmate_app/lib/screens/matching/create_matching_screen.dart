@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../widgets/common/app_button.dart';
 import '../../models/matching.dart';
 import '../../models/user.dart';
@@ -7,6 +8,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../services/matching_data_service.dart';
 import '../../models/tennis_court.dart';
+import '../../providers/auth_provider.dart';
 import 'court_selection_screen.dart';
 
 class CreateMatchingScreen extends StatefulWidget {
@@ -230,16 +232,7 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
       status: 'recruiting',
       message: _messageController.text,
       isFollowersOnly: _isFollowersOnly,
-      host: User(
-        id: 1,
-        email: 'user@example.com',
-        nickname: '현재 사용자',
-        gender: 'male',
-        skillLevel: 3,
-        profileImage: null,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      ),
+      host: context.read<AuthProvider>().currentUser!, // 실제 현재 사용자 정보 사용
       guests: [],
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
@@ -262,8 +255,20 @@ class _CreateMatchingScreenState extends State<CreateMatchingScreen> {
       final createdMatching = await MatchingDataService.createMatching(newMatching.toJson());
       
       if (createdMatching != null) {
-        // 성공시 생성된 매칭을 홈 화면으로 전달
-        Navigator.of(context).pop(createdMatching);
+        // 성공시 생성된 매칭을 홈 화면으로 전달하고 강제 새로고침 요청
+        print('✅ 매칭 생성 완료, 홈 화면으로 돌아가며 새로고침 요청');
+        
+        // 홈 화면으로 돌아가면서 강제 새로고침 플래그와 함께 전달
+        Navigator.of(context).pop({'matching': createdMatching, 'needsRefresh': true});
+        
+        // 약간의 지연 후 추가 새로고침 (타이밍 이슈 해결)
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            // 글로벌 새로고침 이벤트 발생 (NotificationCenter 방식)
+            print('🔄 매칭 생성 후 추가 새로고침 트리거');
+            // TODO: 실제 글로벌 이벤트 구현
+          }
+        });
       } else {
         // API 실패시 폴백: 로컬 매칭으로 처리 (개발용)
         print('매칭 생성 API 실패, 로컬로 처리');

@@ -26,9 +26,10 @@ const getPosts = asyncHandler(async (req, res) => {
     success: true,
     data: posts,
     pagination: {
-      current: parseInt(page),
-      pages: Math.ceil(total / limit),
-      total
+      page: parseInt(page),
+      limit: parseInt(limit),
+      total: total,
+      totalPages: Math.ceil(total / limit)
     }
   });
 });
@@ -58,11 +59,10 @@ const getPost = asyncHandler(async (req, res) => {
 // @route   POST /api/community/posts
 // @access  Private
 const createPost = asyncHandler(async (req, res) => {
-  const { title, content, category, images, hashtags } = req.body;
+  const { content, category, images, hashtags } = req.body;
   
   const post = await Post.create({
     author: req.user.id,
-    title,
     content,
     category,
     images,

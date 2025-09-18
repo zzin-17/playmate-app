@@ -75,7 +75,7 @@ class ReviewService {
   static Future<String?> _getAuthToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
+      final token = prefs.getString('playmate_auth_token');
       
       if (token == null) return null;
       
@@ -85,7 +85,7 @@ class ReviewService {
         final expiryDate = DateTime.parse(expiresAt);
         if (DateTime.now().isAfter(expiryDate)) {
           // 토큰이 만료된 경우 제거
-          await prefs.remove('auth_token');
+          await prefs.remove('playmate_auth_token');
           await prefs.remove('token_expires_at');
           return null;
         }

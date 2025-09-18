@@ -73,7 +73,110 @@ class Matching {
     this.cancelledAt, // 취소된 시간
   });
 
-  factory Matching.fromJson(Map<String, dynamic> json) => _$MatchingFromJson(json);
+  factory Matching.fromJson(Map<String, dynamic> json) {
+    try {
+      // 완전한 null 안전성을 위한 데이터 정제
+      final safeJson = Map<String, dynamic>.from(json);
+      
+      // 숫자 필드들 안전하게 처리 (null → 기본값)
+      safeJson['minLevel'] = safeJson['minLevel'] ?? 1;
+      safeJson['maxLevel'] = safeJson['maxLevel'] ?? 5;
+      safeJson['minAge'] = safeJson['minAge'] ?? 20;
+      safeJson['maxAge'] = safeJson['maxAge'] ?? 60;
+      safeJson['maleRecruitCount'] = safeJson['maleRecruitCount'] ?? 0;
+      safeJson['femaleRecruitCount'] = safeJson['femaleRecruitCount'] ?? 0;
+      safeJson['guestCost'] = safeJson['guestCost'] ?? 0;
+      safeJson['recoveryCount'] = safeJson['recoveryCount'] ?? 0;
+      
+      // 배열 필드들 안전하게 처리 (null → 빈 배열)
+      safeJson['appliedUserIds'] = safeJson['appliedUserIds'] ?? [];
+      safeJson['confirmedUserIds'] = safeJson['confirmedUserIds'] ?? [];
+      safeJson['guests'] = safeJson['guests'] ?? [];
+      
+      // DateTime 필드들 안전하게 처리 (null → null 유지, 올바른 타입)
+      if (safeJson['completedAt'] != null && safeJson['completedAt'] != 'null') {
+        safeJson['completedAt'] = DateTime.tryParse(safeJson['completedAt'].toString())?.toIso8601String();
+      } else {
+        safeJson['completedAt'] = null;
+      }
+      
+      if (safeJson['cancelledAt'] != null && safeJson['cancelledAt'] != 'null') {
+        safeJson['cancelledAt'] = DateTime.tryParse(safeJson['cancelledAt'].toString())?.toIso8601String();
+      } else {
+        safeJson['cancelledAt'] = null;
+      }
+      
+      // Boolean 필드들 안전하게 처리
+      safeJson['isFollowersOnly'] = safeJson['isFollowersOnly'] ?? false;
+      
+      // String 필드들 기본값 처리
+      safeJson['type'] = safeJson['type'] ?? 'host';
+      safeJson['courtName'] = safeJson['courtName'] ?? '테니스장';
+      safeJson['timeSlot'] = safeJson['timeSlot'] ?? '18:00~20:00';
+      safeJson['gameType'] = safeJson['gameType'] ?? 'mixed';
+      safeJson['status'] = safeJson['status'] ?? 'recruiting';
+      
+      // Double 필드들 기본값 처리
+      safeJson['courtLat'] = safeJson['courtLat'] ?? 37.5665;
+      safeJson['courtLng'] = safeJson['courtLng'] ?? 126.978;
+      
+      // host 객체 안전성 검증
+      if (safeJson['host'] != null) {
+        final hostData = Map<String, dynamic>.from(safeJson['host']);
+        
+        // User 모델에 필요한 필수 필드들 확인 및 기본값 추가
+        hostData['id'] = hostData['id'] ?? 0;
+        hostData['nickname'] = hostData['nickname'] ?? 'Unknown';
+        hostData['email'] = hostData['email'] ?? 'unknown@example.com';
+        hostData['createdAt'] = hostData['createdAt'] ?? DateTime.now().toIso8601String();
+        hostData['updatedAt'] = hostData['updatedAt'] ?? DateTime.now().toIso8601String();
+        
+        safeJson['host'] = hostData;
+      } else {
+        // host가 null인 경우 기본 host 생성
+        safeJson['host'] = {
+          'id': 0,
+          'nickname': 'Unknown Host',
+          'email': 'unknown@example.com',
+          'createdAt': DateTime.now().toIso8601String(),
+          'updatedAt': DateTime.now().toIso8601String(),
+        };
+      }
+      
+      print('✅ Matching.fromJson 안전 처리 완료: ${safeJson['courtName']} (ID: ${safeJson['id']})');
+      return _$MatchingFromJson(safeJson);
+    } catch (e) {
+      print('❌ Matching.fromJson 실패: $e');
+      print('📦 원본 JSON: ${json.toString().substring(0, 500)}...');
+      
+      // 최후의 수단: 최소한의 Matching 객체 생성
+      // API 응답이 {success: true, data: {...}} 구조인 경우 처리
+      final actualData = json['data'] ?? json;
+      
+      return Matching(
+        id: actualData['id'] ?? DateTime.now().millisecondsSinceEpoch,
+        type: 'host',
+        courtName: actualData['courtName'] ?? '알 수 없는 테니스장',
+        courtLat: 37.5665,
+        courtLng: 126.978,
+        date: DateTime.tryParse(actualData['date']?.toString() ?? '') ?? DateTime.now(),
+        timeSlot: actualData['timeSlot'] ?? '18:00~20:00',
+        gameType: 'mixed',
+        maleRecruitCount: 1,
+        femaleRecruitCount: 1,
+        status: 'recruiting',
+        host: User(
+          id: actualData['host']?['id'] ?? 0,
+          nickname: actualData['host']?['nickname'] ?? 'Unknown',
+          email: actualData['host']?['email'] ?? 'unknown@example.com',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+    }
+  }
   Map<String, dynamic> toJson() => _$MatchingToJson(this);
 
   // 복사 및 수정 메서드
@@ -148,10 +251,7 @@ class Matching {
 
   // 연령대 범위 텍스트
   String get ageRangeText {
-    print('🔍 ageRangeText 계산 중: minAge=$minAge, maxAge=$maxAge');
-    
     if (minAge == null && maxAge == null) {
-      print('  → 둘 다 null이므로 "연령대 제한없음" 반환');
       return '연령대 제한없음';
     }
     
@@ -166,30 +266,21 @@ class Matching {
     }
     
     if (minAge == null) {
-      final result = '~${_getAgeGroup(maxAge!)}';
-      print('  → minAge가 null이므로 "$result" 반환');
-      return result;
+      return '~${_getAgeGroup(maxAge!)}';
     }
     if (maxAge == null) {
-      final result = '${_getAgeGroup(minAge!)}~';
-      print('  → maxAge가 null이므로 "$result" 반환');
-      return result;
+      return '${_getAgeGroup(minAge!)}~';
     }
     
     // 연령대 범위 표시
     final minGroup = _getAgeGroup(minAge!);
     final maxGroup = _getAgeGroup(maxAge!);
     
-    print('  → minGroup: $minGroup, maxGroup: $maxGroup');
-    
     if (minGroup == maxGroup) {
-      print('  → 같은 연령대이므로 "$minGroup" 반환');
       return minGroup;
     } else {
       // 범위 표시 (예: 20-49 → 20대-40대)
-      final result = '${minGroup}-${maxGroup}';
-      print('  → 범위 표시: "$result" 반환');
-      return result;
+      return '${minGroup}-${maxGroup}';
     }
   }
 

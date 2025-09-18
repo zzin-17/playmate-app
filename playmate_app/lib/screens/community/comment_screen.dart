@@ -64,7 +64,7 @@ class _CommentScreenState extends State<CommentScreen> {
         postId: widget.post.id,
         authorId: 2,
         authorNickname: '테니스러버',
-        authorProfileImage: 'https://via.placeholder.com/40x40',
+        authorProfileImage: null,
         content: '정말 좋은 정보네요! 저도 도움이 많이 됐습니다.',
         likeCount: 3,
         isLikedByCurrentUser: false,
@@ -76,7 +76,7 @@ class _CommentScreenState extends State<CommentScreen> {
             postId: widget.post.id,
             authorId: 1,
             authorNickname: '테니스마스터',
-            authorProfileImage: 'https://via.placeholder.com/40x40',
+            authorProfileImage: null,
             content: '도움이 되었다니 다행이에요!',
             parentCommentId: 1,
             likeCount: 1,
@@ -91,7 +91,7 @@ class _CommentScreenState extends State<CommentScreen> {
         postId: widget.post.id,
         authorId: 3,
         authorNickname: '라켓킹',
-        authorProfileImage: 'https://via.placeholder.com/40x40',
+        authorProfileImage: null,
         content: '이런 팁들이 정말 유용해요. 더 많은 정보를 기대합니다!',
         likeCount: 1,
         isLikedByCurrentUser: false,
@@ -294,9 +294,19 @@ class _CommentScreenState extends State<CommentScreen> {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundImage: NetworkImage(
-                  widget.post.authorProfileImage ?? 'https://via.placeholder.com/40x40',
-                ),
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                backgroundImage: widget.post.authorProfileImage != null 
+                  ? NetworkImage(widget.post.authorProfileImage!)
+                  : null,
+                child: widget.post.authorProfileImage == null 
+                  ? Text(
+                      widget.post.authorNickname[0],
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                  : null,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -382,9 +392,20 @@ class _CommentScreenState extends State<CommentScreen> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundImage: NetworkImage(
-                comment.authorProfileImage ?? 'https://via.placeholder.com/36x36',
-              ),
+              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+              backgroundImage: comment.authorProfileImage != null 
+                ? NetworkImage(comment.authorProfileImage!) 
+                : null,
+              child: comment.authorProfileImage == null 
+                ? Text(
+                    comment.authorNickname.isNotEmpty ? comment.authorNickname[0].toUpperCase() : '?',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  )
+                : null,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -482,9 +503,20 @@ class _CommentScreenState extends State<CommentScreen> {
       children: [
         CircleAvatar(
           radius: 14,
-          backgroundImage: NetworkImage(
-            reply.authorProfileImage ?? 'https://via.placeholder.com/28x28',
-          ),
+          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+          backgroundImage: reply.authorProfileImage != null 
+            ? NetworkImage(reply.authorProfileImage!)
+            : null,
+          child: reply.authorProfileImage == null 
+            ? Text(
+                reply.authorNickname[0],
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              )
+            : null,
         ),
         const SizedBox(width: 8),
         Expanded(

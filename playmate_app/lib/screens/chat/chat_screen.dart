@@ -63,8 +63,17 @@ class _ChatScreenState extends State<ChatScreen> {
     final isHost = widget.currentUser.email == widget.matching.host.email;
     final isChatPartnerHost = widget.chatPartner?.email == widget.matching.host.email;
     
+    print('🔍 채팅 권한 체크:');
+    print('  - 현재 사용자: ${widget.currentUser.email} (ID: ${widget.currentUser.id})');
+    print('  - 매칭 호스트: ${widget.matching.host.email} (ID: ${widget.matching.host.id})');
+    print('  - 채팅 상대방: ${widget.chatPartner?.email} (ID: ${widget.chatPartner?.id})');
+    print('  - isHost: $isHost');
+    print('  - isChatPartnerHost: $isChatPartnerHost');
+    print('  - 권한 체크 결과: ${!(!isHost && !isChatPartnerHost)}');
+    
     // 권한 체크: 호스트이거나 호스트와의 채팅이어야 함
     if (!isHost && !isChatPartnerHost) {
+      print('❌ 채팅 권한 없음 - 뒤로가기');
       // 잘못된 채팅 권한 - 뒤로가기
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.of(context).pop();
@@ -75,6 +84,8 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         );
       });
+    } else {
+      print('✅ 채팅 권한 확인됨');
     }
   }
 
@@ -136,6 +147,8 @@ class _ChatScreenState extends State<ChatScreen> {
       
       // 메시지 리스너
       wsService.messageStream.listen((message) {
+        if (!mounted) return; // 위젯이 dispose된 경우 setState 호출 방지
+        
         print('플메 메시지 수신: ${message.message}');
         setState(() {
           _messages.add(message);
@@ -143,7 +156,7 @@ class _ChatScreenState extends State<ChatScreen> {
         
         // 스크롤을 맨 아래로
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
+          if (mounted && _scrollController.hasClients) {
             _scrollController.animateTo(
               _scrollController.position.maxScrollExtent,
               duration: const Duration(milliseconds: 300),
@@ -156,8 +169,25 @@ class _ChatScreenState extends State<ChatScreen> {
       // 플메 Socket.io 연결
       wsService.connect(widget.matching.id.toString(), widget.currentUser.id.toString());
       
+      // 채팅 상대방 설정
+      final targetUserId = _isHost 
+          ? (widget.chatPartner?.id ?? 999) 
+          : widget.matching.host.id;
+      
+      // 자기 자신과의 채팅 방지 (6자리 고유 ID 시스템)
+      if (targetUserId == widget.currentUser.id) {
+        print('⚠️ 자기 자신과의 채팅은 불가능합니다 (현재 사용자 ID: ${widget.currentUser.id})');
+        return;
+      }
+      
+      print('✅ 채팅 상대방 확인: 현재=${widget.currentUser.id}, 호스트=$targetUserId');
+      
+      wsService.setTargetUser(targetUserId);
+      
       // 연결 상태 수동 확인 (1초 후)
       Future.delayed(const Duration(seconds: 1), () {
+        if (!mounted) return; // 위젯이 dispose된 경우 setState 호출 방지
+        
         if (wsService.isConnected) {
           print('플메 수동 연결 상태 확인: 연결됨');
           setState(() {
@@ -312,7 +342,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     padding: const EdgeInsets.all(16),
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
-                      final message = _messages[index];
+                      // 메시지를 시간순으로 정렬 (최신 메시지가 아래로)
+                      final sortedMessages = List<ChatMessage>.from(_messages)
+                        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+                      final message = sortedMessages[index];
                       return _buildMessageItem(message);
                     },
                   ),

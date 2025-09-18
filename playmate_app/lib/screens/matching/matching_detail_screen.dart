@@ -6,6 +6,7 @@ import '../../constants/app_text_styles.dart';
 import '../../widgets/common/app_button.dart';
 import '../../services/matching_state_service.dart';
 import '../../services/matching_data_service.dart';
+import '../../services/matching_service.dart';
 import '../../services/user_service.dart';
 
 import '../chat/chat_screen.dart';
@@ -1094,175 +1095,10 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   }
   */
 
-  // 확정된 게스트 카드 위젯
-  Widget _buildConfirmedGuestCard(Map<String, dynamic> guest) {
-    final user = guest['user'] as User;
-    final confirmedAt = guest['confirmedAt'] as DateTime;
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.success.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppColors.success.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Row(
-        children: [
-          // 프로필 아바타
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.success.withValues(alpha: 0.1),
-            child: Text(
-              user.nickname.isNotEmpty ? user.nickname.substring(0, 1) : '사',
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.success,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          
-          // 게스트 정보
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.nickname,
-                  style: AppTextStyles.body.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '확정: ${_formatDateTime(confirmedAt)}',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // 확정 취소 버튼
-          IconButton(
-            onPressed: () => _showUnconfirmDialog(user),
-            icon: Icon(
-              Icons.cancel_outlined,
-              color: AppColors.error,
-              size: 20,
-            ),
-            tooltip: '확정 취소',
-          ),
-        ],
-      ),
-    );
-  }
 
-  // 확정 취소 확인 다이얼로그
-  void _showUnconfirmDialog(User guest) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Icon(
-                Icons.warning_amber,
-                color: AppColors.error,
-                size: 24,
-              ),
-              const SizedBox(width: 8),
-              const Text('확정 취소 확인'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${guest.nickname}님의 참여 확정을 취소하시겠습니까?'),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.error.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: AppColors.error.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: AppColors.error,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '확정 취소 후 해당 자리를 다시 모집할 수 있습니다',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.error,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('아니오'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _unconfirmGuest(guest);
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.error,
-              ),
-              child: const Text('확정 취소'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
-  // 게스트 확정 취소 처리
-  void _unconfirmGuest(User guest) {
-    // TODO: 실제 API 호출로 확정 취소 처리
-    // 현재는 UI만 업데이트
-    
-    setState(() {
-      // mock 데이터에서 해당 게스트 제거
-      // 실제로는 matching.confirmedUserIds에서 제거
-    });
-    
-    // 성공 메시지 표시
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${guest.nickname}님의 참여 확정이 취소되었습니다'),
-        backgroundColor: AppColors.success,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-    
-    // 매칭 상태 재계산 필요
-    // TODO: 매칭 상태를 다시 계산하여 UI 업데이트
-  }
-
-  // Mock 확정된 게스트 데이터
+  // Mock 확정된 게스트 데이터 (사용되지 않음)
+  /*
   List<Map<String, dynamic>> _getMockConfirmedGuests() {
     // 실제로는 API에서 가져와야 함
     return [
@@ -1302,22 +1138,8 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
       },
     ];
   }
+  */
 
-  // 날짜/시간 포맷팅
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-    
-    if (difference.inDays > 0) {
-      return '${difference.inDays}일 전';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}시간 전';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes}분 전';
-    } else {
-      return '방금 전';
-    }
-  }
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
@@ -2272,17 +2094,26 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
         applicant['user'].email == widget.currentUser.email);
       
       if (!isAlreadyApplied) {
-        // 신청자 목록에 추가
-        _applicants.add({
-          'user': widget.currentUser,
-          'message': '채팅을 통해 참여 신청',
-          'appliedAt': DateTime.now(),
-        });
+        // 실제 매칭 서비스를 통한 신청 처리
+        print('🔍 실제 매칭 신청 시작: ${widget.currentUser.nickname}');
+        final matchingService = MatchingService();
+        final success = await matchingService.joinMatching(widget.matching, widget.currentUser);
         
-        // UI 업데이트
-        setState(() {});
-        
-        print('✅ 매칭 신청 완료: ${widget.currentUser.nickname}');
+        if (success) {
+          // 신청자 목록에 추가
+          _applicants.add({
+            'user': widget.currentUser,
+            'message': '채팅을 통해 참여 신청',
+            'appliedAt': DateTime.now(),
+          });
+          
+          // UI 업데이트
+          setState(() {});
+          
+          print('✅ 매칭 신청 완료: ${widget.currentUser.nickname}');
+        } else {
+          print('❌ 매칭 신청 API 실패');
+        }
       }
     } catch (e) {
       print('❌ 매칭 신청 실패: $e');

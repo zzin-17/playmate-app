@@ -82,7 +82,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
         playStyle: '공격적',
         hasLesson: true,
         mannerScore: 4.8,
-        profileImage: 'https://via.placeholder.com/100x100',
+        profileImage: null,
         createdAt: DateTime.now().subtract(const Duration(days: 30)),
         updatedAt: DateTime.now(),
         followingIds: [2, 3],
@@ -103,7 +103,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
         playStyle: '전략적',
         hasLesson: false,
         mannerScore: 4.9,
-        profileImage: 'https://via.placeholder.com/100x100',
+        profileImage: null,
         createdAt: DateTime.now().subtract(const Duration(days: 60)),
         updatedAt: DateTime.now(),
         followingIds: [1, 3],
@@ -124,7 +124,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
         playStyle: '파워풀',
         hasLesson: true,
         mannerScore: 4.7,
-        profileImage: 'https://via.placeholder.com/100x100',
+        profileImage: null,
         createdAt: DateTime.now().subtract(const Duration(days: 45)),
         updatedAt: DateTime.now(),
         followingIds: [1, 2],
@@ -210,8 +210,20 @@ class _FollowListScreenState extends State<FollowListScreen> {
             // 프로필 이미지
             CircleAvatar(
               radius: 30,
-              backgroundImage: NetworkImage(user.profileImage ?? 'https://via.placeholder.com/60x60'),
-              onBackgroundImageError: (_, __) {},
+              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+              backgroundImage: user.profileImage != null 
+                ? NetworkImage(user.profileImage!) 
+                : null,
+              child: user.profileImage == null 
+                ? Text(
+                    user.nickname.isNotEmpty ? user.nickname[0].toUpperCase() : '?',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 20,
+                    ),
+                  )
+                : null,
             ),
             const SizedBox(width: 16),
             

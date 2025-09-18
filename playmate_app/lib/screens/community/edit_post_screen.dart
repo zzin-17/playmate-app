@@ -352,7 +352,6 @@ class _EditPostScreenState extends State<EditPostScreen> {
         authorId: widget.post.authorId,
         authorNickname: widget.post.authorNickname,
         authorProfileImage: widget.post.authorProfileImage,
-        title: widget.post.title,
         content: _contentController.text.trim(),
         category: widget.post.category,
         images: allImages,

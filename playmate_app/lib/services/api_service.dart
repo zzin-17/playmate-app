@@ -38,25 +38,37 @@ class ApiService {
     }
   }
   
-  // 재시도 로직
+  // 재시도 로직 (네트워크 오류에 특화)
   static Future<http.Response> _retryRequest(Future<http.Response> Function() request) async {
     int attempts = 0;
     while (attempts < ApiConfig.maxRetries) {
       try {
-        final response = await request();
+        final response = await request().timeout(timeout);
         if (response.statusCode < 500) {
           return response; // 4xx 오류는 재시도하지 않음
         }
         attempts++;
         if (attempts < ApiConfig.maxRetries) {
+          print('🔄 서버 오류로 인한 재시도 중... (${attempts}/${ApiConfig.maxRetries})');
           await Future.delayed(ApiConfig.retryDelay * attempts);
         }
       } catch (e) {
-        attempts++;
-        if (attempts >= ApiConfig.maxRetries) {
+        // 네트워크 연결 오류인 경우에만 재시도
+        if (e.toString().contains('Connection refused') || 
+            e.toString().contains('SocketException') ||
+            e.toString().contains('timeout') ||
+            e.toString().contains('Failed host lookup')) {
+          attempts++;
+          if (attempts >= ApiConfig.maxRetries) {
+            print('❌ 네트워크 연결 실패: $e');
+            rethrow;
+          }
+          print('🔄 네트워크 오류로 인한 재시도 중... (${attempts}/${ApiConfig.maxRetries})');
+          await Future.delayed(Duration(seconds: attempts * 2)); // 재시도 간격 증가
+        } else {
+          // 다른 오류는 즉시 재시도하지 않음
           rethrow;
         }
-        await Future.delayed(ApiConfig.retryDelay * attempts);
       }
     }
     throw ApiException('최대 재시도 횟수 초과');
@@ -198,7 +210,22 @@ class ApiService {
         // 백엔드 응답 구조에 맞게 데이터 추출
         if (responseData['success'] == true && responseData['data'] != null) {
           final List<dynamic> data = responseData['data'];
-          return data.map((json) => Matching.fromJson(json)).toList();
+          
+          // 각 매칭 객체 생성 시 에러 처리 추가
+          final List<Matching> matchings = [];
+          for (int i = 0; i < data.length; i++) {
+            try {
+              final matching = Matching.fromJson(data[i]);
+              matchings.add(matching);
+              print('✅ 매칭 ${i+1}/${data.length} 파싱 성공: ${matching.courtName} (ID: ${matching.id})');
+            } catch (e) {
+              print('❌ 매칭 ${i+1}/${data.length} 파싱 실패: $e');
+              print('📦 실패한 매칭 데이터: ${data[i]}');
+            }
+          }
+          
+          print('🔄 총 ${data.length}개 매칭 중 ${matchings.length}개 파싱 성공');
+          return matchings;
         } else {
           throw ApiException('매칭 목록 조회 실패: ${responseData['message'] ?? 'Unknown error'}');
         }
@@ -222,8 +249,10 @@ class ApiService {
       ).timeout(timeout);
       
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return Matching.fromJson(data);
+        final responseData = json.decode(response.body);
+        // API 응답이 {success: true, data: {...}} 구조인 경우 data 추출
+        final matchingData = responseData['data'] ?? responseData;
+        return Matching.fromJson(matchingData);
       } else {
         throw ApiException('매칭 상세 조회 실패: ${response.statusCode}');
       }
@@ -779,8 +808,28 @@ class ApiService {
       ).timeout(timeout);
       
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => Matching.fromJson(json)).toList();
+        final responseData = json.decode(response.body);
+        print('🔍 내 매칭 API 응답: $responseData');
+        
+        if (responseData['success'] == true) {
+          final List<dynamic> data = responseData['data'] ?? [];
+          print('🔍 내 매칭 데이터 개수: ${data.length}');
+          
+          final matchings = <Matching>[];
+          for (int i = 0; i < data.length; i++) {
+            try {
+              final matching = Matching.fromJson(data[i]);
+              matchings.add(matching);
+              print('✅ 내 매칭 ${i+1}/${data.length} 파싱 성공: ${matching.courtName}');
+            } catch (e) {
+              print('❌ 내 매칭 ${i+1}/${data.length} 파싱 실패: $e');
+            }
+          }
+          
+          return matchings;
+        } else {
+          throw ApiException('내 매칭 목록 조회 실패: ${responseData['message']}');
+        }
       } else {
         throw ApiException('내 매칭 목록 조회 실패: ${response.statusCode}');
       }
@@ -793,7 +842,7 @@ class ApiService {
   // 매칭 요청
   static Future<void> requestMatching(int matchingId, String message, String token) async {
     try {
-      final uri = Uri.parse('$baseUrl/matchings/$matchingId/request');
+      final uri = Uri.parse('$baseUrl/matchings/$matchingId/join');
       
       final response = await http.post(
         uri,

@@ -1,19 +1,61 @@
 {
   "users": [
     {
-      "id": 1,
-      "email": "user1@playmate.com",
-      "password": "$2b$10$uXu/YgXuJw1LUhkaMO5XOOUcy6L6CRQyNSP0z4qd5iUVlm.3X9VJm",
-      "nickname": "user1",
+      "id": 974640,
+      "email": "dev@playmate.com",
+      "password": "$2b$10$K7UQkakN7EhnRU8gc9OHMOpeeATTQWlnfqiUb0ekrL1R/gyAqgVnW",
+      "nickname": "개발자",
       "profileImage": null,
       "bio": "",
       "birthYear": 1990,
       "gender": "male",
       "location": "",
       "isVerified": false,
-      "createdAt": "2025-09-16T02:37:15.161Z",
-      "updatedAt": "2025-09-16T02:37:15.161Z"
+      "createdAt": "2025-09-17T06:32:00.833Z",
+      "updatedAt": "2025-09-17T06:32:00.833Z"
+    },
+    {
+      "id": 912738,
+      "email": "tennis1@playmate.com",
+      "password": "$2b$10$fK9VEpvzNihGpGVLqYCgW.BgJmX4bdzjTlDYQnHYXpzy9T44Oqn2W",
+      "nickname": "테니스초보",
+      "profileImage": null,
+      "bio": "",
+      "birthYear": 1995,
+      "gender": "female",
+      "location": "",
+      "isVerified": false,
+      "createdAt": "2025-09-17T06:32:15.457Z",
+      "updatedAt": "2025-09-17T06:32:15.457Z"
+    },
+    {
+      "id": 598071,
+      "email": "tennis2@playmate.com",
+      "password": "$2b$10$0mI2dMfMX6eG8EAjmos7vuT2bPQ/eTgiRs5mg.2amV.8xKJar8COO",
+      "nickname": "테니스고수",
+      "profileImage": null,
+      "bio": "",
+      "birthYear": 1988,
+      "gender": "male",
+      "location": "",
+      "isVerified": false,
+      "createdAt": "2025-09-17T06:32:30.471Z",
+      "updatedAt": "2025-09-17T06:32:30.471Z"
+    },
+    {
+      "id": 621919,
+      "email": "club@playmate.com",
+      "password": "$2b$10$aGkoU45kzwlgCmgrhnb/zO6yYyAQkvqkqXhp9jMc7/MJRkBPQLzgK",
+      "nickname": "동호회장",
+      "profileImage": null,
+      "bio": "",
+      "birthYear": 1985,
+      "gender": "male",
+      "location": "",
+      "isVerified": false,
+      "createdAt": "2025-09-17T06:32:37.155Z",
+      "updatedAt": "2025-09-17T06:32:37.155Z"
     }
   ],
-  "nextId": 2
+  "nextId": 1
 }

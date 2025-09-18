@@ -5,7 +5,6 @@ import '../../providers/auth_provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../models/matching.dart';
-import '../../models/user.dart';
 import '../../models/location.dart';
 import '../matching/matching_detail_screen.dart';
 import '../matching/edit_matching_screen.dart';
@@ -20,11 +19,13 @@ import '../../widgets/common/date_range_calendar.dart';
 class HomeScreen extends StatefulWidget {
   final Matching? newMatching;
   final VoidCallback? onMatchingAdded;
+  final Function(VoidCallback)? onRefreshCallbackSet;
   
   const HomeScreen({
     super.key,
     this.newMatching,
     this.onMatchingAdded,
+    this.onRefreshCallbackSet,
   });
 
   @override
@@ -34,12 +35,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   late TabController _filterTabController;
+
   final MatchingNotificationService _notificationService = MatchingNotificationService();
   
   // 성능 최적화를 위한 변수들 추가
   Timer? _debounceTimer;
   bool _isFiltering = false;
-  List<Matching>? _cachedFilteredMatchings;
+  // List<Matching>? _cachedFilteredMatchings; // 캐시 로직 비활성화로 임시 제거
   Map<String, dynamic> _lastFilterState = {};
   
   // 정렬 관련 변수들
@@ -50,6 +52,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     _filterTabController = TabController(length: 6, vsync: this);
+    
+    // MainScreen에 새로고침 콜백 등록 (매칭 생성 후 즉시 업데이트용)
+    _registerRefreshCallback();
     
     // 위치 데이터 초기화 (디폴트로 선택 안됨)
     _locationData = LocationData.cities;
@@ -134,6 +139,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   ];
 
 
+  // 외부에서 호출 가능한 강제 새로고침 메서드
+  void forceRefresh() {
+    print('🔄 HomeScreen: 외부에서 강제 새로고침 요청됨');
+    // 캐시 무력화
+    // _cachedFilteredMatchings = null; // 캐시 변수 제거됨
+    _lastFilterState = {};
+    _loadMatchingsFromAPI();
+  }
+
+  // MainScreen에 새로고침 콜백 등록
+  void _registerRefreshCallback() {
+    if (widget.onRefreshCallbackSet != null) {
+      widget.onRefreshCallbackSet!(forceRefresh);
+      print('🔗 HomeScreen: MainScreen에 새로고침 콜백 등록됨');
+    }
+  }
+
+
   // 백엔드 API에서 매칭 데이터 로딩
   Future<void> _loadMatchingsFromAPI() async {
     setState(() {
@@ -160,25 +183,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         showOnlyFollowing: _showOnlyFollowing,
       );
       
-      print('✅ 백엔드 API에서 ${matchings.length}개 매칭 데이터 로딩 완료');
+      // 매칭 데이터 로딩 완료
       
       setState(() {
-        // API에서 가져온 데이터를 우선시하여 _mockMatchings 업데이트
-        if (matchings.isNotEmpty) {
-          // 백엔드 데이터를 직접 사용 (상태 변경 등이 반영된 최신 데이터)
-          _mockMatchings = matchings;
-        } else if (_mockMatchings.isEmpty) {
-          // API 데이터도 없고 기존 데이터도 없으면 빈 리스트 유지
-          _mockMatchings = [];
-        }
-        // API 데이터가 비어있고 기존 데이터가 있으면 기존 데이터 유지
+        // API 데이터를 완전히 새로 로드 (병합 대신 교체)
+        _matchings = List.from(matchings);
+        print('🔄 매칭 데이터 완전 새로고침 - 총 ${_matchings.length}개 매칭 로드됨');
+        // API 데이터가 비어있고 기존 데이터가 있으면 기존 데이터 완전 보존
         _isLoading = false;
       });
       
       // 필터링된 목록 초기화
-      _filteredMatchings = List.from(_mockMatchings);
+      _filteredMatchings = List.from(_matchings);
       
       // 초기 필터 적용 (동기적으로 실행)
+      print('🔄 _loadMatchingsFromAPI 완료 후 필터링 호출');
       _performFiltering();
       _lastFilterState = _getCurrentFilterState();
       
@@ -187,11 +206,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       
       
     } catch (e) {
-      print('❌ 백엔드 API 로딩 실패: $e');
+      // 백엔드 API 로딩 실패: $e
       
       // API 실패 시 기존 데이터 유지
-      if (_mockMatchings.isEmpty) {
-        _mockMatchings = [];
+      if (_matchings.isEmpty) {
+        _matchings = [];
       }
       
       setState(() {
@@ -200,19 +219,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // 매칭 데이터 초기화 함수 (Mock 데이터) - 사용하지 않음
-  // List<Matching> _createMockMatchings() {
-  //   return [
-  //     // Mock 데이터들...
-  //   ];
-  // }
+  // 매칭 데이터는 API에서 직접 로딩
 
 
   // 새 매칭 추가 메서드
   void _addNewMatching(Matching newMatching) {
-    print('🎯 _addNewMatching 호출됨: ${newMatching.courtName}');
-    print('🎯 새 매칭 연령대 정보: minAge=${newMatching.minAge}, maxAge=${newMatching.maxAge}');
-    print('🎯 현재 _mockMatchings 개수: ${_mockMatchings.length}');
+    // 새 매칭 추가: ${newMatching.courtName}
     
     // 이미 didUpdateWidget에서 addPostFrameCallback으로 감싸져 있으므로 직접 setState 호출
     if (mounted) {
@@ -220,13 +232,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         // 새 매칭을 맨 위에 추가
         // 새로 생성된 매칭에 recoveryCount 추가
         final newMatchingWithRecovery = newMatching.copyWith(recoveryCount: 0);
-        _mockMatchings.insert(0, newMatchingWithRecovery);
-        print('🎯 새 매칭 추가 완료: ${newMatchingWithRecovery.courtName}');
-        print('🎯 업데이트된 _mockMatchings 개수: ${_mockMatchings.length}');
+        _matchings.insert(0, newMatchingWithRecovery);
+        // 새 매칭 추가 완료: ${newMatchingWithRecovery.courtName}
         
         // 필터링된 목록도 직접 업데이트
         _filteredMatchings.insert(0, newMatchingWithRecovery);
-        print('🎯 _filteredMatchings에 추가 완료: ${_filteredMatchings.length}개');
       });
     }
     
@@ -360,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
   
-  // 필터 적용 메서드 (중복 호출 방지)
+  // 필터 적용 메서드 (중복 호출 방지) - 최적화됨
   void _applyFiltersIfNeeded() {
     if (_isFiltering) return; // 이미 필터링 중이면 스킵
     
@@ -395,24 +405,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     _isFiltering = true;
     
-    // 캐시된 결과가 있고 필터가 변경되지 않았으면 재사용
-    if (_cachedFilteredMatchings != null && 
-        _cachedFilteredMatchings!.isNotEmpty && 
-        _areFilterStatesEqual(_getCurrentFilterState(), _lastFilterState)) {
-      _filteredMatchings = List.from(_cachedFilteredMatchings!);
-      _isFiltering = false;
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-      return;
-    }
+    // 캐시 로직 임시 비활성화 (새 매칭 즉시 반영을 위해)
+    // if (_cachedFilteredMatchings != null && 
+    //     _cachedFilteredMatchings!.isNotEmpty && 
+    //     _areFilterStatesEqual(_getCurrentFilterState(), _lastFilterState) &&
+    //     _cachedFilteredMatchings!.length == _matchings.where((m) => m.actualStatus != 'deleted').length) {
+    //   _filteredMatchings = List.from(_cachedFilteredMatchings!);
+    //   _isFiltering = false;
+    //   print('🔄 캐시된 필터링 결과 재사용: ${_filteredMatchings.length}개');
+    //   if (mounted) {
+    //     setState(() {
+    //       _isLoading = false;
+    //     });
+    //   }
+    //   return;
+    // }
     
-    // 실제 필터링 수행 - 항상 _mockMatchings 사용 (API 데이터 포함)
-    _filteredMatchings = _mockMatchings.where((matching) {
+    // 실제 필터링 수행 - 항상 _matchings 사용 (API 데이터 포함)
+    print('🔍 필터링 시작: ${_matchings.length}개 매칭');
+    _filteredMatchings = _matchings.where((matching) {
       
-      // 기본 조건: 삭제된 매칭만 제외 (완료, 취소는 표시)
+      // 기본 조건: 삭제된 매칭만 숨김 처리 (completed는 표시)
       if (matching.actualStatus == 'deleted') {
         return false;
       }
@@ -425,10 +438,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
       }
       
-      // 모집중만 보기 필터
-      if (_showOnlyRecruiting && matching.actualStatus != 'recruiting') {
-        return false;
-      }
+      // 모집중만 보기 필터 (임시 비활성화)
+      // if (_showOnlyRecruiting && matching.actualStatus != 'recruiting') {
+      //   return false;
+      // }
+      print('🔍 매칭 필터링 중: ${matching.courtName} (status: ${matching.actualStatus}, showOnlyRecruiting: $_showOnlyRecruiting)');
       
       // 팔로우만 보기 필터
       if (_showOnlyFollowing) {
@@ -577,16 +591,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return true;
     }).toList();
     
-    print('🔍 필터링 후 개수: ${_filteredMatchings.length}');
-    print('🔍 필터링된 카드들: ${_filteredMatchings.map((m) => m.courtName).toList()}');
+    // 필터링 완료
+    print('🔍 필터링 완료: ${_matchings.length}개 → ${_filteredMatchings.length}개');
     
     // 최근 생성된 카드가 첫 번째로 노출되도록 정렬 (생성일 기준 내림차순)
     _filteredMatchings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     
-    print('🔍 정렬 후 카드들: ${_filteredMatchings.map((m) => '${m.courtName}(${m.createdAt})').toList()}');
+    // 정렬 완료
     
-    // 결과 캐싱
-    _cachedFilteredMatchings = List.from(_filteredMatchings);
+    // 결과 캐싱 (비활성화)
+    // _cachedFilteredMatchings = List.from(_filteredMatchings);
     
     // 필터 상태 동기화 (한 번만)
     _syncFilterStateOnce();
@@ -685,8 +699,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
-  // 임시 데이터 (실제로는 API에서 가져올 예정)
-  List<Matching> _mockMatchings = [];
+  // 매칭 데이터 (API에서 가져온 실제 데이터)
+  List<Matching> _matchings = [];
 
   @override
   Widget build(BuildContext context) {
@@ -1066,7 +1080,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         itemCount: _filteredMatchings.length,
               itemBuilder: (context, index) {
                           final matching = _filteredMatchings[index];
-                print('🎯 ListView 렌더링: ${matching.courtName} (ID: ${matching.id}, minAge: ${matching.minAge}, maxAge: ${matching.maxAge})');
+                print('🎯 ListView 렌더링 ${index+1}/${_filteredMatchings.length}: ${matching.courtName} (ID: ${matching.id})');
+                // ListView 렌더링
                 return _buildMatchingCard(matching);
               },
             ),
@@ -1476,9 +1491,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
         
         setState(() {
-          final index = _mockMatchings.indexWhere((m) => m.id == matching.id);
-          if (index != -1) {
-            _mockMatchings[index] = matching.copyWith(
+        final index = _matchings.indexWhere((m) => m.id == matching.id);
+        if (index != -1) {
+          _matchings[index] = matching.copyWith(
               status: newStatus,
               recoveryCount: newRecoveryCount,
               updatedAt: DateTime.now(),
@@ -1503,8 +1518,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             );
           }
           
-          // 캐시된 필터링된 매칭 초기화
-          _cachedFilteredMatchings = null;
+          // 캐시된 필터링된 매칭 초기화 (비활성화)
+          // _cachedFilteredMatchings = null;
         });
         
         // 필터링 재적용
@@ -2914,7 +2929,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return null;
   }
 
-  // 구력 텍스트의 숫자 값 반환
+  // 구력 텍스트의 숫자 값 반환 (사용되지 않음)
+  /*
   int _getSkillLevelValue(String skillText) {
     if (skillText == '6개월') return 0;
     if (skillText == '10년+') return 10;
@@ -2927,6 +2943,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     return 0;
   }
+  */
 
   // 선택된 구력 범위 내의 모든 구력 텍스트 반환 (사용되지 않음)
   /*
@@ -3213,107 +3230,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
   */
 
-  // 필터 버튼 위젯
-  Widget _buildFilterButton(String filter) {
-    IconData icon;
-    Color color;
-    
-    // 필터 타입에 따른 아이콘과 색상 설정
-    if (filter.contains('혼복') || filter.contains('남복') || filter.contains('여복') || 
-        filter.contains('단식') || filter.contains('랠리')) {
-      icon = Icons.sports_tennis;
-      color = AppColors.accent;
-    } else if (filter.contains('년') || filter.contains('개월')) {
-      icon = Icons.timeline;
-      color = AppColors.primary;
-    } else if (filter.contains('월') && filter.contains('일')) {
-      icon = Icons.calendar_today;
-      color = Colors.orange;
-    } else if (filter.contains('시')) {
-      icon = Icons.access_time;
-      color = Colors.purple;
-    } else if (filter.contains('모집중')) {
-      icon = Icons.people;
-      color = Colors.green;
-    } else {
-      icon = Icons.filter_list;
-      color = AppColors.textSecondary;
-    }
-    
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedFilters.remove(filter);
-          
-          // 필터 제거 시 관련 변수도 초기화
-          if (filter.contains('혼복') || filter.contains('남복') || filter.contains('여복') || 
-              filter.contains('단식') || filter.contains('랠리')) {
-            // 해당 게임 유형만 제거
-            if (filter == '혼복') {
-              _selectedGameTypes.remove('mixed');
-            } else if (filter == '남복') {
-              _selectedGameTypes.remove('male_doubles');
-            } else if (filter == '여복') {
-              _selectedGameTypes.remove('female_doubles');
-            } else if (filter == '단식') {
-              _selectedGameTypes.remove('singles');
-            } else if (filter == '랠리') {
-              _selectedGameTypes.remove('rally');
-            }
-          } else if (filter.contains('년') || filter.contains('개월')) {
-            _selectedSkillLevel = null;
-            _selectedEndSkillLevel = null;
-          } else if (filter.contains('월') && filter.contains('일')) {
-            _startDate = null;
-            _endDate = null;
-          } else if (filter.contains('시')) {
-            _startTime = null;
-            _endTime = null;
-          } else if (filter.contains('모집중')) {
-            _showOnlyRecruiting = false;
-          } else if (filter.contains('팔로우만')) {
-            // 팔로우만 보기는 전용 체크박스로 관리하므로 여기서는 제거하지 않음
-            // _showOnlyFollowing = false;
-          }
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          border: Border.all(color: color, width: 1),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.15),
-              blurRadius: 3,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 14),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                filter,
-                style: AppTextStyles.body.copyWith(
-                  color: color,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 3),
-            Icon(Icons.close, color: color, size: 12),
-          ],
-        ),
-      ),
-    );
-  }
 
   // 로딩 상태 표시 위젯
   Widget _buildLoadingState() {
@@ -3420,7 +3336,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // 검색 결과 텍스트 생성
   String _getSearchResultText() {
-    final totalCount = _mockMatchings.length;
+    final totalCount = _matchings.length;
     final filteredCount = _filteredMatchings.length;
 
     if (_searchQuery.isNotEmpty) {
@@ -4062,17 +3978,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
-  // 실시간 업데이트 타이머 시작 (자동 새로고침 비활성화)
+  // 실시간 업데이트 타이머 시작 (매칭 보존하면서 새로고침)
   void _startAutoRefreshTimer() {
-    // 자동 새로고침을 비활성화하여 생성된 매칭이 사라지는 것을 방지
-    print('🔄 자동 새로고침 비활성화됨 (생성된 매칭 보존을 위해)');
-    // _autoRefreshTimer = Timer.periodic(_refreshInterval, (timer) {
-    //   if (mounted) {
-    //     _refreshMatchingData();
-    //   } else {
-    //     timer.cancel();
-    //   }
-    // });
+    print('🔄 자동 새로고침 활성화 (새 매칭 보존하면서 업데이트)');
+    _autoRefreshTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      if (mounted) {
+        _refreshMatchingDataWithPreservation();
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  // 매칭 데이터 새로고침
+  void _refreshMatchingDataWithPreservation() {
+    if (!mounted) return;
+    
+    print('🔄 자동 새로고침 시작 - 기존 매칭 보존하면서 새 데이터 업데이트');
+    
+    // API에서 최신 데이터 로드
+    _loadMatchingsFromAPI();
   }
 
   // 매칭 데이터 새로고침 (사용되지 않음)
@@ -4143,7 +4068,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       recoveryCount: 0,
     );
     
-    _mockMatchings.insert(0, newMatching);
+    _matchings.insert(0, newMatching);
     print('새로운 매칭 추가 시뮬레이션: ${newMatching.courtName}');
   }
   */
@@ -4151,10 +4076,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // 매칭 상태 변경 시뮬레이션 (비활성화)
   /*
   void _simulateStatusChange() {
-    if (_mockMatchings.isEmpty) return;
+    if (_matchings.isEmpty) return;
     
-    final randomIndex = DateTime.now().millisecondsSinceEpoch % _mockMatchings.length;
-    final matching = _mockMatchings[randomIndex];
+    final randomIndex = DateTime.now().millisecondsSinceEpoch % _matchings.length;
+    final matching = _matchings[randomIndex];
     
     // 모집중인 매칭을 확정으로 변경
     if (matching.actualStatus == 'recruiting' && matching.appliedUserIds != null && matching.appliedUserIds!.isNotEmpty) {
@@ -4164,7 +4089,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         updatedAt: DateTime.now(),
       );
       
-      _mockMatchings[randomIndex] = updatedMatching;
+      _matchings[randomIndex] = updatedMatching;
       print('매칭 상태 변경 시뮬레이션: ${matching.courtName} → 확정');
     }
   }
@@ -4185,8 +4110,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final now = DateTime.now();
     bool hasUpdates = false;
     
-    for (int i = 0; i < _mockMatchings.length; i++) {
-      final matching = _mockMatchings[i];
+    for (int i = 0; i < _matchings.length; i++) {
+      final matching = _matchings[i];
       
       // 1. 자동 확정 체크: 모집중 상태이고 모집 인원이 다 찬 경우
       if (matching.status == 'recruiting' && _shouldAutoConfirm(matching)) {
@@ -4213,7 +4138,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           updatedAt: now,
         );
         
-        _mockMatchings[i] = autoConfirmedMatching.copyWith(recoveryCount: matching.recoveryCount);
+        _matchings[i] = autoConfirmedMatching.copyWith(recoveryCount: matching.recoveryCount);
         hasUpdates = true;
         
         print('자동 확정 처리: ${matching.courtName} (${matching.timeSlot})');
@@ -4248,7 +4173,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           updatedAt: now,
         );
         
-        _mockMatchings[i] = updatedMatching.copyWith(recoveryCount: matching.recoveryCount);
+        _matchings[i] = updatedMatching.copyWith(recoveryCount: matching.recoveryCount);
         hasUpdates = true;
         
         print('자동 완료 처리: ${matching.courtName} (${matching.timeSlot})');
