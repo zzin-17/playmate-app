@@ -1,0 +1,30 @@
+[
+  {
+    "id": 2,
+    "postId": 1,
+    "authorId": 912738,
+    "authorNickname": "테니스초보",
+    "authorProfileImage": null,
+    "content": "블레이드, 이존 추천합니다!",
+    "parentCommentId": null,
+    "likeCount": 0,
+    "isLiked": false,
+    "createdAt": "2025-09-19T05:51:03.753Z",
+    "updatedAt": "2025-09-22T04:25:04.148Z",
+    "replies": []
+  },
+  {
+    "id": 7,
+    "postId": 1,
+    "authorId": 974640,
+    "authorNickname": "개발자",
+    "authorProfileImage": null,
+    "content": "헤드스피드도 추천해요!",
+    "parentCommentId": null,
+    "likeCount": 0,
+    "isLiked": false,
+    "createdAt": "2025-09-22T05:18:16.668Z",
+    "updatedAt": "2025-09-22T05:18:16.668Z",
+    "replies": []
+  }
+]

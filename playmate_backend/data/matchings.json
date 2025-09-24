@@ -141,7 +141,9 @@
       "createdAt": "2025-09-17T07:44:13.384Z",
       "updatedAt": "2025-09-17T07:44:13.384Z",
       "recoveryCount": 0,
-      "appliedUserIds": [],
+      "appliedUserIds": [
+        912738
+      ],
       "confirmedUserIds": [],
       "completedAt": null,
       "cancelledAt": null
@@ -304,6 +306,44 @@
       "updatedAt": "2025-09-17T08:29:46.564Z",
       "recoveryCount": 0,
       "appliedUserIds": [],
+      "confirmedUserIds": [],
+      "completedAt": null,
+      "cancelledAt": null
+    },
+    "1758178038184": {
+      "id": 1758178038184,
+      "type": "host",
+      "courtName": "KBS아레나",
+      "courtLat": 37.5665,
+      "courtLng": 126.978,
+      "date": "2025-09-17T15:00:00.000Z",
+      "timeSlot": "18:00~20:00",
+      "minLevel": 3,
+      "maxLevel": 5,
+      "minAge": 20,
+      "maxAge": 49,
+      "gameType": "female_doubles",
+      "maleRecruitCount": 0,
+      "femaleRecruitCount": 1,
+      "status": "recruiting",
+      "message": "구력3년이상 여자 3명있습니다. ",
+      "guestCost": 13335,
+      "isFollowersOnly": false,
+      "host": {
+        "id": 912738,
+        "nickname": "테니스초보",
+        "email": "tennis1@playmate.com",
+        "profileImage": null,
+        "createdAt": "2025-09-18T06:47:18.184Z",
+        "updatedAt": "2025-09-18T06:47:18.184Z"
+      },
+      "guests": [],
+      "createdAt": "2025-09-18T06:47:18.184Z",
+      "updatedAt": "2025-09-18T06:47:18.184Z",
+      "recoveryCount": 0,
+      "appliedUserIds": [
+        974640
+      ],
       "confirmedUserIds": [],
       "completedAt": null,
       "cancelledAt": null

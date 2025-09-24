@@ -153,8 +153,8 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
           SnackBar(
             content: Text(
               isFollowing 
-                ? '${widget.targetUser.nickname}님을 팔로우했습니다!' 
-                : '${widget.targetUser.nickname}님을 언팔로우했습니다!',
+                ? '${widget.targetUser.nickname}님 팔로우를 성공했습니다!' 
+                : '${widget.targetUser.nickname}님 팔로우를 취소했습니다!',
             ),
             backgroundColor: isFollowing ? AppColors.success : AppColors.textSecondary,
             duration: const Duration(seconds: 2),

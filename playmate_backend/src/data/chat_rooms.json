@@ -42,5 +42,49 @@
     "matchingId": 1758095574165,
     "createdAt": "2025-09-18T02:28:20.660Z",
     "updatedAt": "2025-09-18T02:28:20.660Z"
+  },
+  {
+    "id": 1758098127233,
+    "type": "direct",
+    "name": null,
+    "participants": [
+      {
+        "userId": 912738,
+        "joinedAt": "2025-09-18T06:48:38.061Z",
+        "lastReadAt": "2025-09-18T06:48:38.061Z"
+      },
+      {
+        "userId": 974640,
+        "joinedAt": "2025-09-18T06:48:38.061Z",
+        "lastReadAt": "2025-09-18T06:48:38.061Z"
+      }
+    ],
+    "lastMessage": null,
+    "isActive": true,
+    "matchingId": 1758095053384,
+    "createdAt": "2025-09-18T06:48:38.061Z",
+    "updatedAt": "2025-09-18T06:48:38.061Z"
+  },
+  {
+    "id": 1758098127234,
+    "type": "direct",
+    "name": null,
+    "participants": [
+      {
+        "userId": 974640,
+        "joinedAt": "2025-09-24T06:26:29.450Z",
+        "lastReadAt": "2025-09-24T06:26:29.450Z"
+      },
+      {
+        "userId": 912738,
+        "joinedAt": "2025-09-24T06:26:29.450Z",
+        "lastReadAt": "2025-09-24T06:26:29.450Z"
+      }
+    ],
+    "lastMessage": null,
+    "isActive": true,
+    "matchingId": 1758178038184,
+    "createdAt": "2025-09-24T06:26:29.450Z",
+    "updatedAt": "2025-09-24T06:26:29.450Z"
   }
 ]

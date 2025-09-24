@@ -146,7 +146,7 @@ class CommunityService {
       if (token == null) throw Exception('인증 토큰이 없습니다');
 
       final response = await ApiService.post(
-        '/posts/$postId/like',
+        '/community/posts/$postId/like',
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -182,13 +182,18 @@ class CommunityService {
       if (token == null) throw Exception('인증 토큰이 없습니다');
 
       final response = await ApiService.get(
-        '/posts/$postId/comments',
+        '/community/posts/$postId/comments',
         headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return (data as List).map((json) => Comment.fromJson(json)).toList();
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          final data = responseData['data'] as List;
+          return data.map((json) => Comment.fromJson(json)).toList();
+        } else {
+          throw Exception('댓글 목록 조회 실패: ${responseData['message']}');
+        }
       } else {
         throw Exception('댓글 목록 조회 실패: ${response.statusCode}');
       }
@@ -214,7 +219,7 @@ class CommunityService {
       };
 
       final response = await ApiService.post(
-        '/posts/$postId/comments',
+        '/community/posts/$postId/comments',
         body: json.encode(commentData),
         headers: {
           'Authorization': 'Bearer $token',
@@ -223,8 +228,12 @@ class CommunityService {
       );
 
       if (response.statusCode == 201) {
-        final data = json.decode(response.body);
-        return Comment.fromJson(data);
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          return Comment.fromJson(responseData['data']);
+        } else {
+          throw Exception('댓글 작성 실패: ${responseData['message']}');
+        }
       } else {
         throw Exception('댓글 작성 실패: ${response.statusCode}');
       }
@@ -248,7 +257,7 @@ class CommunityService {
       };
 
       final response = await ApiService.put(
-        '/comments/$commentId',
+        '/community/comments/$commentId',
         body: json.encode(commentData),
         headers: {
           'Authorization': 'Bearer $token',
@@ -257,8 +266,12 @@ class CommunityService {
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return Comment.fromJson(data);
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          return Comment.fromJson(responseData['data']);
+        } else {
+          throw Exception('댓글 수정 실패: ${responseData['message']}');
+        }
       } else {
         throw Exception('댓글 수정 실패: ${response.statusCode}');
       }
@@ -275,7 +288,7 @@ class CommunityService {
       if (token == null) throw Exception('인증 토큰이 없습니다');
 
       final response = await ApiService.delete(
-        '/comments/$commentId',
+        '/community/comments/$commentId',
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -293,7 +306,7 @@ class CommunityService {
       if (token == null) throw Exception('인증 토큰이 없습니다');
 
       final response = await ApiService.post(
-        '/comments/$commentId/like',
+        '/community/comments/$commentId/like',
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -350,28 +363,6 @@ class CommunityService {
     }
   }
 
-  /// 내 북마크 게시글 조회
-  Future<List<Post>> getMyBookmarks() async {
-    try {
-      final token = await _getAuthToken();
-      if (token == null) throw Exception('인증 토큰이 없습니다');
-
-      final response = await ApiService.get(
-        '/posts/my-bookmarks',
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return (data as List).map((json) => Post.fromJson(json)).toList();
-      } else {
-        throw Exception('북마크 게시글 조회 실패: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('북마크 게시글 조회 오류: $e');
-      return [];
-    }
-  }
 
   /// 내 게시글 조회
   Future<List<Post>> getMyPosts() async {
@@ -492,6 +483,109 @@ class CommunityService {
     } catch (e) {
       print('게시글 삭제 오류: $e');
       return false;
+    }
+  }
+
+  /// 특정 사용자의 게시글 조회
+  Future<List<Post>> getUserPosts(int userId) async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) throw Exception('인증 토큰이 없습니다');
+
+      final response = await ApiService.get(
+        '/community/posts/user/$userId',
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          final data = responseData['data'] as List;
+          return data.map((json) => Post.fromJson(json)).toList();
+        } else {
+          throw Exception('사용자 게시글 조회 실패: ${responseData['message']}');
+        }
+      } else {
+        throw Exception('사용자 게시글 조회 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('사용자 게시글 조회 오류: $e');
+      return [];
+    }
+  }
+
+  /// 내가 북마크한 게시글 조회
+  Future<List<Post>> getMyBookmarks() async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) throw Exception('인증 토큰이 없습니다');
+
+      final response = await ApiService.get('/api/community/posts/my-bookmarks');
+      
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          final List<dynamic> postsData = responseData['data'] ?? [];
+          return postsData.map((data) => Post.fromJson(data)).toList();
+        } else {
+          throw Exception('북마크한 게시글 조회 실패: ${responseData['message']}');
+        }
+      } else {
+        throw Exception('북마크한 게시글 조회 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('북마크한 게시글 조회 오류: $e');
+      return [];
+    }
+  }
+
+  /// 내가 좋아요한 게시글 조회
+  Future<List<Post>> getMyLikes() async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) throw Exception('인증 토큰이 없습니다');
+
+      final response = await ApiService.get('/api/community/posts/my-likes');
+      
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          final List<dynamic> postsData = responseData['data'] ?? [];
+          return postsData.map((data) => Post.fromJson(data)).toList();
+        } else {
+          throw Exception('좋아요한 게시글 조회 실패: ${responseData['message']}');
+        }
+      } else {
+        throw Exception('좋아요한 게시글 조회 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('좋아요한 게시글 조회 오류: $e');
+      return [];
+    }
+  }
+
+  /// 내가 댓글단 게시글 조회
+  Future<List<Post>> getMyCommentedPosts() async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) throw Exception('인증 토큰이 없습니다');
+
+      final response = await ApiService.get('/api/community/posts/my-comments');
+      
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          final List<dynamic> postsData = responseData['data'] ?? [];
+          return postsData.map((data) => Post.fromJson(data)).toList();
+        } else {
+          throw Exception('댓글단 게시글 조회 실패: ${responseData['message']}');
+        }
+      } else {
+        throw Exception('댓글단 게시글 조회 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('댓글단 게시글 조회 오류: $e');
+      return [];
     }
   }
 }

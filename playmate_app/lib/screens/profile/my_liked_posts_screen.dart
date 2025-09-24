@@ -5,38 +5,38 @@ import '../../models/post.dart';
 import '../../services/community_service.dart';
 // import '../community/post_detail_screen.dart'; // PostDetailScreen이 없으므로 주석 처리
 
-class MyBookmarksScreen extends StatefulWidget {
-  const MyBookmarksScreen({super.key});
+class MyLikedPostsScreen extends StatefulWidget {
+  const MyLikedPostsScreen({super.key});
 
   @override
-  State<MyBookmarksScreen> createState() => _MyBookmarksScreenState();
+  State<MyLikedPostsScreen> createState() => _MyLikedPostsScreenState();
 }
 
-class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
+class _MyLikedPostsScreenState extends State<MyLikedPostsScreen> {
   final CommunityService _communityService = CommunityService();
-  List<Post> _bookmarkedPosts = [];
+  List<Post> _likedPosts = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadBookmarkedPosts();
+    _loadLikedPosts();
   }
 
-  Future<void> _loadBookmarkedPosts() async {
+  Future<void> _loadLikedPosts() async {
     try {
       setState(() {
         _isLoading = true;
       });
 
-      final posts = await _communityService.getMyBookmarks();
+      final posts = await _communityService.getMyLikes();
       
       setState(() {
-        _bookmarkedPosts = posts;
+        _likedPosts = posts;
         _isLoading = false;
       });
     } catch (e) {
-      print('북마크한 게시글 로드 오류: $e');
+      print('좋아요한 게시글 로드 오류: $e');
       setState(() {
         _isLoading = false;
       });
@@ -47,7 +47,7 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('내가 북마크한 게시글'),
+        title: const Text('내가 좋아요한 게시글'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -58,26 +58,26 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
               ),
             )
-          : _bookmarkedPosts.isEmpty
+          : _likedPosts.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.bookmark_border,
+                        Icons.favorite_border,
                         size: 64,
                         color: AppColors.textSecondary,
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '북마크한 게시글이 없습니다',
+                        '좋아요한 게시글이 없습니다',
                         style: AppTextStyles.title2.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '마음에 드는 게시글을 북마크해보세요',
+                        '마음에 드는 게시글에 좋아요를 눌러보세요',
                         style: AppTextStyles.body.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -86,13 +86,13 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: _loadBookmarkedPosts,
+                  onRefresh: _loadLikedPosts,
                   color: AppColors.primary,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _bookmarkedPosts.length,
+                    itemCount: _likedPosts.length,
                     itemBuilder: (context, index) {
-                      final post = _bookmarkedPosts[index];
+                      final post = _likedPosts[index];
                       return _buildPostCard(post);
                     },
                   ),
@@ -173,8 +173,8 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
                     ),
                   ),
                   Icon(
-                    Icons.bookmark,
-                    color: AppColors.primary,
+                    Icons.favorite,
+                    color: Colors.red,
                     size: 20,
                   ),
                 ],

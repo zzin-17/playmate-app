@@ -30,7 +30,11 @@ class UserService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return User.fromJson(data);
+        if (data['success'] == true && data['data'] != null) {
+          return User.fromJson(data['data']);
+        } else {
+          throw Exception('사용자 프로필 데이터가 없습니다');
+        }
       } else {
         throw Exception('사용자 프로필 조회 실패: ${response.statusCode}');
       }
@@ -64,20 +68,21 @@ class UserService {
   }
 
 
-  /// 사용자 검색
+  /// 사용자 검색 (공개 기능, 인증 불필요)
   Future<List<User>> searchUsers(String query) async {
     try {
-      final token = await _getAuthToken();
-      if (token == null) throw Exception('인증 토큰이 없습니다');
-
       final response = await ApiService.get(
         '/users/search?q=${Uri.encodeComponent(query)}',
-        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return (data as List).map((json) => User.fromJson(json)).toList();
+        final responseData = json.decode(response.body);
+        if (responseData['success'] == true) {
+          final data = responseData['data'] as List;
+          return data.map((json) => User.fromJson(json)).toList();
+        } else {
+          throw Exception('사용자 검색 실패: ${responseData['message']}');
+        }
       } else {
         throw Exception('사용자 검색 실패: ${response.statusCode}');
       }
@@ -251,6 +256,62 @@ class UserService {
     } catch (e) {
       print('프로필 이미지 업로드 오류: $e');
       return null;
+    }
+  }
+
+  /// 팔로워 목록 조회
+  Future<List<User>> getFollowers(int userId) async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) throw Exception('인증 토큰이 없습니다');
+
+      final response = await ApiService.get(
+        '/users/$userId/followers',
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] is List) {
+          return (data['data'] as List)
+              .map((userData) => User.fromJson(userData))
+              .toList();
+        }
+        return [];
+      } else {
+        throw Exception('팔로워 목록 조회 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('팔로워 목록 조회 오류: $e');
+      return [];
+    }
+  }
+
+  /// 팔로잉 목록 조회
+  Future<List<User>> getFollowing(int userId) async {
+    try {
+      final token = await _getAuthToken();
+      if (token == null) throw Exception('인증 토큰이 없습니다');
+
+      final response = await ApiService.get(
+        '/users/$userId/following',
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] is List) {
+          return (data['data'] as List)
+              .map((userData) => User.fromJson(userData))
+              .toList();
+        }
+        return [];
+      } else {
+        throw Exception('팔로잉 목록 조회 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('팔로잉 목록 조회 오류: $e');
+      return [];
     }
   }
 }

@@ -30,6 +30,7 @@ class AppColors {
   // Card Colors
   static const Color cardBackground = surface;
   static const Color cardBorder = Color(0xFFE8E8E8);
+  static const Color border = Color(0xFFE8E8E8);
   
   // Rating Colors
   static const Color ratingStar = Color(0xFFFFD700);

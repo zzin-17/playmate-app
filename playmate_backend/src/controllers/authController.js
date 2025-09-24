@@ -1,117 +1,10 @@
 const asyncHandler = require('express-async-handler');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const fs = require('fs');
-const path = require('path');
 const User = require('../models/User');
+const userStore = require('../stores/userStore');
 
-// 사용자 데이터 파일 경로
-const USERS_FILE = path.join(__dirname, '../data/users.json');
-
-// 메모리 저장소 (대규모 사용자 대응)
-const memoryStore = {
-  users: new Map(), // ID를 키로 사용
-  usersByEmail: new Map(), // 이메일을 키로 사용 (중복 체크용)
-  nextId: 1,
-  maxUsers: 1000000, // 최대 100만 사용자 지원
-  idRange: {
-    min: 100000, // 6자리 ID 시작 (100000부터)
-    max: 999999  // 6자리 ID 끝 (999999까지)
-  }
-};
-
-// 고유 사용자 ID 생성 함수 (대규모 사용자 대응)
-const generateUniqueUserId = () => {
-  const maxAttempts = 1000; // 최대 시도 횟수
-  let attempts = 0;
-  
-  while (attempts < maxAttempts) {
-    // 6자리 랜덤 ID 생성 (100000 ~ 999999)
-    const randomId = Math.floor(Math.random() * (memoryStore.idRange.max - memoryStore.idRange.min + 1)) + memoryStore.idRange.min;
-    
-    // ID 중복 확인
-    if (!memoryStore.users.has(randomId)) {
-      return randomId;
-    }
-    
-    attempts++;
-  }
-  
-  // 시퀀셜 ID로 폴백 (100000부터 시작)
-  let sequentialId = memoryStore.idRange.min;
-  while (sequentialId <= memoryStore.idRange.max) {
-    if (!memoryStore.users.has(sequentialId)) {
-      return sequentialId;
-    }
-    sequentialId++;
-  }
-  
-  return null; // 사용 가능한 ID가 없음
-};
-
-// 사용자 데이터를 파일에서 로드 (비동기로 변경)
-const loadUsersFromFile = async () => {
-  try {
-    // 디렉토리가 없으면 미리 생성
-    const dir = path.dirname(USERS_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    
-    if (fs.existsSync(USERS_FILE)) {
-      const data = await fs.promises.readFile(USERS_FILE, 'utf8');
-      const usersData = JSON.parse(data);
-      
-      // Map으로 변환
-      memoryStore.users.clear();
-      memoryStore.usersByEmail.clear();
-      
-      // users가 배열인지 확인
-      if (Array.isArray(usersData.users)) {
-        usersData.users.forEach(user => {
-          memoryStore.users.set(user.id, user);
-          memoryStore.usersByEmail.set(user.email, user);
-        });
-      } else {
-        console.log('⚠️ 사용자 데이터가 배열이 아닙니다. 빈 배열로 시작합니다.');
-      }
-      
-      // nextId 설정
-      memoryStore.nextId = usersData.nextId || 1;
-      console.log(`✅ 사용자 데이터 로드 완료: ${memoryStore.users.size}명, 다음 ID: ${memoryStore.nextId}`);
-    } else {
-      console.log('📝 사용자 데이터 파일이 없습니다. 새로 시작합니다.');
-    }
-  } catch (error) {
-    console.error('❌ 사용자 데이터 로드 실패:', error.message);
-    memoryStore.users.clear();
-    memoryStore.nextId = 1;
-  }
-};
-
-// 사용자 데이터를 파일에 저장 (비동기로 변경)
-const saveUsersToFile = async () => {
-  try {
-    const usersData = {
-      users: Array.from(memoryStore.users.values()),
-      nextId: memoryStore.nextId
-    };
-    
-    // 디렉토리가 없으면 생성
-    const dir = path.dirname(USERS_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    
-    await fs.promises.writeFile(USERS_FILE, JSON.stringify(usersData, null, 2));
-    console.log(`💾 사용자 데이터 저장 완료: ${memoryStore.users.size}명`);
-  } catch (error) {
-    console.error('❌ 사용자 데이터 저장 실패:', error.message);
-  }
-};
-
-// 서버 시작 시 사용자 데이터 로드
-loadUsersFromFile();
+// 사용자 데이터는 server.js에서 통합 관리
 
 // @desc    Register new user
 // @route   POST /api/auth/register
@@ -126,7 +19,7 @@ const registerUser = asyncHandler(async (req, res) => {
   }
   
   // 이메일 중복 확인
-  if (memoryStore.usersByEmail.has(email)) {
+  if (userStore.isEmailExists(email)) {
     res.status(400);
     throw new Error('User already exists');
   }
@@ -136,13 +29,13 @@ const registerUser = asyncHandler(async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, salt);
   
   // 사용자 수 제한 확인
-  if (memoryStore.users.size >= memoryStore.maxUsers) {
+  if (userStore.getUserCount() >= userStore.maxUsers) {
     res.status(503);
     throw new Error('서버 용량 초과: 최대 사용자 수에 도달했습니다.');
   }
   
   // 고유 ID 생성 (6자리 숫자)
-  const userId = generateUniqueUserId();
+  const userId = userStore.generateUniqueUserId();
   if (!userId) {
     res.status(503);
     throw new Error('사용자 ID 생성 실패: 사용 가능한 ID가 없습니다.');
@@ -165,12 +58,11 @@ const registerUser = asyncHandler(async (req, res) => {
   
   console.log(`🔍 새 사용자 생성 - ID: ${userId}, 이메일: ${email}, 닉네임: ${nickname}`);
   
-  // 메모리에 저장
-  memoryStore.users.set(newUser.id, newUser);
-  memoryStore.usersByEmail.set(email, newUser);
+  // 통합 저장소에 저장
+  userStore.addUser(newUser);
   
   // 파일에 저장 (비동기)
-  saveUsersToFile().catch(console.error);
+  userStore.saveUsersToFile().catch(console.error);
   
   // JWT 토큰 생성
     const token = jwt.sign({ 
@@ -203,8 +95,12 @@ const registerUser = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   
-  // 메모리에서 사용자 찾기
-  const user = memoryStore.usersByEmail.get(email);
+  console.log(`🔍 로그인 시도: ${email}`);
+  console.log(`📊 통합 저장소 상태: 사용자 ${userStore.getUserCount()}명`);
+  
+  // 통합 저장소에서 사용자 찾기
+  const user = userStore.getUserByEmail(email);
+  console.log(`👤 사용자 찾기 결과: ${user ? '찾음' : '없음'}`);
   
   if (user && (await bcrypt.compare(password, user.password))) {
     // JWT 토큰 생성
@@ -263,19 +159,48 @@ const getMe = asyncHandler(async (req, res) => {
 // @route   GET /api/auth/me
 // @access  Private
 const getCurrentUser = asyncHandler(async (req, res) => {
+  // 실제 사용자 데이터를 메모리 스토어에서 가져오기
+  const userStore = require('../stores/userStore');
+  const user = userStore.getUserById(req.user.id);
+  
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+  }
+  
+  // 비밀번호 제외하고 반환
+  const { password, ...userWithoutPassword } = user;
+  
+  // null 값들을 기본값으로 처리
+  const safeUser = {
+    ...userWithoutPassword,
+    // 숫자 필드들 안전 처리
+    birthYear: userWithoutPassword.birthYear ? parseInt(userWithoutPassword.birthYear) : 1990,
+    skillLevel: userWithoutPassword.skillLevel ? parseInt(userWithoutPassword.skillLevel) : 1,
+    reviewCount: userWithoutPassword.reviewCount ? parseInt(userWithoutPassword.reviewCount) : 0,
+    mannerScore: userWithoutPassword.mannerScore ? parseFloat(userWithoutPassword.mannerScore) : 5.0,
+    ntrpScore: userWithoutPassword.ntrpScore ? parseFloat(userWithoutPassword.ntrpScore) : 3.0,
+    // 배열 필드들 안전 처리
+    followingIds: Array.isArray(userWithoutPassword.followingIds) ? userWithoutPassword.followingIds : [],
+    followerIds: Array.isArray(userWithoutPassword.followerIds) ? userWithoutPassword.followerIds : [],
+    preferredTime: Array.isArray(userWithoutPassword.preferredTime) ? userWithoutPassword.preferredTime : [],
+    // 문자열 필드들 안전 처리
+    startYearMonth: userWithoutPassword.startYearMonth || "2020-01",
+    preferredCourt: userWithoutPassword.preferredCourt || "",
+    playStyle: userWithoutPassword.playStyle || "",
+    preferredGameType: userWithoutPassword.preferredGameType || "mixed",
+    bio: userWithoutPassword.bio || "",
+    location: userWithoutPassword.location || "",
+    // 불린 필드들 안전 처리
+    hasLesson: userWithoutPassword.hasLesson === true,
+    isVerified: userWithoutPassword.isVerified === true,
+  };
+  
   res.json({
     success: true,
-    data: {
-      id: req.user.id,
-      email: req.user.email,
-      nickname: req.user.nickname,
-      profileImage: req.user.profileImage,
-      bio: req.user.bio,
-      birthYear: req.user.birthYear,
-      gender: req.user.gender,
-      location: req.user.location,
-      isVerified: req.user.isVerified
-    }
+    data: safeUser
   });
 });
 

@@ -5,7 +5,7 @@ part 'user.g.dart';
 @JsonSerializable()
 class User {
   final int id;
-  final String email;
+  final String? email;  // 검색 결과에서는 개인정보 보호를 위해 제외될 수 있음
   final String nickname;
   final String? gender;
   final int? birthYear;
@@ -29,7 +29,7 @@ class User {
 
   User({
     required this.id,
-    required this.email,
+    this.email,  // optional로 변경
     required this.nickname,
     this.gender,
     this.birthYear,

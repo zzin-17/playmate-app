@@ -233,7 +233,16 @@ class AuthProvider extends ChangeNotifier {
     
     try {
       await _clearToken();
+      
+      // 저장된 에러 메시지도 삭제
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('playmate_lastError');
+      
+      // 프로필 자동 동기화 중지
+      _stopProfileSync();
+      
       _currentUser = null;
+      _error = null; // 현재 에러 상태도 초기화
       _setLoading(false);
       notifyListeners();
     } catch (e) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:table_calendar/table_calendar.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../models/matching.dart';
@@ -25,11 +26,17 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
   late TabController _tabController;
   List<Matching> _myGuestMatchings = [];
   bool _isLoading = true;
+  
+  // 캘린더 관련 상태
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+  DateTime _focusedDay = DateTime(2025, 9, 1);
+  DateTime? _selectedDay;
+  Map<DateTime, List<Matching>> _events = {};
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadMyGuestMatchings();
   }
 
@@ -39,21 +46,28 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
     super.dispose();
   }
 
-  // 게스트로 참여한 매칭 데이터 로드
+  // 게스트로 참여한 매칭 데이터 로드 (실제 매칭 데이터 기반)
   void _loadMyGuestMatchings() async {
     try {
       setState(() => _isLoading = true);
       
-      // 실제 API 호출로 교체 - 게스트로 참여한 매칭만 필터링
+      // 실제 매칭 데이터 가져오기
       final token = await _getAuthToken();
       if (token != null) {
+        // 내가 게스트로 참여한 매칭 가져오기
         final matchings = await ApiService.getMyMatchings(token);
+        final guestMatchings = matchings.where((m) => 
+          m.guests?.any((guest) => guest.id == widget.currentUser.id) ?? false
+        ).toList();
+        
+        
         setState(() {
-          _myGuestMatchings = matchings.where((m) => 
-            m.guests?.any((guest) => guest.id == widget.currentUser.id) ?? false
-          ).toList();
+          _myGuestMatchings = guestMatchings;
           _isLoading = false;
         });
+        
+        // 캘린더 이벤트 설정
+        _updateCalendarEvents();
       } else {
         setState(() {
           _myGuestMatchings = [];
@@ -80,6 +94,28 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
   
   // Mock 데이터 완전 제거됨
 
+  // 캘린더 이벤트 업데이트
+  void _updateCalendarEvents() {
+    _events.clear();
+    
+    for (final matching in _myGuestMatchings) {
+      // 날짜를 정규화하여 시간 정보 제거
+      final date = DateTime.utc(
+        matching.date.year,
+        matching.date.month,
+        matching.date.day,
+      );
+      
+      if (_events[date] == null) {
+        _events[date] = [];
+      }
+      _events[date]!.add(matching);
+    }
+    
+    // 캘린더 리빌드 강제
+    setState(() {});
+  }
+
   // 상태별 매칭 필터링
   List<Matching> _getMatchingsByStatus(String status) {
     return _myGuestMatchings.where((matching) => matching.status == status).toList();
@@ -89,13 +125,15 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('게스트로 참여한 일정'),
+        title: const Text('내가 참여한 일정'),
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           tabs: const [
-            Tab(text: '완료'),
-            Tab(text: '확정'),
-            Tab(text: '참여중'),
+            Tab(text: '캘린더'),
+            Tab(text: '완료된 일정'),
+            Tab(text: '확정된 일정'),
+            Tab(text: '참여 신청중'),
           ],
         ),
       ),
@@ -104,6 +142,7 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
           : TabBarView(
               controller: _tabController,
               children: [
+                _buildCalendarView(),
                 _buildMatchingList(_getMatchingsByStatus('completed'), '완료'),
                 _buildMatchingList(_getMatchingsByStatus('confirmed'), '확정'),
                 _buildMatchingList(_getMatchingsByStatus('recruiting'), '참여중'),
@@ -350,6 +389,183 @@ class _MyGuestMatchingsScreenState extends State<MyGuestMatchingsScreen>
           matching: matching,
         ),
       ),
+    );
+  }
+
+  // 캘린더 뷰 빌드
+  Widget _buildCalendarView() {
+    return Column(
+      children: [
+        // 캘린더
+        TableCalendar<Matching>(
+          firstDay: DateTime.utc(2020, 1, 1),
+          lastDay: DateTime.utc(2030, 12, 31),
+          focusedDay: _focusedDay,
+          calendarFormat: _calendarFormat,
+          eventLoader: (day) {
+            // 날짜를 정규화하여 시간 정보 제거
+            final normalizedDay = DateTime.utc(day.year, day.month, day.day);
+            return _events[normalizedDay] ?? [];
+          },
+          startingDayOfWeek: StartingDayOfWeek.sunday,
+          calendarStyle: CalendarStyle(
+            outsideDaysVisible: false,
+            weekendTextStyle: AppTextStyles.body.copyWith(
+              color: AppColors.primary,
+            ),
+            defaultTextStyle: AppTextStyles.body,
+            selectedTextStyle: AppTextStyles.body.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+            todayTextStyle: AppTextStyles.body.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+            selectedDecoration: BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+            ),
+            todayDecoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.7),
+              shape: BoxShape.circle,
+            ),
+            markerDecoration: BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+            ),
+            markersMaxCount: 10,
+            markersAlignment: Alignment.bottomCenter,
+            markerSize: 6.0,
+          ),
+          headerStyle: HeaderStyle(
+            formatButtonVisible: true,
+            titleCentered: true,
+            formatButtonShowsNext: false,
+            formatButtonDecoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(12.0),
+            ),
+            formatButtonTextStyle: AppTextStyles.caption.copyWith(
+              color: Colors.white,
+            ),
+            titleTextStyle: AppTextStyles.h3.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          onDaySelected: (selectedDay, focusedDay) {
+            if (!isSameDay(_selectedDay, selectedDay)) {
+              setState(() {
+                _selectedDay = selectedDay;
+                _focusedDay = focusedDay;
+              });
+            }
+          },
+          onPageChanged: (focusedDay) {
+            setState(() {
+              _focusedDay = focusedDay;
+            });
+          },
+          onFormatChanged: (format) {
+            if (_calendarFormat != format) {
+              setState(() {
+                _calendarFormat = format;
+              });
+            }
+          },
+          selectedDayPredicate: (day) {
+            return isSameDay(_selectedDay, day);
+          },
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // 선택된 날짜의 매칭 목록
+        Expanded(
+          child: _buildSelectedDayEvents(),
+        ),
+      ],
+    );
+  }
+
+  // 선택된 날짜의 이벤트 목록
+  Widget _buildSelectedDayEvents() {
+    if (_selectedDay == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.calendar_today,
+              size: 64,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '날짜를 선택해주세요',
+              style: AppTextStyles.h3.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '캘린더에서 매칭 일정을 확인할 수 있습니다',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final events = _events[_selectedDay!] ?? [];
+    
+    if (events.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.event_available,
+              size: 64,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '선택한 날짜에 일정이 없습니다',
+              style: AppTextStyles.h3.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            '${_selectedDay!.year}년 ${_selectedDay!.month}월 ${_selectedDay!.day}일 일정',
+            style: AppTextStyles.h3.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: events.length,
+            itemBuilder: (context, index) {
+              final matching = events[index];
+              return _buildMatchingCard(matching);
+            },
+          ),
+        ),
+      ],
     );
   }
 }

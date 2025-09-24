@@ -5,38 +5,38 @@ import '../../models/post.dart';
 import '../../services/community_service.dart';
 // import '../community/post_detail_screen.dart'; // PostDetailScreen이 없으므로 주석 처리
 
-class MyBookmarksScreen extends StatefulWidget {
-  const MyBookmarksScreen({super.key});
+class MyCommentedPostsScreen extends StatefulWidget {
+  const MyCommentedPostsScreen({super.key});
 
   @override
-  State<MyBookmarksScreen> createState() => _MyBookmarksScreenState();
+  State<MyCommentedPostsScreen> createState() => _MyCommentedPostsScreenState();
 }
 
-class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
+class _MyCommentedPostsScreenState extends State<MyCommentedPostsScreen> {
   final CommunityService _communityService = CommunityService();
-  List<Post> _bookmarkedPosts = [];
+  List<Post> _commentedPosts = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadBookmarkedPosts();
+    _loadCommentedPosts();
   }
 
-  Future<void> _loadBookmarkedPosts() async {
+  Future<void> _loadCommentedPosts() async {
     try {
       setState(() {
         _isLoading = true;
       });
 
-      final posts = await _communityService.getMyBookmarks();
+      final posts = await _communityService.getMyCommentedPosts();
       
       setState(() {
-        _bookmarkedPosts = posts;
+        _commentedPosts = posts;
         _isLoading = false;
       });
     } catch (e) {
-      print('북마크한 게시글 로드 오류: $e');
+      print('댓글단 게시글 로드 오류: $e');
       setState(() {
         _isLoading = false;
       });
@@ -47,7 +47,7 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('내가 북마크한 게시글'),
+        title: const Text('내가 댓글단 게시글'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -58,26 +58,26 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
               ),
             )
-          : _bookmarkedPosts.isEmpty
+          : _commentedPosts.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.bookmark_border,
+                        Icons.chat_bubble_outline,
                         size: 64,
                         color: AppColors.textSecondary,
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '북마크한 게시글이 없습니다',
+                        '댓글단 게시글이 없습니다',
                         style: AppTextStyles.title2.copyWith(
                           color: AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '마음에 드는 게시글을 북마크해보세요',
+                        '게시글에 댓글을 작성해보세요',
                         style: AppTextStyles.body.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -86,13 +86,13 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: _loadBookmarkedPosts,
+                  onRefresh: _loadCommentedPosts,
                   color: AppColors.primary,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: _bookmarkedPosts.length,
+                    itemCount: _commentedPosts.length,
                     itemBuilder: (context, index) {
-                      final post = _bookmarkedPosts[index];
+                      final post = _commentedPosts[index];
                       return _buildPostCard(post);
                     },
                   ),
@@ -101,6 +101,10 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
   }
 
   Widget _buildPostCard(Post post) {
+    // 내가 작성한 댓글 찾기
+     // 내가 작성한 댓글 찾기 (현재는 단순히 댓글이 있는 게시글만 표시)
+     final myComments = post.comments ?? [];
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -173,7 +177,7 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
                     ),
                   ),
                   Icon(
-                    Icons.bookmark,
+                    Icons.chat_bubble,
                     color: AppColors.primary,
                     size: 20,
                   ),
@@ -218,6 +222,51 @@ class _MyBookmarksScreenState extends State<MyBookmarksScreen> {
               ],
               
               const SizedBox(height: 12),
+              
+              // 내 댓글 미리보기
+              if (myComments.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.chat_bubble,
+                            color: AppColors.primary,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '내 댓글',
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        myComments.first.content,
+                        style: AppTextStyles.caption,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               
               // 통계 정보
               Row(

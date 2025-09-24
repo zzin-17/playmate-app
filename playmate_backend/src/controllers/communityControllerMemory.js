@@ -76,14 +76,19 @@ const updatePostIndexes = (post, operation = 'add') => {
 // 파일에서 데이터 로드
 function loadFromFile() {
   try {
+    console.log(`📁 POSTS_FILE 경로: ${POSTS_FILE}`);
+    console.log(`📁 파일 존재 여부: ${fs.existsSync(POSTS_FILE)}`);
+    
     // 게시글 데이터 로드
     if (fs.existsSync(POSTS_FILE)) {
       const postsData = fs.readFileSync(POSTS_FILE, 'utf8');
       posts = JSON.parse(postsData);
       console.log(`게시글 데이터 로드 완료: ${posts.length}개`);
+      console.log(`게시글 ID 목록:`, posts.map(p => p.id));
     } else {
       posts = getDefaultPosts();
       console.log('기본 게시글 데이터 생성 완료');
+      console.log(`기본 게시글 개수: ${posts.length}개`);
     }
 
     // 댓글 데이터 로드
@@ -112,9 +117,23 @@ function loadFromFile() {
   }
 }
 
+// 게시글의 실제 댓글 수 계산 및 업데이트
+function updatePostCommentCounts() {
+  posts.forEach(post => {
+    const actualCommentCount = comments.filter(c => c.postId === post.id).length;
+    if (post.comments !== actualCommentCount) {
+      console.log(`📊 게시글 ${post.id} 댓글 수 업데이트: ${post.comments} → ${actualCommentCount}`);
+      post.comments = actualCommentCount;
+    }
+  });
+}
+
 // 파일에 데이터 저장
 function saveToFile() {
   try {
+    // 댓글 수 동기화
+    updatePostCommentCounts();
+    
     // 게시글 데이터 저장
     const postsData = JSON.stringify(posts, null, 2);
     fs.writeFileSync(POSTS_FILE, postsData, 'utf8');
@@ -419,14 +438,14 @@ const togglePostLike = (req, res) => {
 // 댓글 목록 조회
 const getComments = (req, res) => {
   try {
-    const { postId } = req.params;
+    const postId = req.params.id; // 라우트가 /posts/:id/comments 이므로 req.params.id 사용
     const postIdNum = parseInt(postId);
 
     console.log(`댓글 목록 조회 요청: 게시글 ID ${postIdNum}`);
 
     const postComments = comments
       .filter(c => c.postId === postIdNum && !c.parentCommentId)
-      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // 최신 댓글이 상단에
 
     // 각 댓글의 답글도 포함
     const commentsWithReplies = postComments.map(comment => {
@@ -459,7 +478,7 @@ const getComments = (req, res) => {
 // 댓글 생성
 const createComment = (req, res) => {
   try {
-    const { postId } = req.params;
+    const postId = req.params.id; // 라우트가 /posts/:id/comments 이므로 req.params.id 사용
     const { content, parentCommentId } = req.body;
     const authorId = req.user.id;
     const postIdNum = parseInt(postId);
@@ -471,16 +490,22 @@ const createComment = (req, res) => {
       });
     }
 
+    console.log(`🔍 원본 postId: "${postId}" (타입: ${typeof postId})`);
+    console.log(`🔍 parseInt 결과: ${postIdNum} (타입: ${typeof postIdNum})`);
     console.log(`댓글 생성 요청: 게시글 ID ${postIdNum}`);
+    console.log(`현재 posts 배열 길이: ${posts.length}`);
+    console.log(`posts 배열:`, posts.map(p => ({ id: p.id, authorId: p.authorId })));
 
     // 게시글 존재 확인
     const post = posts.find(p => p.id === postIdNum);
     if (!post) {
+      console.log(`❌ 게시글 ID ${postIdNum}을 찾을 수 없음`);
       return res.status(404).json({
         success: false,
         message: '게시글을 찾을 수 없습니다.'
       });
     }
+    console.log(`✅ 게시글 찾음: ID ${post.id}, 작성자: ${post.authorNickname}`);
 
     const newComment = {
       id: nextCommentId++,
@@ -499,8 +524,7 @@ const createComment = (req, res) => {
 
     comments.push(newComment);
 
-    // 게시글의 댓글 수 증가
-    post.comments += 1;
+    // saveToFile()에서 자동으로 댓글 수 계산됨
     saveToFile();
 
     console.log(`댓글 생성 완료: ID ${newComment.id}`);
@@ -514,6 +538,114 @@ const createComment = (req, res) => {
     res.status(500).json({
       success: false,
       message: '댓글 생성에 실패했습니다.',
+      error: error.message
+    });
+  }
+};
+
+// 댓글 수정
+const updateComment = (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { content } = req.body;
+    const userId = req.user.id;
+    const commentIdNum = parseInt(commentId);
+
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '댓글 내용은 필수입니다.'
+      });
+    }
+
+    console.log(`댓글 수정 요청: 댓글 ID ${commentIdNum}, 사용자 ID ${userId}`);
+
+    // 댓글 찾기
+    const commentIndex = comments.findIndex(c => c.id === commentIdNum);
+    if (commentIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: '댓글을 찾을 수 없습니다.'
+      });
+    }
+
+    const comment = comments[commentIndex];
+
+    // 작성자 권한 확인
+    if (comment.authorId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: '댓글 수정 권한이 없습니다.'
+      });
+    }
+
+    // 댓글 수정
+    comment.content = content.trim();
+    comment.updatedAt = new Date().toISOString();
+    
+    saveToFile();
+
+    console.log(`댓글 수정 완료: ID ${commentIdNum}`);
+
+    res.json({
+      success: true,
+      data: comment
+    });
+  } catch (error) {
+    console.error('댓글 수정 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '댓글 수정에 실패했습니다.',
+      error: error.message
+    });
+  }
+};
+
+// 댓글 삭제
+const deleteComment = (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const userId = req.user.id;
+    const commentIdNum = parseInt(commentId);
+
+    console.log(`댓글 삭제 요청: 댓글 ID ${commentIdNum}, 사용자 ID ${userId}`);
+
+    // 댓글 찾기
+    const commentIndex = comments.findIndex(c => c.id === commentIdNum);
+    if (commentIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: '댓글을 찾을 수 없습니다.'
+      });
+    }
+
+    const comment = comments[commentIndex];
+
+    // 작성자 권한 확인
+    if (comment.authorId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: '댓글 삭제 권한이 없습니다.'
+      });
+    }
+
+    // 댓글 삭제
+    comments.splice(commentIndex, 1);
+
+    // saveToFile()에서 자동으로 댓글 수 계산됨
+    saveToFile();
+
+    console.log(`댓글 삭제 완료: ID ${commentIdNum}`);
+
+    res.json({
+      success: true,
+      message: '댓글이 삭제되었습니다.'
+    });
+  } catch (error) {
+    console.error('댓글 삭제 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '댓글 삭제에 실패했습니다.',
       error: error.message
     });
   }
@@ -611,7 +743,145 @@ const getMyPosts = async (req, res) => {
 };
 
 // 서버 시작 시 데이터 로드
+console.log('🔄 커뮤니티 데이터 로드 시작...');
 loadFromFile();
+console.log(`✅ 커뮤니티 데이터 로드 완료: posts=${posts.length}개, comments=${comments.length}개`);
+
+// 특정 사용자의 게시글 조회
+const getUserPosts = (req, res) => {
+  try {
+    const { userId } = req.params;
+    const targetUserId = parseInt(userId);
+
+    console.log(`특정 사용자 게시글 조회: 사용자 ID ${targetUserId}`);
+
+    // 해당 사용자의 게시글 필터링
+    const userPosts = posts.filter(post => post.authorId === targetUserId);
+    const currentUserId = req.user.id;
+
+    // 각 게시글에 현재 사용자의 좋아요 상태 추가
+    const postsWithLikeStatus = userPosts.map(post => {
+      const isLiked = post.likedBy && post.likedBy.includes(currentUserId);
+      const isBookmarked = post.bookmarkedBy && post.bookmarkedBy.includes(currentUserId);
+      
+      const { isLiked: oldIsLiked, isBookmarked: oldIsBookmarked, isShared, likes, comments, shares, ...postWithoutOldFields } = post;
+      return {
+        ...postWithoutOldFields,
+        likeCount: likes || 0,
+        commentCount: comments || 0,
+        shareCount: shares || 0,
+        isLikedByCurrentUser: isLiked || false,
+        isBookmarkedByCurrentUser: isBookmarked || false,
+        isSharedByCurrentUser: false // 공유 기능은 아직 구현되지 않음
+      };
+    });
+
+    // 최신순 정렬
+    postsWithLikeStatus.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    console.log(`사용자 ${targetUserId}의 게시글 ${postsWithLikeStatus.length}개 반환`);
+
+    res.json({
+      success: true,
+      data: postsWithLikeStatus,
+      count: postsWithLikeStatus.length
+    });
+  } catch (error) {
+    console.error('사용자 게시글 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '사용자 게시글 조회에 실패했습니다.',
+      error: error.message
+    });
+  }
+};
+
+// 내가 북마크한 게시글 조회
+const getMyBookmarks = (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    console.log(`북마크한 게시글 조회 요청: 사용자 ID ${userId}`);
+    
+    // 북마크한 게시글 필터링
+    const bookmarkedPosts = posts.filter(post => 
+      post.bookmarks && post.bookmarks.some(bookmark => bookmark.userId === userId)
+    );
+    
+    console.log(`북마크한 게시글 개수: ${bookmarkedPosts.length}`);
+    
+    res.json({
+      success: true,
+      data: bookmarkedPosts,
+      count: bookmarkedPosts.length
+    });
+  } catch (error) {
+    console.error('북마크한 게시글 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '북마크한 게시글 조회에 실패했습니다.',
+      error: error.message
+    });
+  }
+};
+
+// 내가 좋아요한 게시글 조회
+const getMyLikes = (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    console.log(`좋아요한 게시글 조회 요청: 사용자 ID ${userId}`);
+    
+    // 좋아요한 게시글 필터링
+    const likedPosts = posts.filter(post => 
+      post.isLiked && post.authorId !== userId // 내가 작성한 게시글은 제외
+    );
+    
+    console.log(`좋아요한 게시글 개수: ${likedPosts.length}`);
+    
+    res.json({
+      success: true,
+      data: likedPosts,
+      count: likedPosts.length
+    });
+  } catch (error) {
+    console.error('좋아요한 게시글 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '좋아요한 게시글 조회에 실패했습니다.',
+      error: error.message
+    });
+  }
+};
+
+// 내가 댓글단 게시글 조회
+const getMyCommentedPosts = (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    console.log(`댓글단 게시글 조회 요청: 사용자 ID ${userId}`);
+    
+    // 댓글을 작성한 게시글 필터링
+    const commentedPosts = posts.filter(post => 
+      post.comments && post.comments.some(comment => comment.authorId === userId)
+    );
+    
+    console.log(`댓글단 게시글 개수: ${commentedPosts.length}`);
+    
+    res.json({
+      success: true,
+      data: commentedPosts,
+      count: commentedPosts.length
+    });
+  } catch (error) {
+    console.error('댓글단 게시글 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '댓글단 게시글 조회에 실패했습니다.',
+      error: error.message
+    });
+  }
+};
 
 module.exports = {
   getPosts,
@@ -622,8 +892,14 @@ module.exports = {
   togglePostLike,
   getComments,
   createComment,
+  updateComment,
+  deleteComment,
   toggleCommentLike,
   getMyPosts,
+  getUserPosts,
+  getMyBookmarks,
+  getMyLikes,
+  getMyCommentedPosts,
   loadFromFile,
   saveToFile
 };

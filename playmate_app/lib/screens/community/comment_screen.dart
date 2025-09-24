@@ -5,6 +5,9 @@ import '../../constants/app_text_styles.dart';
 import '../../models/comment.dart';
 import '../../models/post.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/community_service.dart';
+import '../../services/user_service.dart';
+import '../profile/user_profile_home_screen.dart';
 
 class CommentScreen extends StatefulWidget {
   final Post post;
@@ -21,6 +24,8 @@ class CommentScreen extends StatefulWidget {
 class _CommentScreenState extends State<CommentScreen> {
   final _commentController = TextEditingController();
   final _replyController = TextEditingController();
+  final _communityService = CommunityService();
+  final _userService = UserService();
   bool _isSubmitting = false;
   Comment? _replyingTo; // 답글 대상 댓글
   List<Comment> _comments = [];
@@ -29,6 +34,10 @@ class _CommentScreenState extends State<CommentScreen> {
   @override
   void initState() {
     super.initState();
+    print('🔍 CommentScreen 초기화 - 게시글 정보:');
+    print('   ID: ${widget.post.id}');
+    print('   작성자: ${widget.post.authorNickname}');
+    print('   내용: ${widget.post.content.substring(0, 30)}...');
     _loadComments();
   }
 
@@ -45,11 +54,12 @@ class _CommentScreenState extends State<CommentScreen> {
     });
 
     try {
-      // TODO: 실제 API 호출로 변경
-      await Future.delayed(const Duration(milliseconds: 500));
-      _comments = _getMockComments();
+      print('🔍 댓글 로드 시작: 게시글 ID ${widget.post.id}');
+      _comments = await _communityService.getComments(widget.post.id);
+      print('✅ 댓글 로드 완료: ${_comments.length}개');
     } catch (e) {
-      print('댓글 로드 실패: $e');
+      print('❌ 댓글 로드 실패: $e');
+      _comments = [];
     } finally {
       setState(() {
         _isLoading = false;
@@ -57,49 +67,6 @@ class _CommentScreenState extends State<CommentScreen> {
     }
   }
 
-  List<Comment> _getMockComments() {
-    return [
-      Comment(
-        id: 1,
-        postId: widget.post.id,
-        authorId: 2,
-        authorNickname: '테니스러버',
-        authorProfileImage: null,
-        content: '정말 좋은 정보네요! 저도 도움이 많이 됐습니다.',
-        likeCount: 3,
-        isLikedByCurrentUser: false,
-        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-        updatedAt: DateTime.now().subtract(const Duration(hours: 2)),
-        replies: [
-          Comment(
-            id: 3,
-            postId: widget.post.id,
-            authorId: 1,
-            authorNickname: '테니스마스터',
-            authorProfileImage: null,
-            content: '도움이 되었다니 다행이에요!',
-            parentCommentId: 1,
-            likeCount: 1,
-            isLikedByCurrentUser: true,
-            createdAt: DateTime.now().subtract(const Duration(hours: 1)),
-            updatedAt: DateTime.now().subtract(const Duration(hours: 1)),
-          ),
-        ],
-      ),
-      Comment(
-        id: 2,
-        postId: widget.post.id,
-        authorId: 3,
-        authorNickname: '라켓킹',
-        authorProfileImage: null,
-        content: '이런 팁들이 정말 유용해요. 더 많은 정보를 기대합니다!',
-        likeCount: 1,
-        isLikedByCurrentUser: false,
-        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-        updatedAt: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-    ];
-  }
 
   Future<void> _submitComment() async {
     if (_commentController.text.trim().isEmpty) return;
@@ -109,35 +76,30 @@ class _CommentScreenState extends State<CommentScreen> {
     });
 
     try {
-      // TODO: 실제 API 호출로 변경
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      final newComment = Comment(
-        id: _comments.length + 1,
+      print('🔍 댓글 작성 시작: "${_commentController.text.trim()}"');
+      final newComment = await _communityService.createComment(
         postId: widget.post.id,
-        authorId: context.read<AuthProvider>().currentUser?.id ?? 1,
-        authorNickname: context.read<AuthProvider>().currentUser?.nickname ?? '사용자',
-        authorProfileImage: context.read<AuthProvider>().currentUser?.profileImage,
         content: _commentController.text.trim(),
-        likeCount: 0,
-        isLikedByCurrentUser: false,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
       );
 
-      setState(() {
-        _comments.insert(0, newComment);
-        _commentController.clear();
-      });
+      if (newComment != null) {
+        setState(() {
+          _comments.insert(0, newComment); // 최신 댓글을 맨 앞에 추가
+          _commentController.clear();
+        });
+        print('✅ 댓글 작성 완료: ID ${newComment.id}');
 
-      // 성공 메시지
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('댓글이 작성되었습니다.')),
-        );
+        // 성공 메시지
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('댓글이 작성되었습니다.')),
+          );
+        }
+      } else {
+        throw Exception('댓글 작성 응답이 null입니다');
       }
     } catch (e) {
-      print('댓글 작성 실패: $e');
+      print('❌ 댓글 작성 실패: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('댓글 작성에 실패했습니다.')),
@@ -222,6 +184,97 @@ class _CommentScreenState extends State<CommentScreen> {
     _replyController.clear();
   }
 
+  Future<void> _editComment(Comment comment) async {
+    String? result;
+    
+    try {
+      result = await showDialog<String>(
+        context: context,
+        builder: (context) => _EditCommentDialog(initialText: comment.content),
+      );
+    } catch (e) {
+      print('❌ 댓글 수정 다이얼로그 오류: $e');
+      return;
+    }
+
+    if (result != null && result.isNotEmpty && result != comment.content) {
+      try {
+        print('🔍 댓글 수정 시작: ID ${comment.id}');
+        final updatedComment = await _communityService.updateComment(
+          commentId: comment.id,
+          content: result,
+        );
+
+        if (updatedComment != null && mounted) {
+          // 댓글 목록 새로고침
+          await _loadComments();
+          print('✅ 댓글 수정 완료');
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('댓글이 수정되었습니다.')),
+          );
+        }
+      } catch (e) {
+        print('❌ 댓글 수정 실패: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('댓글 수정에 실패했습니다.')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _deleteComment(Comment comment) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('댓글 삭제'),
+        content: const Text('이 댓글을 삭제하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        print('🔍 댓글 삭제 시작: ID ${comment.id}');
+        final success = await _communityService.deleteComment(comment.id);
+
+        if (success) {
+          setState(() {
+            _comments.removeWhere((c) => c.id == comment.id);
+          });
+          print('✅ 댓글 삭제 완료');
+          
+          // 댓글 목록 새로고침
+          await _loadComments();
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('댓글이 삭제되었습니다.')),
+            );
+          }
+        }
+      } catch (e) {
+        print('❌ 댓글 삭제 실패: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('댓글 삭제에 실패했습니다.')),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _toggleLike(Comment comment) async {
     try {
       // TODO: 실제 API 호출로 변경
@@ -246,16 +299,23 @@ class _CommentScreenState extends State<CommentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('댓글 ${_comments.length}개'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
+    return PopScope(
+      onPopInvoked: (didPop) {
+        if (didPop) {
+          // 댓글 화면을 나갈 때 부모 화면에 새로고침 신호 전송
+          print('🔄 댓글 화면 종료 - 커뮤니티 새로고침 필요');
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text('댓글 ${_comments.length}개'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: Column(
+          children: [
           // 게시글 미리보기
           _buildPostPreview(),
           
@@ -279,7 +339,8 @@ class _CommentScreenState extends State<CommentScreen> {
           
           // 댓글 입력 영역
           _buildCommentInput(),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -414,12 +475,17 @@ class _CommentScreenState extends State<CommentScreen> {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        comment.authorNickname,
-                        style: AppTextStyles.body.copyWith(
-                          fontWeight: FontWeight.w600,
+                        GestureDetector(
+                          onTap: () => _showUserActionMenu(context, comment.authorId, comment.authorNickname),
+                          child: Text(
+                            comment.authorNickname,
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
                         ),
-                      ),
                       const SizedBox(width: 8),
                       Text(
                         comment.timeAgo,
@@ -427,6 +493,46 @@ class _CommentScreenState extends State<CommentScreen> {
                           color: AppColors.textSecondary,
                         ),
                       ),
+                      const Spacer(),
+                      // 작성자인 경우에만 수정/삭제 버튼 표시
+                      if (comment.authorId == context.read<AuthProvider>().currentUser?.id) ...[
+                        PopupMenuButton<String>(
+                          icon: Icon(
+                            Icons.more_vert,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              _editComment(comment);
+                            } else if (value == 'delete') {
+                              _deleteComment(comment);
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit, size: 16),
+                                  SizedBox(width: 8),
+                                  Text('수정'),
+                                ],
+                              ),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete, size: 16, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text('삭제', style: TextStyle(color: Colors.red)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -713,6 +819,232 @@ class _CommentScreenState extends State<CommentScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // 닉네임 클릭 시 사용자 액션 메뉴 표시
+  void _showUserActionMenu(BuildContext context, int authorId, String authorNickname) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 헤더
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              authorNickname,
+              style: AppTextStyles.h3.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // 액션 버튼들
+            _buildActionButton(
+              icon: Icons.person_add,
+              title: '팔로우',
+              subtitle: '이 사용자를 팔로우합니다',
+              onTap: () async {
+                Navigator.pop(context);
+                await _followUserById(authorId, authorNickname);
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildActionButton(
+              icon: Icons.person,
+              title: '프로필 방문',
+              subtitle: '사용자 프로필을 확인합니다',
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToUserProfile(authorId);
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTextStyles.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey[400],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ID로 사용자 팔로우
+  Future<void> _followUserById(int userId, String nickname) async {
+    try {
+      final success = await _userService.followUser(userId);
+      if (success && mounted) {
+        // 팔로우 성공 메시지만 표시 (화면 전환 방지)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${nickname}님 팔로우를 성공했습니다'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      } else {
+        throw Exception('팔로우 실패');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('팔로우 중 오류가 발생했습니다: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  // 사용자 프로필로 이동
+  void _navigateToUserProfile(int userId) async {
+    try {
+      // 사용자 정보 조회
+      final user = await _userService.getUserProfile(userId);
+      if (user != null && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UserProfileHomeScreen(user: user),
+          ),
+        );
+      } else {
+        throw Exception('사용자 정보를 찾을 수 없습니다');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('사용자 정보 로드 실패: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+}
+
+// 안전한 TextEditingController 관리를 위한 커스텀 다이얼로그
+class _EditCommentDialog extends StatefulWidget {
+  final String initialText;
+
+  const _EditCommentDialog({required this.initialText});
+
+  @override
+  State<_EditCommentDialog> createState() => _EditCommentDialogState();
+}
+
+class _EditCommentDialogState extends State<_EditCommentDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('댓글 수정'),
+      content: TextField(
+        controller: _controller,
+        maxLines: 3,
+        decoration: const InputDecoration(
+          hintText: '댓글을 수정하세요',
+          border: OutlineInputBorder(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('취소'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          child: const Text('수정'),
+        ),
+      ],
     );
   }
 }

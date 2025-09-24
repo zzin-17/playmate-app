@@ -94,7 +94,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${widget.matching.host.nickname}님을 팔로우했습니다.'),
+            content: Text('${widget.matching.host.nickname}님 팔로우를 성공했습니다.'),
             backgroundColor: AppColors.success,
           ),
         );

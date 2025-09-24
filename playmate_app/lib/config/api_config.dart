@@ -1,6 +1,6 @@
 class ApiConfig {
   // 환경별 API URL 설정 (더 안정적인 localhost 사용)
-  static const String devBaseUrl = 'http://10.0.2.2:3000'; // Android 에뮬레이터용 localhost
+  static const String devBaseUrl = 'http://192.168.6.100:3000'; // 네트워크 IP 사용
   static const String devBaseUrlIOS = 'http://localhost:3000'; // iOS 시뮬레이터용
   static const String devBaseUrlNetwork = 'http://192.168.6.100:3000'; // 네트워크용 (백업)
   static const String stagingBaseUrl = 'https://staging-api.playmate.com';

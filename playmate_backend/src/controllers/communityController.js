@@ -233,6 +233,58 @@ const addComment = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get user's bookmarked posts
+// @route   GET /api/community/posts/my-bookmarks
+// @access  Private
+const getMyBookmarks = asyncHandler(async (req, res) => {
+  const posts = await Post.find({
+    'bookmarks.user': req.user.id
+  })
+  .populate('author', 'nickname profileImage')
+  .sort({ updatedAt: -1 });
+
+  res.json({
+    success: true,
+    data: posts,
+    count: posts.length
+  });
+});
+
+// @desc    Get user's liked posts
+// @route   GET /api/community/posts/my-likes
+// @access  Private
+const getMyLikes = asyncHandler(async (req, res) => {
+  const posts = await Post.find({
+    'likes.user': req.user.id
+  })
+  .populate('author', 'nickname profileImage')
+  .sort({ updatedAt: -1 });
+
+  res.json({
+    success: true,
+    data: posts,
+    count: posts.length
+  });
+});
+
+// @desc    Get posts where user commented
+// @route   GET /api/community/posts/my-comments
+// @access  Private
+const getMyCommentedPosts = asyncHandler(async (req, res) => {
+  const posts = await Post.find({
+    'comments.author': req.user.id
+  })
+  .populate('author', 'nickname profileImage')
+  .populate('comments.author', 'nickname profileImage')
+  .sort({ updatedAt: -1 });
+
+  res.json({
+    success: true,
+    data: posts,
+    count: posts.length
+  });
+});
+
 module.exports = {
   getPosts,
   getPost,
@@ -241,5 +293,8 @@ module.exports = {
   deletePost,
   toggleLike,
   toggleBookmark,
-  addComment
+  addComment,
+  getMyBookmarks,
+  getMyLikes,
+  getMyCommentedPosts
 };

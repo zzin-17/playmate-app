@@ -8,7 +8,10 @@ import '../../models/user.dart';
 import '../../services/api_service.dart';
 import '../../services/community_service.dart';
 import 'my_hosted_matchings_screen.dart';
+import 'my_guest_matchings_screen.dart';
 import 'my_bookmarks_screen.dart';
+import 'my_liked_posts_screen.dart';
+import 'my_commented_posts_screen.dart';
 import '../review/my_reviews_screen.dart';
 import '../community/community_screen.dart';
 import '../profile/edit_profile_screen.dart';
@@ -21,7 +24,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  int _matchingCount = 0;
+  int _hostedMatchingCount = 0;
+  int _guestMatchingCount = 0;
   int _postCount = 0;
   bool _isLoading = true;
 
@@ -40,7 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final token = await _getAuthToken();
       if (token == null) return;
 
-      // 매칭 수 조회 (호스트 + 게스트)
+      // 실제 매칭 데이터 조회
       final matchings = await ApiService.getMyMatchings(token);
       final hostMatchings = matchings.where((m) => m.host.id == user.id).toList();
       final guestMatchings = matchings.where((m) => 
@@ -52,16 +56,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final posts = await communityService.getMyPosts();
 
       setState(() {
-        _matchingCount = hostMatchings.length + guestMatchings.length;
-        _postCount = posts.length;
+        _hostedMatchingCount = hostMatchings.length; // 내가 모집한 매칭 수
+        _guestMatchingCount = guestMatchings.length; // 내가 참여한 매칭 수
+        _postCount = posts.length; // 게시글 수
         _isLoading = false;
       });
 
-      print('📊 프로필 통계 로드 완료: 매칭 ${_matchingCount}개, 게시글 ${_postCount}개');
+      print('📊 프로필 통계 로드 완료: 모집한 일정 ${_hostedMatchingCount}개, 참여한 일정 ${_guestMatchingCount}개, 게시글 ${_postCount}개');
     } catch (e) {
       print('프로필 통계 로드 실패: $e');
       setState(() {
-        _matchingCount = 0;
+        _hostedMatchingCount = 0;
+        _guestMatchingCount = 0;
         _postCount = 0;
         _isLoading = false;
       });
@@ -129,7 +135,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: '내가 좋아요한 게시글',
                       subtitle: '좋아요한 게시글 목록',
                       onTap: () {
-                        // 내가 좋아요한 게시글 페이지로 이동
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const MyLikedPostsScreen(),
+                          ),
+                        );
                       },
                     ),
                     MenuItem(
@@ -137,7 +147,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: '내가 댓글단 게시글',
                       subtitle: '댓글을 작성한 게시글 목록',
                       onTap: () {
-                        // 내가 댓글단 게시글 페이지로 이동
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const MyCommentedPostsScreen(),
+                          ),
+                        );
                       },
                     ),
                   ],
@@ -350,13 +364,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               Expanded(
                 child: _buildStatCard(
-                  icon: Icons.people,
-                  value: _isLoading ? '-' : '$_matchingCount',
-                  label: '매칭',
-                  onTap: () => _navigateToMatching(context),
+                  icon: Icons.event,
+                  value: _isLoading ? '-' : '$_hostedMatchingCount',
+                  label: '모집한 일정',
+                  onTap: () => _navigateToHostedMatchings(context),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStatCard(
+                  icon: Icons.person_add,
+                  value: _isLoading ? '-' : '$_guestMatchingCount',
+                  label: '참여한 일정',
+                  onTap: () => _navigateToGuestMatchings(context),
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: _buildStatCard(
                   icon: Icons.article,
@@ -365,16 +388,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   onTap: () => _navigateToPosts(context),
                 ),
               ),
-              // TODO: 거래 기능 구현 완료 시 활성화
-              // const SizedBox(width: 12),
-              // Expanded(
-              //   child: _buildStatCard(
-              //     icon: Icons.shopping_bag,
-              //     value: '5',
-              //     label: '거래',
-              //     onTap: () => _navigateToTransactions(),
-              //   ),
-              // ),
             ],
           ),
         ],
@@ -430,11 +443,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   // 네비게이션 메서드들
-  void _navigateToMatching(BuildContext context) {
-    // 매칭 관련 페이지로 이동 (내가 모집한 일정)
+  void _navigateToHostedMatchings(BuildContext context) {
+    // 내가 모집한 일정 페이지로 이동
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => MyHostedMatchingsScreen(
+          currentUser: context.read<AuthProvider>().currentUser!,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToGuestMatchings(BuildContext context) {
+    // 내가 참여한 일정 페이지로 이동
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MyGuestMatchingsScreen(
           currentUser: context.read<AuthProvider>().currentUser!,
         ),
       ),

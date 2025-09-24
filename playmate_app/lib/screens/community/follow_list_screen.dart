@@ -8,13 +8,13 @@ import '../../services/user_service.dart';
 
 class FollowListScreen extends StatefulWidget {
   final String title;
-  final List<int> userIds;
+  final int userId;
   final bool isFollowing; // true: 팔로잉, false: 팔로워
 
   const FollowListScreen({
     super.key,
     required this.title,
-    required this.userIds,
+    required this.userId,
     required this.isFollowing,
   });
 
@@ -40,15 +40,12 @@ class _FollowListScreenState extends State<FollowListScreen> {
 
     try {
       // 실제 API 호출
-      final currentUser = context.read<AuthProvider>().currentUser;
-      if (currentUser != null) {
-        if (widget.isFollowing) {
-          // 팔로잉 목록 조회
-          _users = await _userService.getFollowingList(currentUser.id);
-        } else {
-          // 팔로워 목록 조회
-          _users = await _userService.getFollowerList(currentUser.id);
-        }
+      if (widget.isFollowing) {
+        // 팔로잉 목록 조회
+        _users = await _userService.getFollowing(widget.userId);
+      } else {
+        // 팔로워 목록 조회
+        _users = await _userService.getFollowers(widget.userId);
       }
       
       // API 호출이 실패하거나 빈 결과인 경우 Mock 데이터 사용
@@ -285,7 +282,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
           ),
         ),
         child: Text(
-          isFollowing ? '언팔로우' : '팔로우',
+          isFollowing ? '팔로잉' : '팔로우',
           style: AppTextStyles.body.copyWith(
             color: isFollowing ? Colors.grey[700] : Colors.white,
             fontSize: 14,
@@ -331,8 +328,8 @@ class _FollowListScreenState extends State<FollowListScreen> {
           SnackBar(
             content: Text(
               isFollowing 
-                  ? '${user.nickname}님을 언팔로우했습니다'
-                  : '${user.nickname}님을 팔로우했습니다',
+                  ? '${user.nickname}님 팔로우를 취소했습니다'
+                  : '${user.nickname}님 팔로우를 성공했습니다',
             ),
             backgroundColor: AppColors.primary,
           ),

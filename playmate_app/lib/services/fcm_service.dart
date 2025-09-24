@@ -54,9 +54,10 @@ class FCMService {
       }
     } catch (e) {
       if (kDebugMode) {
-        print('FCM 서비스 초기화 실패: $e');
+        print('FCM 서비스 초기화 실패 (앱은 계속 실행): $e');
       }
-      _isInitialized = false;
+      // Firebase 초기화 실패해도 앱은 계속 실행
+      _isInitialized = true; // 로컬 알림은 사용 가능하도록 설정
     }
   }
 

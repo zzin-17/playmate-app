@@ -1,10 +1,31 @@
 import 'dart:async';
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'api_service.dart';
 import 'community_service.dart';
 import 'chat_service.dart';
 import '../models/user.dart';
+
+// 배치 요청 타입
+enum BatchRequestType {
+  loadPosts,
+  loadChatRooms, 
+  loadNotifications,
+  loadReviews,
+  syncProfile,
+}
+
+// 배치 요청 데이터
+class BatchRequest {
+  final BatchRequestType type;
+  final Map<String, dynamic> params;
+  final Completer<dynamic> completer;
+  final DateTime createdAt;
+
+  BatchRequest({
+    required this.type,
+    required this.params,
+    required this.completer,
+    required this.createdAt,
+  });
+}
 
 /**
  * 배치 처리 서비스 (나중을 위한 준비)
@@ -22,30 +43,6 @@ class BatchUpdateService {
   Timer? _batchTimer;
   final List<BatchRequest> _pendingRequests = [];
   bool _isBatchProcessing = false;
-
-  // 배치 요청 타입
-  enum BatchRequestType {
-    loadPosts,
-    loadChatRooms, 
-    loadNotifications,
-    loadReviews,
-    syncProfile,
-  }
-
-  // 배치 요청 데이터
-  class BatchRequest {
-    final BatchRequestType type;
-    final Map<String, dynamic> params;
-    final Completer<dynamic> completer;
-    final DateTime createdAt;
-
-    BatchRequest({
-      required this.type,
-      required this.params,
-      required this.completer,
-      required this.createdAt,
-    });
-  }
 
   // 배치 처리 시작
   void startBatchProcessing() {

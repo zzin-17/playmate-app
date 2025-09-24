@@ -35,6 +35,7 @@ dependencies:
 
   # UI & Icons
   cupertino_icons: ^1.0.8
+  table_calendar: ^3.0.9
   
   # 상태 관리
   provider: ^6.1.2

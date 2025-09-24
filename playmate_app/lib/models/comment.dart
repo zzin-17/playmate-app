@@ -13,6 +13,7 @@ class Comment {
   final int? parentCommentId; // 답글인 경우 부모 댓글 ID
   final List<Comment> replies; // 답글 목록
   final int likeCount;
+  @JsonKey(name: 'isLiked') // 백엔드에서 isLiked로 보내므로 매핑
   final bool isLikedByCurrentUser;
   final DateTime createdAt;
   final DateTime updatedAt;

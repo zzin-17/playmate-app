@@ -16,9 +16,23 @@ class AppTextStyles {
     color: AppColors.textPrimary,
   );
 
+  // Title2 - 18pt Medium
+  static const TextStyle title2 = TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.w500,
+    color: AppColors.textPrimary,
+  );
+
   // H3 - 15pt Medium
   static const TextStyle h3 = TextStyle(
     fontSize: 15,
+    fontWeight: FontWeight.w500,
+    color: AppColors.textPrimary,
+  );
+
+  // Subtitle2 - 14pt Medium
+  static const TextStyle subtitle2 = TextStyle(
+    fontSize: 14,
     fontWeight: FontWeight.w500,
     color: AppColors.textPrimary,
   );

@@ -9,6 +9,7 @@ import 'follow_list_screen.dart';
 import 'comment_screen.dart';
 import 'create_post_screen.dart';
 import 'edit_post_screen.dart';
+import '../profile/user_profile_home_screen.dart';
 import '../../models/post.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/share_service.dart';
@@ -36,6 +37,7 @@ class _CommunityScreenState extends State<CommunityScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final CommunityService _communityService = CommunityService();
+  final UserService _userService = UserService();
   
   // 게시글 데이터
   final List<Post> _feedPosts = [];      // 전체 게시글 (All 탭용)
@@ -783,11 +785,15 @@ class _CommunityScreenState extends State<CommunityScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        post.authorNickname,
-                        style: AppTextStyles.body.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
+                      GestureDetector(
+                        onTap: () => _showUserActionMenu(context, post.authorId, post.authorNickname),
+                        child: Text(
+                          post.authorNickname,
+                          style: AppTextStyles.body.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
                         ),
                       ),
                       Text(
@@ -1013,7 +1019,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                   MaterialPageRoute(
                     builder: (context) => FollowListScreen(
                       title: '팔로잉',
-                      userIds: currentUser.followingIds ?? [],
+                      userId: currentUser.id,
                       isFollowing: true,
                     ),
                   ),
@@ -1022,7 +1028,7 @@ class _CommunityScreenState extends State<CommunityScreen>
             ),
             ListTile(
               leading: const Icon(Icons.people),
-              title: Text('팔로워 (${currentUser.followingIds?.length ?? 0})'),
+              title: Text('팔로워 (${currentUser.followerIds?.length ?? 0})'),
               subtitle: const Text('나를 팔로우하는 사용자들'),
               onTap: () {
                 Navigator.pop(context);
@@ -1031,7 +1037,7 @@ class _CommunityScreenState extends State<CommunityScreen>
                   MaterialPageRoute(
                     builder: (context) => FollowListScreen(
                       title: '팔로워',
-                      userIds: currentUser.followerIds ?? [],
+                      userId: currentUser.id,
                       isFollowing: false,
                     ),
                   ),
@@ -1062,14 +1068,20 @@ class _CommunityScreenState extends State<CommunityScreen>
     );
   }
 
-  void _navigateToComments(Post post) {
-
-    Navigator.push(
+  void _navigateToComments(Post post) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CommentScreen(post: post),
       ),
     );
+    
+    // 댓글 화면에서 돌아왔을 때 게시글 목록 새로고침
+    if (mounted) {
+      print('🔄 댓글 화면에서 돌아옴 - 게시글 목록 새로고침');
+      _loadAllPosts();
+      _loadMyPosts();
+    }
   }
 
 
@@ -1456,6 +1468,193 @@ class _CommunityScreenState extends State<CommunityScreen>
       ),
     );
   }
+
+  // 닉네임 클릭 시 사용자 액션 메뉴 표시
+  void _showUserActionMenu(BuildContext context, int authorId, String authorNickname) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 헤더
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              authorNickname,
+              style: AppTextStyles.h3.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // 액션 버튼들
+            _buildActionButton(
+              icon: Icons.person_add,
+              title: '팔로우',
+              subtitle: '이 사용자를 팔로우합니다',
+              onTap: () async {
+                Navigator.pop(context);
+                await _followUserById(authorId, authorNickname);
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildActionButton(
+              icon: Icons.person,
+              title: '프로필 방문',
+              subtitle: '사용자 프로필을 확인합니다',
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToUserProfile(authorId);
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: AppTextStyles.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey[400],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ID로 사용자 팔로우
+  Future<void> _followUserById(int userId, String nickname) async {
+    try {
+      final success = await _userService.followUser(userId);
+      if (success && mounted) {
+        // 팔로우 성공 메시지만 표시 (화면 전환 방지)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${nickname}님 팔로우를 성공했습니다'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+        
+        // 커뮤니티 데이터만 새로고침
+        _loadAllPosts();
+        _loadMyPosts();
+      } else {
+        throw Exception('팔로우 실패');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('팔로우 중 오류가 발생했습니다: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  // 사용자 프로필로 이동
+  void _navigateToUserProfile(int userId) async {
+    print('🔍 _navigateToUserProfile 호출됨 - 사용자 ID: $userId');
+    try {
+      // 사용자 정보 조회
+      print('🔍 사용자 정보 조회 시작 - ID: $userId');
+      final user = await _userService.getUserProfile(userId);
+      print('🔍 사용자 정보 조회 완료 - 사용자: ${user?.nickname}');
+      if (user != null && mounted) {
+        print('🔍 UserProfileHomeScreen으로 이동');
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => UserProfileHomeScreen(
+              user: user,
+              fromCommunity: true,
+            ),
+          ),
+        );
+      } else {
+        throw Exception('사용자 정보를 찾을 수 없습니다');
+      }
+    } catch (e) {
+      print('🔍 사용자 프로필 이동 오류: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('사용자 정보 로드 실패: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
 }
 
 class PostData {
@@ -1639,10 +1838,16 @@ class _UserSearchDialogState extends State<UserSearchDialog> {
         ),
         onTap: () {
           Navigator.pop(context);
-          // 사용자 프로필 화면으로 이동
-          // Navigator.push(context, MaterialPageRoute(
-          //   builder: (context) => UserProfileScreen(user: user),
-          // ));
+          // 사용자의 프로필 홈화면으로 이동
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => UserProfileHomeScreen(
+                user: user,
+                fromCommunity: true,
+              ),
+            ),
+          );
         },
       ),
     );
@@ -1654,7 +1859,7 @@ class _UserSearchDialogState extends State<UserSearchDialog> {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${user.nickname}님을 팔로우했습니다'),
+            content: Text('${user.nickname}님 팔로우를 성공했습니다'),
             backgroundColor: AppColors.primary,
           ),
         );

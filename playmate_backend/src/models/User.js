@@ -57,8 +57,7 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// 인덱스 설정
-userSchema.index({ email: 1 });
+// 인덱스 설정 (email은 unique: true로 이미 인덱스 생성됨)
 userSchema.index({ nickname: 1 });
 userSchema.index({ isActive: 1 });
 

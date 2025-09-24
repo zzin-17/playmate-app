@@ -20,7 +20,7 @@ Comment _$CommentFromJson(Map<String, dynamic> json) => Comment(
           .toList() ??
       const [],
   likeCount: (json['likeCount'] as num).toInt(),
-  isLikedByCurrentUser: json['isLikedByCurrentUser'] as bool,
+  isLikedByCurrentUser: json['isLiked'] as bool? ?? false,
   createdAt: DateTime.parse(json['createdAt'] as String),
   updatedAt: DateTime.parse(json['updatedAt'] as String),
 );
@@ -35,7 +35,7 @@ Map<String, dynamic> _$CommentToJson(Comment instance) => <String, dynamic>{
   'parentCommentId': instance.parentCommentId,
   'replies': instance.replies,
   'likeCount': instance.likeCount,
-  'isLikedByCurrentUser': instance.isLikedByCurrentUser,
+  'isLiked': instance.isLikedByCurrentUser,
   'createdAt': instance.createdAt.toIso8601String(),
   'updatedAt': instance.updatedAt.toIso8601String(),
 };

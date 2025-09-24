@@ -78,9 +78,9 @@ class _CourtSelectionScreenState extends State<CourtSelectionScreen> {
       print('🎾 카카오 API 테니스장 로드 완료: ${_courts.length}개');
     } catch (e) {
       print('❌ 카카오 API 테니스장 로드 실패: $e');
-      // API 실패 시 로컬 데이터 사용
-      _courts = _courtService.getAllCourts();
-      _filteredCourts = List.from(_courts);
+      // API 실패 시 빈 리스트로 초기화
+      _courts = <TennisCourt>[];
+      _filteredCourts = <TennisCourt>[];
     } finally {
       setState(() {
         _isLoading = false;
