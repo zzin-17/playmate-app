@@ -14,6 +14,7 @@ import 'constants/app_colors.dart';
 import 'constants/app_text_styles.dart';
 
 import 'services/fcm_service.dart';
+import 'services/connection_monitor_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +29,9 @@ void main() async {
   } catch (e) {
     // Firebase 초기화 실패 시에도 앱은 계속 실행
   }
+  
+  // 연결 상태 모니터링 시작
+  ConnectionMonitorService().startMonitoring();
   
 
   
@@ -163,47 +167,28 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
-  bool _isCheckingAuth = true;  // 인증 확인 중 상태 추가
-  
   @override
   void initState() {
     super.initState();
-    _checkAuthStatus();
+    _initializeAuth();
   }
 
-  Future<void> _checkAuthStatus() async {
+  Future<void> _initializeAuth() async {
     try {
-      // AuthProvider에서 인증 상태 확인
       final authProvider = context.read<AuthProvider>();
-      
-      // 개발 중: 로그인 시도 횟수 초기화
-      await authProvider.resetAllLoginAttempts();
-      
-      // 사용자 정보 로드
       await authProvider.loadCurrentUser();
-      
-      print('🔍 인증 확인 완료 - 사용자: ${authProvider.currentUser?.email ?? "null"}');
-      
+      print('🔍 인증 초기화 완료');
     } catch (e) {
-      print('🔍 인증 확인 실패: $e');
-    } finally {
-      // 인증 확인 완료 후 상태 업데이트
-      if (mounted) {
-        setState(() {
-          _isCheckingAuth = false;
-        });
-      }
+      print('🔍 인증 초기화 실패: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Consumer 사용으로 필요한 경우에만 리빌드
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-    
-        // 인증 확인이 완료될 때까지 로딩 화면 표시
-        if (_isCheckingAuth || authProvider.isLoading) {
+        // 로딩 중일 때만 로딩 화면 표시
+        if (authProvider.isLoading) {
           return const Scaffold(
             body: Center(
               child: CircularProgressIndicator(),
@@ -211,19 +196,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
         
-        if (authProvider.isLoggedIn) {
-          return const MainScreen();
-        } else {
-          // LoginScreen을 항상 동일한 인스턴스로 유지
-          // (로그인 실패 시에도 화면이 새로 생성되지 않도록)
-          return LoginScreen(
-            key: const ValueKey('login_screen'),
-            // 에러 상태를 전달하지 않음 (화면 재생성 방지)
-            initialError: null,
-            // 로그인 실패 시에도 화면 유지
-            preserveState: true,
-          );
-        }
+        // 로그인 상태에 따라 화면 분기
+        return authProvider.isLoggedIn 
+          ? const MainScreen()
+          : const LoginScreen();
       },
     );
   }

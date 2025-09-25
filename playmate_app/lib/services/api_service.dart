@@ -6,8 +6,40 @@ import '../models/review.dart';
 import '../config/api_config.dart';
 
 class ApiService {
-  static String get baseUrl => ApiConfig.fullBaseUrl;
+  static String _currentBaseUrl = ApiConfig.fullBaseUrl;
+  static String get baseUrl => _currentBaseUrl;
   static const Duration timeout = ApiConfig.timeout;
+  
+  // 동적 포트 감지 및 URL 업데이트
+  static Future<void> _updateBaseUrlIfNeeded() async {
+    // 현재 URL이 작동하는지 확인
+    try {
+      final testUri = Uri.parse('$_currentBaseUrl/health');
+      final response = await http.get(testUri).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        return; // 현재 URL이 작동함
+      }
+    } catch (e) {
+      // 현재 URL이 작동하지 않음, 백업 URL들 시도
+    }
+    
+    // 백업 URL들 시도
+    for (final fallbackUrl in ApiConfig.fallbackUrls) {
+      try {
+        final testUri = Uri.parse('$fallbackUrl/api/health');
+        final response = await http.get(testUri).timeout(const Duration(seconds: 5));
+        if (response.statusCode == 200) {
+          _currentBaseUrl = '$fallbackUrl/api';
+          print('🔄 API URL 업데이트: $_currentBaseUrl');
+          return;
+        }
+      } catch (e) {
+        continue; // 다음 URL 시도
+      }
+    }
+    
+    print('❌ 사용 가능한 서버를 찾을 수 없습니다.');
+  }
   
   // HTTP 헤더
   static Map<String, String> get _headers => {
@@ -38,40 +70,70 @@ class ApiService {
     }
   }
   
-  // 재시도 로직 (네트워크 오류에 특화)
+  // 향상된 재시도 로직 (네트워크 오류에 특화)
   static Future<http.Response> _retryRequest(Future<http.Response> Function() request) async {
     int attempts = 0;
+    int baseDelay = 1; // 기본 지연 시간 (초)
+    
     while (attempts < ApiConfig.maxRetries) {
       try {
         final response = await request().timeout(timeout);
-        if (response.statusCode < 500) {
-          return response; // 4xx 오류는 재시도하지 않음
+        
+        // 성공적인 응답
+        if (response.statusCode < 400) {
+          return response;
         }
+        
+        // 4xx 클라이언트 오류는 재시도하지 않음
+        if (response.statusCode < 500) {
+          return response;
+        }
+        
+        // 5xx 서버 오류는 재시도
         attempts++;
         if (attempts < ApiConfig.maxRetries) {
-          print('🔄 서버 오류로 인한 재시도 중... (${attempts}/${ApiConfig.maxRetries})');
-          await Future.delayed(ApiConfig.retryDelay * attempts);
+          final delay = baseDelay * (attempts * attempts); // 지수 백오프
+          print('🔄 서버 오류(${response.statusCode})로 인한 재시도 중... (${attempts}/${ApiConfig.maxRetries}) - ${delay}초 후');
+          await Future.delayed(Duration(seconds: delay));
         }
+        
       } catch (e) {
-        // 네트워크 연결 오류인 경우에만 재시도
-        if (e.toString().contains('Connection refused') || 
-            e.toString().contains('SocketException') ||
-            e.toString().contains('timeout') ||
-            e.toString().contains('Failed host lookup')) {
+        // 네트워크 연결 오류 분류
+        final errorMessage = e.toString().toLowerCase();
+        final isNetworkError = errorMessage.contains('connection refused') || 
+                              errorMessage.contains('socketexception') ||
+                              errorMessage.contains('timeout') ||
+                              errorMessage.contains('failed host lookup') ||
+                              errorMessage.contains('network is unreachable') ||
+                              errorMessage.contains('connection reset') ||
+                              errorMessage.contains('connection aborted');
+        
+        if (isNetworkError) {
           attempts++;
-          if (attempts >= ApiConfig.maxRetries) {
-            print('❌ 네트워크 연결 실패: $e');
-            rethrow;
+          
+          // 첫 번째 시도에서 동적 포트 감지 시도
+          if (attempts == 1) {
+            print('🔄 동적 포트 감지 시도 중...');
+            await _updateBaseUrlIfNeeded();
           }
-          print('🔄 네트워크 오류로 인한 재시도 중... (${attempts}/${ApiConfig.maxRetries})');
-          await Future.delayed(Duration(seconds: attempts * 2)); // 재시도 간격 증가
+          
+          if (attempts >= ApiConfig.maxRetries) {
+            print('❌ 네트워크 연결 실패 (${attempts}회 시도): $e');
+            throw ApiException('서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.');
+          }
+          
+          final delay = baseDelay * (attempts * attempts); // 지수 백오프
+          print('🔄 네트워크 오류로 인한 재시도 중... (${attempts}/${ApiConfig.maxRetries}) - ${delay}초 후');
+          await Future.delayed(Duration(seconds: delay));
         } else {
-          // 다른 오류는 즉시 재시도하지 않음
+          // 네트워크 오류가 아닌 경우 즉시 재시도하지 않음
+          print('❌ 네트워크 오류가 아닌 예외: $e');
           rethrow;
         }
       }
     }
-    throw ApiException('최대 재시도 횟수 초과');
+    
+    throw ApiException('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
   }
   
   // 인증 헤더 (토큰이 있는 경우)

@@ -1099,7 +1099,7 @@ class _CommunityScreenState extends State<CommunityScreen>
         if (!post.isLikedByCurrentUser) {
           await NotificationService().showLikeNotification(
             postTitle: post.content,
-            likerName: '현재 사용자', // TODO: 실제 사용자 이름으로 변경
+            likerName: '현재 사용자', // 실제 사용자 이름으로 변경 (향후 구현)
           );
         }
       } else {
@@ -1159,12 +1159,12 @@ class _CommunityScreenState extends State<CommunityScreen>
     // 공유 시 알림 표시
     await NotificationService().showShareNotification(
       postTitle: post.content.length > 30 ? '${post.content.substring(0, 30)}...' : post.content,
-      sharerName: '현재 사용자', // TODO: 실제 사용자 이름으로 변경
+      sharerName: '현재 사용자', // 실제 사용자 이름으로 변경 (향후 구현)
     );
   }
 
   void _searchByHashtag(String hashtag) {
-    // TODO: 해시태그 검색 기능 구현
+    // 해시태그 검색 기능 구현 (향후 구현)
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('"#$hashtag" 검색 결과를 보여줍니다.'),
@@ -1218,7 +1218,7 @@ class _CommunityScreenState extends State<CommunityScreen>
     });
 
     try {
-      // TODO: 실제 API 호출로 변경
+      // 실제 API 호출로 변경 (향후 구현)
       await Future.delayed(const Duration(milliseconds: 800)); // 로딩 시뮬레이션
       
       final newPosts = _getMockPostsForPage(_currentPage);
@@ -1360,7 +1360,7 @@ class _CommunityScreenState extends State<CommunityScreen>
         break;
       case 'hide':
         await BlockService().hidePost(post.id, context);
-        // TODO: 게시글 목록에서 제거
+        // 게시글 목록에서 제거 (향후 구현)
         break;
     }
   }

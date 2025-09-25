@@ -24,11 +24,18 @@ class ApiConfig {
   }
   
   // 백업 URL들 (연결 실패 시 시도할 수 있는 URL들)
-  static List<String> get fallbackUrls => [
-    devBaseUrl,           // 10.0.2.2:3000 (Android 에뮬레이터)
-    devBaseUrlIOS,        // localhost:3000 (iOS)
-    devBaseUrlNetwork,    // 192.168.6.100:3000 (네트워크)
-  ];
+  static List<String> get fallbackUrls {
+    final urls = <String>[];
+    
+    // 기본 포트들 (3000-3010)
+    for (int port = 3000; port <= 3010; port++) {
+      urls.add('http://192.168.6.100:$port');  // 네트워크 IP
+      urls.add('http://10.0.2.2:$port');       // Android 에뮬레이터
+      urls.add('http://localhost:$port');       // iOS 시뮬레이터
+    }
+    
+    return urls;
+  }
   
   // API 타임아웃 설정
   static const Duration timeout = Duration(seconds: 30);

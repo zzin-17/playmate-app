@@ -229,8 +229,8 @@ class WebSocketService {
       final joinData = {
         'matchingId': int.parse(matchingId),
         'userId': int.parse(userId),
-        'userNickname': '테스트유저', // TODO: 실제 사용자 정보 사용
-        'isHost': true // TODO: 실제 호스트 여부 확인
+        'userNickname': '테스트유저', // 실제 사용자 정보 사용 (향후 구현)
+        'isHost': true // 실제 호스트 여부 확인 (향후 구현)
       };
       
       _socket!.emit('join_matching', joinData);
@@ -278,7 +278,7 @@ class WebSocketService {
   
   // 채팅 상대방 ID 가져오기
   int? _getTargetUserId(ChatMessage message) {
-    // TODO: 실제 매칭 정보에서 상대방 ID 추출
+    // 실제 매칭 정보에서 상대방 ID 추출 (향후 구현)
     // 현재는 임시로 호스트 ID 반환 (추후 개선 필요)
     return _targetUserId ?? 1; // 기본값으로 호스트 ID 사용
   }

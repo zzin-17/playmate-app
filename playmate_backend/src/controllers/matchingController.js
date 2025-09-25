@@ -2,6 +2,10 @@ const asyncHandler = require('express-async-handler');
 const Matching = require('../models/Matching');
 const fs = require('fs');
 const path = require('path');
+const { createPaginationOptions, createPaginationMeta, createAggregationPipeline, createQueryHint } = require('../utils/pagination');
+const cacheService = require('../services/cacheService');
+const performanceMonitor = require('../services/performanceMonitor');
+const memoryOptimizer = require('../utils/memoryOptimizer');
 
 // 파일 기반 저장소 (앱 재시작 시에도 유지)
 const STORAGE_FILE = path.join(__dirname, '../../data/matchings.json');

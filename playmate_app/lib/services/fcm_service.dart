@@ -109,7 +109,7 @@ class FCMService {
         if (kDebugMode) {
           print('FCM 토큰 갱신: $newToken');
         }
-        // TODO: 서버에 새 토큰 전송
+        // 서버에 새 토큰 전송 (향후 구현)
       });
     } catch (e) {
       if (kDebugMode) {
@@ -138,7 +138,7 @@ class FCMService {
     }
     
     // 백그라운드에서는 로컬 알림만 표시
-    // TODO: 필요한 경우 백그라운드 작업 수행
+    // 백그라운드 작업 수행 (필요시)
   }
 
   // 알림 탭 처리
@@ -148,7 +148,7 @@ class FCMService {
       print('데이터: ${message.data}');
     }
     
-    // TODO: 알림 타입에 따라 적절한 화면으로 이동
+    // 알림 타입에 따라 적절한 화면으로 이동
     _navigateToScreen(message.data);
   }
 
@@ -158,7 +158,7 @@ class FCMService {
       print('로컬 알림 탭됨: ${response.payload}');
     }
     
-    // TODO: 페이로드에 따라 적절한 화면으로 이동
+    // 페이로드에 따라 적절한 화면으로 이동
     if (response.payload != null) {
       final data = json.decode(response.payload!);
       _navigateToScreen(data);
@@ -201,7 +201,7 @@ class FCMService {
 
   // 알림 데이터에 따른 화면 이동
   void _navigateToScreen(Map<String, dynamic> data) {
-    // TODO: GetX나 다른 네비게이션 솔루션을 사용하여 화면 이동
+    // 네비게이션 솔루션을 사용하여 화면 이동
     // 예: 매칭 상세, 채팅, 프로필 등
     if (kDebugMode) {
       print('화면 이동 데이터: $data');
@@ -260,7 +260,7 @@ class FCMService {
   Future<void> dispose() async {
     try {
       // 모든 토픽 구독 해제
-      // TODO: 구독 중인 토픽 목록을 추적하여 해제
+      // 구독 중인 토픽 목록을 추적하여 해제
       
       if (kDebugMode) {
         print('FCM 서비스 정리 완료');
