@@ -3,6 +3,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../models/matching.dart';
 import '../../models/user.dart';
+import '../../services/location_service.dart';
 
 class ImprovedMatchingCard extends StatelessWidget {
   final Matching matching;
@@ -23,38 +24,47 @@ class ImprovedMatchingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isHost = currentUser != null && matching.host.email == currentUser!.email;
+    final isExpired = matching.date.isBefore(DateTime.now());
     
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _getStatusColor(matching.actualStatus).withValues(alpha: 0.3),
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: isExpired ? AppColors.surface : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isExpired 
+                ? AppColors.textSecondary.withValues(alpha: 0.3)
+                : _getStatusColor(matching.actualStatus).withValues(alpha: 0.3),
+              width: 1.2,
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 헤더: 코트명, 상태, 액션 버튼
-            _buildHeader(isHost),
-            
-            // 메인 정보: 날짜, 시간, 위치
-            _buildMainInfo(),
-            
-            // 게임 정보: 유형, 구력, 연령
-            _buildGameInfo(),
-          ],
+            boxShadow: [
+              BoxShadow(
+                color: isExpired 
+                  ? Colors.grey.withValues(alpha: 0.03)
+                  : Colors.black.withValues(alpha: 0.06),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 헤더: 코트명, 상태, 액션 버튼
+              _buildHeader(isHost),
+              
+              // 메인 정보: 날짜, 시간, 위치
+              _buildMainInfo(),
+              
+              // 게임 정보: 유형, 구력, 연령
+              _buildGameInfo(),
+            ],
+          ),
         ),
       ),
     );
@@ -62,7 +72,7 @@ class ImprovedMatchingCard extends StatelessWidget {
 
   Widget _buildHeader(bool isHost) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: _getStatusColor(matching.actualStatus).withValues(alpha: 0.1),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
@@ -166,7 +176,7 @@ class ImprovedMatchingCard extends StatelessWidget {
 
   Widget _buildMainInfo() {
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       child: Column(
         children: [
           // 날짜와 시간
@@ -204,7 +214,7 @@ class ImprovedMatchingCard extends StatelessWidget {
           
           const SizedBox(height: 6),
           
-          // 위치 (간단하게 표시)
+          // 위치 정보 (시군구 표시)
           Row(
             children: [
               Icon(
@@ -214,13 +224,76 @@ class ImprovedMatchingCard extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Expanded(
-                child: Text(
-                  '위도: ${matching.courtLat.toStringAsFixed(2)}, 경도: ${matching.courtLng.toStringAsFixed(2)}',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+                child: FutureBuilder<String>(
+                  future: LocationService().getDistrictFromCoordinates(matching.courtLat, matching.courtLng),
+                  builder: (context, snapshot) {
+                    final location = snapshot.data ?? '위치 정보 없음';
+                    return Text(
+                      location,
+                      style: AppTextStyles.body2.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    );
+                  },
                 ),
               ),
+            ],
+          ),
+          
+          const SizedBox(height: 6),
+          
+          // 모집 인원 정보
+          Row(
+            children: [
+              Icon(
+                Icons.people,
+                size: 14,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                matching.recruitCountText,
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+          // 상태별 인원 표시
+          if (matching.remainingCount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${matching.remainingCount}명 남음',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                ),
+              ),
+            )
+          else if (matching.remainingCount == 0 && matching.actualStatus == 'recruiting')
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '모집 완료',
+                style: AppTextStyles.caption.copyWith(
+                  color: Colors.orange[700],
+                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                ),
+              ),
+            ),
             ],
           ),
         ],
@@ -230,8 +303,8 @@ class ImprovedMatchingCard extends StatelessWidget {
 
   Widget _buildGameInfo() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(8),
@@ -282,15 +355,15 @@ class ImprovedMatchingCard extends StatelessWidget {
       children: [
         Icon(
           icon,
-          size: 14,
+          size: 12,
           color: AppColors.primary,
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 2),
         Text(
           label,
           style: AppTextStyles.caption.copyWith(
             color: AppColors.textSecondary,
-            fontSize: 10,
+            fontSize: 9,
           ),
         ),
         const SizedBox(height: 1),
@@ -299,7 +372,7 @@ class ImprovedMatchingCard extends StatelessWidget {
           style: AppTextStyles.caption.copyWith(
             fontWeight: FontWeight.w600,
             color: AppColors.textPrimary,
-            fontSize: 11,
+            fontSize: 10,
           ),
           textAlign: TextAlign.center,
         ),
@@ -367,6 +440,7 @@ class ImprovedMatchingCard extends StatelessWidget {
         return gameType;
     }
   }
+
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
