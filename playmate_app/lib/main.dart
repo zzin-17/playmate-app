@@ -3,9 +3,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'providers/auth_provider.dart';
+import 'providers/home_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/main_screen.dart';
-import 'screens/home/home_screen.dart';
+import 'screens/home/improved_home_screen.dart';
 import 'screens/community/create_post_screen.dart';
 import 'screens/matching/edit_matching_screen.dart';
 import 'models/matching.dart';
@@ -46,6 +47,7 @@ class PlayMateApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => HomeProvider()),
       ],
       child: MaterialApp(
         title: '플메 - 테니스 동호인 매칭',
@@ -147,7 +149,7 @@ class PlayMateApp extends StatelessWidget {
         routes: {
           '/login': (context) => const LoginScreen(),
           '/main': (context) => const MainScreen(),
-          '/home': (context) => const HomeScreen(),
+          '/home': (context) => const ImprovedHomeScreen(),
           '/write-post': (context) => const CreatePostScreen(),
           '/edit-matching': (context) {
             final matching = ModalRoute.of(context)!.settings.arguments as Matching;

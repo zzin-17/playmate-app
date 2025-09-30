@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'home/home_screen.dart';
+import 'home/improved_home_screen.dart';
 import 'community/community_screen.dart';
 import 'profile/profile_screen.dart';
 import 'chat/chat_list_screen.dart';
@@ -25,7 +25,7 @@ class _MainScreenState extends State<MainScreen> {
     
     // 모든 페이지 인스턴스 생성
     _pages = [
-      const HomeScreen(),         // index 0: 홈
+      const ImprovedHomeScreen(),         // index 0: 홈
       const ChatListScreen(),     // index 1: 채팅
       const CommunityScreen(
         initialTabIndex: 0, 
