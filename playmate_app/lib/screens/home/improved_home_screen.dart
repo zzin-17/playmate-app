@@ -9,7 +9,7 @@ import '../../widgets/home/filter_tabs.dart';
 import '../../widgets/home/sort_and_filter_summary.dart';
 import '../../widgets/home/matching_list.dart';
 import '../../widgets/home/simple_filter_modal.dart';
-import '../matching/matching_detail_screen.dart';
+import '../matching/improved_matching_detail_screen.dart';
 import '../matching/edit_matching_screen.dart';
 import '../notification/notification_list_screen.dart';
 
@@ -203,9 +203,12 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => MatchingDetailScreen(
+          builder: (context) => ImprovedMatchingDetailScreen(
             matching: matching,
             currentUser: currentUser,
+            onMatchingUpdated: () {
+              context.read<HomeProvider>().refreshMatchings();
+            },
           ),
         ),
       );

@@ -3,7 +3,7 @@ import 'home/improved_home_screen.dart';
 import 'community/community_screen.dart';
 import 'profile/profile_screen.dart';
 import 'chat/chat_list_screen.dart';
-import 'matching/create_matching_screen.dart';
+import 'matching/improved_create_matching_screen.dart';
 
 
 class MainScreen extends StatefulWidget {
@@ -46,7 +46,7 @@ class _MainScreenState extends State<MainScreen> {
             // 게스트 모집 페이지로 이동
             await Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const CreateMatchingScreen()),
+              MaterialPageRoute(builder: (context) => const ImprovedCreateMatchingScreen()),
             );
             // 매칭 생성 후 HomeScreen은 자동으로 새로고침됨
           },

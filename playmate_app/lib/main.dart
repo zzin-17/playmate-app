@@ -9,6 +9,7 @@ import 'screens/main_screen.dart';
 import 'screens/home/improved_home_screen.dart';
 import 'screens/community/create_post_screen.dart';
 import 'screens/matching/edit_matching_screen.dart';
+import 'screens/matching/improved_create_matching_screen.dart';
 import 'models/matching.dart';
 
 import 'constants/app_colors.dart';
@@ -151,6 +152,7 @@ class PlayMateApp extends StatelessWidget {
           '/main': (context) => const MainScreen(),
           '/home': (context) => const ImprovedHomeScreen(),
           '/write-post': (context) => const CreatePostScreen(),
+          '/create-matching': (context) => const ImprovedCreateMatchingScreen(),
           '/edit-matching': (context) {
             final matching = ModalRoute.of(context)!.settings.arguments as Matching;
             return EditMatchingScreen(matching: matching);

@@ -348,6 +348,11 @@ class HomeProvider extends ChangeNotifier {
     await loadMatchings();
   }
 
+  // 매칭 새로고침 (별칭)
+  Future<void> refreshMatchings() async {
+    await loadMatchings();
+  }
+
   // 자동 새로고침 타이머 시작
   void _startAutoRefreshTimer() {
     _autoRefreshTimer?.cancel();
