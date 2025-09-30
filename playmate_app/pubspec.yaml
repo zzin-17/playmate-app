@@ -146,9 +146,6 @@ flutter:
   #       - asset: assets/fonts/Pretendard-Light.ttf
   #         weight: 300
   
-  # 이미지 에셋
-  assets:
-    - assets/images/
-    - assets/images/logo.svg
-    - assets/images/logo.png
-    - assets/icons/
+ 
+ 
+ 
