@@ -115,22 +115,27 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
         break;
       case 1: // 확정
         homeProvider.resetFilters();
+        homeProvider.updateShowOnlyRecruiting(true); // 모집중 필터 기본 적용
         // 확정된 매칭만 보기 로직 추가 필요
         break;
       case 2: // 내가 만든
         homeProvider.resetFilters();
+        homeProvider.updateShowOnlyRecruiting(true); // 모집중 필터 기본 적용
         // 내가 만든 매칭만 보기 로직 추가 필요
         break;
       case 3: // 참여중
         homeProvider.resetFilters();
+        homeProvider.updateShowOnlyRecruiting(true); // 모집중 필터 기본 적용
         // 참여중인 매칭만 보기 로직 추가 필요
         break;
       case 4: // 팔로우
         homeProvider.resetFilters();
+        homeProvider.updateShowOnlyRecruiting(true); // 모집중 필터 기본 적용
         homeProvider.updateShowOnlyFollowing(true);
         break;
       case 5: // 전체
         homeProvider.resetFilters();
+        // 전체 탭만 모집중 필터 없이 모든 매칭 표시
         break;
     }
   }
