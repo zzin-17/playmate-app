@@ -37,8 +37,8 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
 
   // 탭 라벨과 인덱스 매핑
   final List<String> _tabLabels = [
-    '전체',
     '모집중',
+    '전체',
     '확정',
     '내가 만든',
     '참여중',
@@ -109,12 +109,12 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
     final homeProvider = context.read<HomeProvider>();
     
     switch (index) {
-      case 0: // 전체
-        homeProvider.resetFilters();
-        break;
-      case 1: // 모집중
+      case 0: // 모집중
         homeProvider.resetFilters();
         homeProvider.updateShowOnlyRecruiting(true);
+        break;
+      case 1: // 전체
+        homeProvider.resetFilters();
         break;
       case 2: // 확정
         homeProvider.resetFilters();
@@ -317,9 +317,9 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
     // TODO: 내가 만든, 참여중, 팔로우 매칭 개수 계산 로직 추가
     
     return [
-      allMatchings.length,
-      recruitingMatchings,
-      confirmedMatchings,
+      recruitingMatchings, // 모집중
+      allMatchings.length, // 전체
+      confirmedMatchings, // 확정
       0, // 내가 만든
       0, // 참여중
       0, // 팔로우

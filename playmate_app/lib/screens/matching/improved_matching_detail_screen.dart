@@ -41,7 +41,7 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _checkUserStatus();
     _initializeMatchingState();
     _loadApplicants();
@@ -156,6 +156,8 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
   bool get isExpired => widget.matching.date.isBefore(DateTime.now());
   bool get isFull => (widget.matching.maleRecruitCount + widget.matching.femaleRecruitCount) <= 
                      (widget.matching.guests?.length ?? 0);
+  bool get isParticipant => widget.matching.guests?.any((guest) => guest.id == widget.currentUser.id) ?? false;
+  bool get canWriteReview => isExpired && isParticipant && _currentMatchingStatus == 'completed';
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +182,6 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
           tabs: const [
             Tab(text: '정보', icon: Icon(Icons.info_outline)),
             Tab(text: '참가자', icon: Icon(Icons.people)),
-            Tab(text: '채팅', icon: Icon(Icons.chat)),
           ],
         ),
       ),
@@ -206,7 +207,6 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
                     children: [
                       _buildInfoTab(),
                       _buildParticipantsTab(),
-                      _buildChatTab(),
                     ],
                   ),
                 ),
@@ -217,34 +217,31 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
   }
 
   Widget _buildInfoTab() {
-    return SingleChildScrollView(
+    return ListView(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 매칭 상태 배지
-          _buildStatusBadge(),
-          const SizedBox(height: 16),
-          
-          // 매칭 기본 정보
-          _buildMatchingInfo(),
+      children: [
+        // 매칭 상태 배지
+        _buildStatusBadge(),
+        const SizedBox(height: 16),
+        
+        // 매칭 기본 정보
+        _buildMatchingInfo(),
+        const SizedBox(height: 24),
+        
+        // 게임 정보
+        _buildGameInfo(),
+        const SizedBox(height: 24),
+        
+        // 호스트 정보
+        _buildHostInfo(),
+        const SizedBox(height: 24),
+        
+        // 메시지
+        if (widget.matching.message?.isNotEmpty == true) ...[
+          _buildMessageSection(),
           const SizedBox(height: 24),
-          
-          // 호스트 정보
-          _buildHostInfo(),
-          const SizedBox(height: 24),
-          
-          // 게임 정보
-          _buildGameInfo(),
-          const SizedBox(height: 24),
-          
-          // 메시지
-          if (widget.matching.message?.isNotEmpty == true) ...[
-            _buildMessageSection(),
-            const SizedBox(height: 24),
-          ],
         ],
-      ),
+      ],
     );
   }
 
@@ -337,7 +334,7 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
               children: [
                 Icon(Icons.location_on, size: 16, color: AppColors.textSecondary),
                 const SizedBox(width: 8),
-                Flexible(
+                Expanded(
                   child: FutureBuilder<String>(
                     future: LocationService().getDistrictFromCoordinates(
                       widget.matching.courtLat, 
@@ -436,7 +433,7 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Flexible(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -480,39 +477,40 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
               ),
             ),
             const SizedBox(height: 12),
-            Row(
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
               children: [
-                _buildInfoItem('게임 유형', _getGameTypeLabel(widget.matching.gameType)),
-                const SizedBox(width: 24),
-                _buildInfoItem('구력', '${widget.matching.minLevel}~${widget.matching.maxLevel}년'),
+                _buildCompactInfoChip(Icons.sports_tennis, _getGameTypeLabel(widget.matching.gameType)),
+                _buildCompactInfoChip(Icons.star, '${widget.matching.minLevel}~${widget.matching.maxLevel}년'),
+                if (widget.matching.minAge != null && widget.matching.maxAge != null)
+                  _buildCompactInfoChip(Icons.people, '${widget.matching.minAge}~${widget.matching.maxAge}세'),
               ],
             ),
-            if (widget.matching.minAge != null && widget.matching.maxAge != null) ...[
-              const SizedBox(height: 8),
-              _buildInfoItem('연령대', '${widget.matching.minAge}~${widget.matching.maxAge}세'),
-            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoItem(String label, String value) {
-    return Flexible(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildCompactInfoChip(IconData icon, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            label,
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 4),
+          Icon(icon, size: 14, color: AppColors.primary),
+          const SizedBox(width: 6),
           Text(
             value,
             style: AppTextStyles.body2.copyWith(
               fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
             ),
           ),
         ],
@@ -594,36 +592,46 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
-                  child: Text(
-                    user.nickname.isNotEmpty ? user.nickname[0].toUpperCase() : '?',
-                    style: AppTextStyles.body.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
+                InkWell(
+                  onTap: () => _viewUserProfile(user),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                    child: Text(
+                      user.nickname.isNotEmpty ? user.nickname[0].toUpperCase() : '?',
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user.nickname,
-                        style: AppTextStyles.body.copyWith(
-                          fontWeight: FontWeight.w500,
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _viewUserProfile(user),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.nickname,
+                          style: AppTextStyles.body.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '레벨 ${user.skillLevel} • ${user.region}',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.textSecondary,
+                        Text(
+                          '레벨 ${user.skillLevel} • ${user.region}',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_outline, size: 20, color: AppColors.primary),
+                  onPressed: () => _openChatWithUser(user),
                 ),
                 if (isConfirmed)
                   Container(
@@ -644,31 +652,28 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
             ),
             if (message.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(
-                message,
-                style: AppTextStyles.body2,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  message,
+                  style: AppTextStyles.body2,
+                ),
               ),
             ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Flexible(
-                  child: AppButton(
-                    text: '프로필 보기',
-                    onPressed: () => _viewUserProfile(user),
-                    type: ButtonType.secondary,
-                  ),
+            if (!isConfirmed) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: AppButton(
+                  text: '확정하기',
+                  onPressed: () => _confirmApplicant(user.id),
                 ),
-                const SizedBox(width: 8),
-                if (!isConfirmed)
-                  Flexible(
-                    child: AppButton(
-                      text: '확정하기',
-                      onPressed: () => _confirmApplicant(user.id),
-                    ),
-                  ),
-              ],
-            ),
+              ),
+            ],
           ],
         ),
       ),
@@ -694,13 +699,50 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
       );
     }
 
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.all(16),
-      itemCount: guests.length,
-      itemBuilder: (context, index) {
-        final guest = guests[index];
-        return _buildGuestCard(guest);
-      },
+      children: [
+        ...guests.map((guest) => _buildGuestCard(guest)),
+        
+        // 후기 작성 버튼 (조건: 참가자이고, 일정 종료되고, 매칭 완료된 경우)
+        if (canWriteReview) ...[
+          const SizedBox(height: 16),
+          Card(
+            color: AppColors.primary.withOpacity(0.05),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Icon(Icons.rate_review, size: 32, color: AppColors.primary),
+                  const SizedBox(height: 8),
+                  Text(
+                    '매칭이 완료되었습니다',
+                    style: AppTextStyles.body.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '함께한 플레이어들에게 후기를 남겨주세요',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: AppButton(
+                      text: '후기 작성하기',
+                      onPressed: () => _writeReview(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -720,75 +762,69 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
         ),
         title: Text(guest.nickname),
         subtitle: Text('레벨 ${guest.skillLevel} • ${guest.region}'),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        trailing: IconButton(
+          icon: const Icon(Icons.chat_bubble_outline, size: 20, color: AppColors.primary),
+          onPressed: () => _openChatWithUser(guest),
+        ),
         onTap: () => _viewUserProfile(guest),
       ),
     );
   }
 
-  Widget _buildChatTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.chat_bubble_outline, size: 64, color: AppColors.textSecondary),
-          const SizedBox(height: 16),
-          Text(
-            '채팅 기능',
-            style: AppTextStyles.h3.copyWith(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '곧 제공될 예정입니다',
-            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildBottomButtons() {
-    if (isExpired) {
+    // 이미 참가 중인 경우
+    if (isParticipant) {
       return Container(
         padding: const EdgeInsets.all(16),
-        child: AppButton(
-          text: '후기 작성하기',
-          onPressed: () => _writeReview(),
-          type: ButtonType.secondary,
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle, size: 20, color: AppColors.success),
+                  const SizedBox(width: 8),
+                  Text(
+                    '참가 신청이 완료되었습니다',
+                    style: AppTextStyles.body2.copyWith(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    if (isFull) {
+    // 모집 완료 또는 종료된 경우
+    if (isFull || isExpired) {
       return Container(
         padding: const EdgeInsets.all(16),
         child: AppButton(
-          text: '모집 완료',
+          text: isExpired ? '모집 종료' : '모집 완료',
           onPressed: null,
           type: ButtonType.secondary,
         ),
       );
     }
 
+    // 신청 가능한 경우
     return Container(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Flexible(
-            child: AppButton(
-              text: '신청하기',
-              onPressed: () => _applyToMatching(),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: AppButton(
-              text: '채팅하기',
-              onPressed: () => _openChat(),
-              type: ButtonType.secondary,
-            ),
-          ),
-        ],
+      child: SizedBox(
+        width: double.infinity,
+        child: AppButton(
+          text: '신청하기',
+          onPressed: () => _applyToMatching(),
+        ),
       ),
     );
   }
@@ -885,7 +921,7 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
     );
   }
 
-  void _openChat() {
+  void _openChatWithUser(User user) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ChatScreen(

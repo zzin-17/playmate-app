@@ -25,6 +25,12 @@ class ImprovedMatchingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isHost = currentUser != null && matching.host.email == currentUser!.email;
     final isExpired = matching.date.isBefore(DateTime.now());
+    final isFull = (matching.maleRecruitCount + matching.femaleRecruitCount) <= (matching.guests?.length ?? 0);
+    
+    // 실제 표시할 상태 결정
+    final displayStatus = isExpired 
+        ? 'expired' 
+        : (isFull ? 'full' : matching.actualStatus);
     
     return Material(
       color: Colors.transparent,
@@ -39,7 +45,7 @@ class ImprovedMatchingCard extends StatelessWidget {
             border: Border.all(
               color: isExpired 
                 ? AppColors.textSecondary.withValues(alpha: 0.3)
-                : _getStatusColor(matching.actualStatus).withValues(alpha: 0.3),
+                : _getStatusColor(displayStatus).withValues(alpha: 0.3),
               width: 1.2,
             ),
             boxShadow: [
@@ -56,7 +62,7 @@ class ImprovedMatchingCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 헤더: 코트명, 상태, 액션 버튼
-              _buildHeader(isHost),
+              _buildHeader(isHost, displayStatus),
               
               // 메인 정보: 날짜, 시간, 위치
               _buildMainInfo(),
@@ -70,11 +76,11 @@ class ImprovedMatchingCard extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(bool isHost) {
+  Widget _buildHeader(bool isHost, String displayStatus) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: _getStatusColor(matching.actualStatus).withValues(alpha: 0.1),
+        color: _getStatusColor(displayStatus).withValues(alpha: 0.1),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
       ),
       child: Row(
@@ -109,20 +115,20 @@ class ImprovedMatchingCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: _getStatusColor(matching.actualStatus),
+              color: _getStatusColor(displayStatus),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  _getStatusIcon(matching.actualStatus),
+                  _getStatusIcon(displayStatus),
                   size: 14,
                   color: Colors.white,
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  _getStatusText(matching.actualStatus),
+                  _getStatusText(displayStatus),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
@@ -391,6 +397,10 @@ class ImprovedMatchingCard extends StatelessWidget {
         return Colors.grey;
       case 'cancelled':
         return Colors.red;
+      case 'expired':
+        return AppColors.textSecondary;
+      case 'full':
+        return AppColors.warning;
       default:
         return Colors.grey;
     }
@@ -406,6 +416,10 @@ class ImprovedMatchingCard extends StatelessWidget {
         return Icons.done_all;
       case 'cancelled':
         return Icons.cancel;
+      case 'expired':
+        return Icons.schedule;
+      case 'full':
+        return Icons.people;
       default:
         return Icons.help;
     }
@@ -421,6 +435,10 @@ class ImprovedMatchingCard extends StatelessWidget {
         return '완료';
       case 'cancelled':
         return '취소';
+      case 'expired':
+        return '종료';
+      case 'full':
+        return '모집완료';
       default:
         return status;
     }

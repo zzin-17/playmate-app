@@ -18,7 +18,7 @@ class HomeProvider extends ChangeNotifier {
   String? _selectedEndSkillLevel;
   List<String> _selectedAgeRanges = [];
   bool _noAgeRestriction = false;
-  bool _showOnlyRecruiting = false;
+  bool _showOnlyRecruiting = true; // 기본값을 true로 변경
   bool _showOnlyFollowing = false;
   DateTime? _startDate;
   DateTime? _endDate;
@@ -31,7 +31,7 @@ class HomeProvider extends ChangeNotifier {
   List<String> _selectedDistrictIds = [];
 
   // 정렬 상태
-  String _sortBy = 'latest';
+  String _sortBy = 'latest'; // 최신순이 기본값
   bool _sortAscending = false;
 
   // 타이머들
