@@ -198,9 +198,11 @@ class HomeProvider extends ChangeNotifier {
 
     // 모집중만 보기 필터
     if (_showOnlyRecruiting) {
-      filtered = filtered.where((matching) => 
-        matching.status == 'recruiting'
-      ).toList();
+      filtered = filtered.where((matching) {
+        // 종료된 일정 제외
+        final isExpired = matching.date.isBefore(DateTime.now());
+        return matching.status == 'recruiting' && !isExpired;
+      }).toList();
     }
 
     // 게임 유형 필터

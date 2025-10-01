@@ -38,11 +38,11 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
   // 탭 라벨과 인덱스 매핑
   final List<String> _tabLabels = [
     '모집중',
-    '전체',
     '확정',
     '내가 만든',
     '참여중',
     '팔로우',
+    '전체',
   ];
 
   @override
@@ -113,24 +113,24 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
         homeProvider.resetFilters();
         homeProvider.updateShowOnlyRecruiting(true);
         break;
-      case 1: // 전체
-        homeProvider.resetFilters();
-        break;
-      case 2: // 확정
+      case 1: // 확정
         homeProvider.resetFilters();
         // 확정된 매칭만 보기 로직 추가 필요
         break;
-      case 3: // 내가 만든
+      case 2: // 내가 만든
         homeProvider.resetFilters();
         // 내가 만든 매칭만 보기 로직 추가 필요
         break;
-      case 4: // 참여중
+      case 3: // 참여중
         homeProvider.resetFilters();
         // 참여중인 매칭만 보기 로직 추가 필요
         break;
-      case 5: // 팔로우
+      case 4: // 팔로우
         homeProvider.resetFilters();
         homeProvider.updateShowOnlyFollowing(true);
+        break;
+      case 5: // 전체
+        homeProvider.resetFilters();
         break;
     }
   }
@@ -318,11 +318,11 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
     
     return [
       recruitingMatchings, // 모집중
-      allMatchings.length, // 전체
       confirmedMatchings, // 확정
       0, // 내가 만든
       0, // 참여중
       0, // 팔로우
+      allMatchings.length, // 전체
     ];
   }
 
