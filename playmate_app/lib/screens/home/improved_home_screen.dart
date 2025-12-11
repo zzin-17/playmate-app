@@ -115,8 +115,8 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
         break;
       case 1: // 확정
         homeProvider.resetFilters();
-        homeProvider.updateShowOnlyRecruiting(true); // 모집중 필터 기본 적용
-        // 확정된 매칭만 보기 로직 추가 필요
+        homeProvider.updateShowOnlyRecruiting(false); // 모집중 필터 해제
+        homeProvider.updateShowOnlyConfirmed(true); // 확정된 매칭만 보기
         break;
       case 2: // 내가 만든
         homeProvider.resetFilters();
@@ -317,8 +317,24 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
   // 탭별 매칭 개수 계산
   List<int> _getTabCounts(HomeProvider homeProvider) {
     final allMatchings = homeProvider.matchings;
-    final recruitingMatchings = allMatchings.where((m) => m.status == 'recruiting').length;
-    final confirmedMatchings = allMatchings.where((m) => m.status == 'confirmed').length;
+    
+    // 각 탭별로 필터링된 매칭 개수 계산
+    final recruitingMatchings = allMatchings.where((m) => 
+      m.status == 'recruiting' && 
+      m.actualStatus != 'completed' && 
+      m.actualStatus != 'cancelled' && 
+      m.actualStatus != 'deleted' &&
+      !m.date.isBefore(DateTime.now()) // 일정이 도래하지 않음
+    ).length;
+    
+    final confirmedMatchings = allMatchings.where((m) => 
+      m.status == 'confirmed' && 
+      m.actualStatus != 'completed' && 
+      m.actualStatus != 'cancelled' && 
+      m.actualStatus != 'deleted' &&
+      !m.date.isBefore(DateTime.now()) // 일정이 도래하지 않음
+    ).length;
+    
     // TODO: 내가 만든, 참여중, 팔로우 매칭 개수 계산 로직 추가
     
     return [
@@ -327,7 +343,12 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
       0, // 내가 만든
       0, // 참여중
       0, // 팔로우
-      allMatchings.length, // 전체
+      allMatchings.where((m) => 
+        m.actualStatus != 'completed' && 
+        m.actualStatus != 'cancelled' && 
+        m.actualStatus != 'deleted'
+        // 전체 탭은 종료된 일정도 포함
+      ).length, // 전체
     ];
   }
 

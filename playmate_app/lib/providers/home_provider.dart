@@ -20,6 +20,7 @@ class HomeProvider extends ChangeNotifier {
   bool _noAgeRestriction = false;
   bool _showOnlyRecruiting = true; // 기본값을 true로 변경
   bool _showOnlyFollowing = false;
+  bool _showOnlyConfirmed = false;
   DateTime? _startDate;
   DateTime? _endDate;
   String? _startTime;
@@ -55,6 +56,7 @@ class HomeProvider extends ChangeNotifier {
   bool get noAgeRestriction => _noAgeRestriction;
   bool get showOnlyRecruiting => _showOnlyRecruiting;
   bool get showOnlyFollowing => _showOnlyFollowing;
+  bool get showOnlyConfirmed => _showOnlyConfirmed;
   DateTime? get startDate => _startDate;
   DateTime? get endDate => _endDate;
   String? get startTime => _startTime;
@@ -152,6 +154,11 @@ class HomeProvider extends ChangeNotifier {
     _applyFilters();
   }
 
+  void updateShowOnlyConfirmed(bool showOnly) {
+    _showOnlyConfirmed = showOnly;
+    _applyFilters();
+  }
+
   void updateDateRange(DateTime? start, DateTime? end) {
     _startDate = start;
     _endDate = end;
@@ -199,9 +206,18 @@ class HomeProvider extends ChangeNotifier {
     // 모집중만 보기 필터
     if (_showOnlyRecruiting) {
       filtered = filtered.where((matching) {
-        // 종료된 일정 제외
-        final isExpired = matching.date.isBefore(DateTime.now());
-        return matching.status == 'recruiting' && !isExpired;
+        // 일정이 도래하지 않고, 현재 모집중 상태의 카드
+        final isNotExpired = !matching.date.isBefore(DateTime.now());
+        return matching.status == 'recruiting' && isNotExpired;
+      }).toList();
+    }
+
+    // 확정된 매칭만 보기 필터
+    if (_showOnlyConfirmed) {
+      filtered = filtered.where((matching) {
+        // 일정이 도래되지 않았지만 모집완료(확정)상태의 카드
+        final isNotExpired = !matching.date.isBefore(DateTime.now());
+        return matching.status == 'confirmed' && isNotExpired;
       }).toList();
     }
 
@@ -315,6 +331,7 @@ class HomeProvider extends ChangeNotifier {
     _noAgeRestriction = false;
     _showOnlyRecruiting = false;
     _showOnlyFollowing = false;
+    _showOnlyConfirmed = false;
     _startDate = null;
     _endDate = null;
     _startTime = null;
@@ -382,6 +399,7 @@ class HomeProvider extends ChangeNotifier {
       'noAgeRestriction': _noAgeRestriction,
       'showOnlyRecruiting': _showOnlyRecruiting,
       'showOnlyFollowing': _showOnlyFollowing,
+      'showOnlyConfirmed': _showOnlyConfirmed,
       'startDate': _startDate?.millisecondsSinceEpoch,
       'endDate': _endDate?.millisecondsSinceEpoch,
       'startTime': _startTime,

@@ -27,11 +27,39 @@
         "createdAt": "2025-09-17T07:17:08.948Z",
         "updatedAt": "2025-09-17T07:17:08.948Z"
       },
-      "guests": [],
+      "guests": [
+        {
+          "id": 598071,
+          "email": "tennis2@playmate.com",
+          "nickname": "테니스고수",
+          "gender": "male",
+          "birthYear": 1988,
+          "region": "서울",
+          "skillLevel": 3,
+          "startYearMonth": "2020-01",
+          "preferredCourt": "실내",
+          "preferredTime": [
+            "18:00~20:00"
+          ],
+          "playStyle": "균형",
+          "hasLesson": false,
+          "mannerScore": 4,
+          "profileImage": null,
+          "followingIds": [
+            974640
+          ],
+          "followerIds": [],
+          "reviewCount": 0,
+          "createdAt": "2025-09-17T06:32:30.471Z",
+          "updatedAt": "2025-09-17T06:32:30.471Z"
+        }
+      ],
       "createdAt": "2025-09-17T07:17:08.948Z",
       "updatedAt": "2025-09-17T07:17:08.948Z",
       "recoveryCount": 0,
-      "appliedUserIds": [],
+      "appliedUserIds": [
+        598071
+      ],
       "confirmedUserIds": [],
       "completedAt": null,
       "cancelledAt": null
@@ -137,12 +165,38 @@
         "createdAt": "2025-09-17T07:44:13.384Z",
         "updatedAt": "2025-09-17T07:44:13.384Z"
       },
-      "guests": [],
+      "guests": [
+        {
+          "id": 598071,
+          "email": "tennis2@playmate.com",
+          "nickname": "테니스고수",
+          "gender": "male",
+          "birthYear": 1988,
+          "region": "서울",
+          "skillLevel": 3,
+          "startYearMonth": "2020-01",
+          "preferredCourt": "실내",
+          "preferredTime": [
+            "18:00~20:00"
+          ],
+          "playStyle": "균형",
+          "hasLesson": false,
+          "mannerScore": 4,
+          "profileImage": null,
+          "followingIds": [
+            974640
+          ],
+          "followerIds": [],
+          "reviewCount": 0,
+          "createdAt": "2025-09-17T06:32:30.471Z",
+          "updatedAt": "2025-09-17T06:32:30.471Z"
+        }
+      ],
       "createdAt": "2025-09-17T07:44:13.384Z",
       "updatedAt": "2025-09-17T07:44:13.384Z",
       "recoveryCount": 0,
       "appliedUserIds": [
-        912738
+        598071
       ],
       "confirmedUserIds": [],
       "completedAt": null,
@@ -175,12 +229,38 @@
         "createdAt": "2025-09-17T07:52:54.165Z",
         "updatedAt": "2025-09-17T07:52:54.165Z"
       },
-      "guests": [],
+      "guests": [
+        {
+          "id": 598071,
+          "email": "tennis2@playmate.com",
+          "nickname": "테니스고수",
+          "gender": "male",
+          "birthYear": 1988,
+          "region": "서울",
+          "skillLevel": 3,
+          "startYearMonth": "2020-01",
+          "preferredCourt": "실내",
+          "preferredTime": [
+            "18:00~20:00"
+          ],
+          "playStyle": "균형",
+          "hasLesson": false,
+          "mannerScore": 4,
+          "profileImage": null,
+          "followingIds": [
+            974640
+          ],
+          "followerIds": [],
+          "reviewCount": 0,
+          "createdAt": "2025-09-17T06:32:30.471Z",
+          "updatedAt": "2025-09-17T06:32:30.471Z"
+        }
+      ],
       "createdAt": "2025-09-17T07:52:54.165Z",
       "updatedAt": "2025-09-17T07:52:54.165Z",
       "recoveryCount": 0,
       "appliedUserIds": [
-        912738
+        598071
       ],
       "confirmedUserIds": [],
       "completedAt": null,
@@ -280,7 +360,7 @@
       "courtName": "이지테니스",
       "courtLat": 37.5665,
       "courtLng": 126.978,
-      "date": "2025-09-18T15:00:00.000Z",
+      "date": "2025-09-29T00:00:00.000",
       "timeSlot": "18:00~20:00",
       "minLevel": 4,
       "maxLevel": 5,
@@ -295,17 +375,85 @@
       "isFollowersOnly": false,
       "host": {
         "id": 974640,
-        "nickname": "개발자",
         "email": "dev@playmate.com",
+        "nickname": "개발자",
+        "gender": null,
+        "birthYear": null,
+        "region": null,
+        "skillLevel": null,
+        "startYearMonth": null,
+        "ntrpScore": null,
+        "preferredCourt": null,
+        "preferredTime": null,
+        "playStyle": null,
+        "hasLesson": null,
+        "mannerScore": null,
         "profileImage": null,
+        "preferredGameType": null,
+        "followingIds": null,
+        "followerIds": null,
+        "bio": null,
+        "reviewCount": null,
         "createdAt": "2025-09-17T08:29:46.564Z",
         "updatedAt": "2025-09-17T08:29:46.564Z"
       },
-      "guests": [],
+      "guests": [
+        {
+          "id": 912738,
+          "email": "tennis1@playmate.com",
+          "nickname": "테니스초보",
+          "gender": "female",
+          "birthYear": 1995,
+          "region": "서울",
+          "skillLevel": 3,
+          "startYearMonth": "2020-01",
+          "preferredCourt": "실내",
+          "preferredTime": [
+            "18:00~20:00"
+          ],
+          "playStyle": "균형",
+          "hasLesson": false,
+          "mannerScore": 4,
+          "profileImage": null,
+          "followingIds": [],
+          "followerIds": [],
+          "reviewCount": 0,
+          "createdAt": "2025-09-17T06:32:15.457Z",
+          "updatedAt": "2025-09-17T06:32:15.457Z"
+        },
+        {
+          "id": 598071,
+          "email": "tennis2@playmate.com",
+          "nickname": "테니스고수",
+          "gender": "male",
+          "birthYear": 1988,
+          "region": "서울",
+          "skillLevel": 3,
+          "startYearMonth": "2020-01",
+          "preferredCourt": "실내",
+          "preferredTime": [
+            "18:00~20:00"
+          ],
+          "playStyle": "균형",
+          "hasLesson": false,
+          "mannerScore": 4,
+          "profileImage": null,
+          "followingIds": [
+            974640
+          ],
+          "followerIds": [],
+          "reviewCount": 0,
+          "createdAt": "2025-09-17T06:32:30.471Z",
+          "updatedAt": "2025-09-17T06:32:30.471Z"
+        }
+      ],
       "createdAt": "2025-09-17T08:29:46.564Z",
-      "updatedAt": "2025-09-17T08:29:46.564Z",
+      "updatedAt": "2025-09-26T06:01:02.720Z",
       "recoveryCount": 0,
-      "appliedUserIds": [],
+      "appliedUserIds": [
+        912738,
+        598071
+      ],
       "confirmedUserIds": [],
       "completedAt": null,
       "cancelledAt": null
@@ -337,13 +485,111 @@
         "createdAt": "2025-09-18T06:47:18.184Z",
         "updatedAt": "2025-09-18T06:47:18.184Z"
       },
-      "guests": [],
+      "guests": [
+        {
+          "id": 598071,
+          "email": "tennis2@playmate.com",
+          "nickname": "테니스고수",
+          "gender": "male",
+          "birthYear": 1988,
+          "region": "서울",
+          "skillLevel": 3,
+          "startYearMonth": "2020-01",
+          "preferredCourt": "실내",
+          "preferredTime": [
+            "18:00~20:00"
+          ],
+          "playStyle": "균형",
+          "hasLesson": false,
+          "mannerScore": 4,
+          "profileImage": null,
+          "followingIds": [
+            974640
+          ],
+          "followerIds": [],
+          "reviewCount": 0,
+          "createdAt": "2025-09-17T06:32:30.471Z",
+          "updatedAt": "2025-09-17T06:32:30.471Z"
+        }
+      ],
       "createdAt": "2025-09-18T06:47:18.184Z",
       "updatedAt": "2025-09-18T06:47:18.184Z",
       "recoveryCount": 0,
       "appliedUserIds": [
-        974640
+        598071
       ],
+      "confirmedUserIds": [],
+      "completedAt": null,
+      "cancelledAt": null
+    },
+    "1761032026999": {
+      "id": 1761032026999,
+      "type": "host",
+      "courtName": "서울특별시강동구도시관리공단 강일테니스장",
+      "courtLat": 37.5665,
+      "courtLng": 126.978,
+      "date": "2025-10-30T15:00:00.000Z",
+      "timeSlot": "18:00~20:00",
+      "minLevel": 3,
+      "maxLevel": 5,
+      "minAge": 30,
+      "maxAge": 49,
+      "gameType": "female_doubles",
+      "maleRecruitCount": 0,
+      "femaleRecruitCount": 2,
+      "status": "recruiting",
+      "message": "대회 준비를 하고 있는 페어로 모집합니다.",
+      "guestCost": 5000,
+      "isFollowersOnly": false,
+      "host": {
+        "id": 974640,
+        "nickname": "개발자",
+        "email": "dev@playmate.com",
+        "profileImage": null,
+        "createdAt": "2025-10-21T07:33:46.999Z",
+        "updatedAt": "2025-10-21T07:33:46.999Z"
+      },
+      "guests": [],
+      "createdAt": "2025-10-21T07:33:46.999Z",
+      "updatedAt": "2025-10-21T07:33:46.999Z",
+      "recoveryCount": 0,
+      "appliedUserIds": [],
+      "confirmedUserIds": [],
+      "completedAt": null,
+      "cancelledAt": null
+    },
+    "1761034294861": {
+      "id": 1761034294861,
+      "type": "host",
+      "courtName": "한남테니스장",
+      "courtLat": 37.5665,
+      "courtLng": 126.978,
+      "date": "2025-10-31T15:00:00.000Z",
+      "timeSlot": "18:00~20:00",
+      "minLevel": 2,
+      "maxLevel": 5,
+      "minAge": 20,
+      "maxAge": 49,
+      "gameType": "mixed",
+      "maleRecruitCount": 1,
+      "femaleRecruitCount": 1,
+      "status": "recruiting",
+      "message": "클럽에서 게스트모집합니다 \n여복, 혼복, 남쪽 골고루 진행합니다",
+      "guestCost": 3000,
+      "isFollowersOnly": false,
+      "host": {
+        "id": 974640,
+        "nickname": "개발자",
+        "email": "dev@playmate.com",
+        "profileImage": null,
+        "createdAt": "2025-10-21T08:11:34.861Z",
+        "updatedAt": "2025-10-21T08:11:34.861Z"
+      },
+      "guests": [],
+      "createdAt": "2025-10-21T08:11:34.861Z",
+      "updatedAt": "2025-10-21T08:11:34.861Z",
+      "recoveryCount": 0,
+      "appliedUserIds": [],
       "confirmedUserIds": [],
       "completedAt": null,
       "cancelledAt": null

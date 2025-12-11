@@ -130,6 +130,7 @@ class _ImprovedCreateMatchingScreenState extends State<ImprovedCreateMatchingScr
       MaterialPageRoute(
         builder: (context) => CourtSelectionScreen(
           selectedCourt: _selectedCourt,
+          initialSearchQuery: _courtNameController.text.isNotEmpty ? _courtNameController.text : null,
           onCourtSelected: (court) {
             setState(() {
               _selectedCourt = court;
@@ -725,10 +726,10 @@ class _ImprovedCreateMatchingScreenState extends State<ImprovedCreateMatchingScr
                     borderSide: const BorderSide(color: AppColors.cardBorder),
                   ),
                 ),
-                items: List.generate(6, (index) {
+                items: List.generate(11, (index) {
                   return DropdownMenuItem(
                     value: index,
-                    child: Text('${index}년'),
+                    child: Text(index == 10 ? '10년 이상' : '${index}년'),
                   );
                 }),
                 onChanged: (value) {
@@ -753,10 +754,10 @@ class _ImprovedCreateMatchingScreenState extends State<ImprovedCreateMatchingScr
                     borderSide: const BorderSide(color: AppColors.cardBorder),
                   ),
                 ),
-                items: List.generate(6, (index) {
+                items: List.generate(11, (index) {
                   return DropdownMenuItem(
                     value: index,
-                    child: Text('${index}년'),
+                    child: Text(index == 10 ? '10년 이상' : '${index}년'),
                   );
                 }),
                 onChanged: (value) {

@@ -449,6 +449,57 @@ const joinMatching = asyncHandler(async (req, res) => {
     // 파일에 저장
     saveToFile();
     
+    // 매칭 참여 시 호스트와의 1:1 채팅방 자동 생성
+    try {
+      const { addChatRoomToMemory, saveToFile: saveChatToFile } = require('./chatControllerMemory');
+      
+      // 호스트와의 1:1 채팅방 생성 (중복 방지)
+      const chatRoomId = `${matchingId}_${matching.host.id}_${userId}`;
+      
+      // 기존 채팅방 확인
+      const existingRoom = chatRooms.find(room => 
+        room.matchingId === matchingId && 
+        room.participants.some(p => p.userId === userId) &&
+        room.participants.some(p => p.userId === matching.host.id)
+      );
+      
+      if (!existingRoom) {
+        const newChatRoom = {
+          id: chatRoomId,
+          type: 'direct',
+          name: null,
+          participants: [
+            {
+              userId: userId,
+              joinedAt: new Date().toISOString(),
+              lastReadAt: new Date().toISOString()
+            },
+            {
+              userId: matching.host.id,
+              joinedAt: new Date().toISOString(),
+              lastReadAt: new Date().toISOString()
+            }
+          ],
+          lastMessage: null,
+          isActive: true,
+          matchingId: matchingId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        addChatRoomToMemory(newChatRoom);
+        saveChatToFile();
+        
+        console.log(`💬 채팅방 생성 완료: ${userId} ↔ ${matching.host.id} (매칭: ${matchingId})`);
+      } else {
+        console.log(`⚠️ 채팅방이 이미 존재함: ${userId} ↔ ${matching.host.id}`);
+      }
+      
+    } catch (chatError) {
+      console.error('채팅방 생성 중 오류 발생:', chatError);
+      // 채팅방 생성 실패해도 매칭 참여는 성공으로 처리
+    }
+    
     console.log(`✅ 매칭 참여 완료: 사용자 ${userId} -> 매칭 ${matchingId}`);
     
     res.json({

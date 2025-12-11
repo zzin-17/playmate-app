@@ -33,13 +33,18 @@ class AppConstants {
     '랠리'
   ];
   
-  static const List<int> skillLevels = [1, 2, 3, 4, 5];
+  static const List<int> skillLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   static const List<String> skillLevelNames = [
     '입문자',
     '초급자',
     '중급자',
     '고급자',
-    '전문가'
+    '전문가',
+    '6년',
+    '7년',
+    '8년',
+    '9년',
+    '10년 이상'
   ];
   
   static const List<String> timeSlots = [
