@@ -28,11 +28,15 @@ class FCMService {
       // 로컬 알림 초기화
       await _initializeLocalNotifications();
       
-      // FCM 권한 요청 (앱 시작 시에는 조용히 확인만, 사용자가 명시적으로 요청할 때만 팝업 표시)
-      final permissionStatus = await _requestNotificationPermission();
+      // FCM 권한 상태 확인 (앱 시작 시에는 팝업 없이 확인만)
+      // iOS에서 알림 설정이 보이려면 최소한 한 번은 권한을 요청해야 함
+      final currentStatus = await getNotificationPermissionStatus();
       if (kDebugMode) {
-        if (permissionStatus == AuthorizationStatus.denied) {
+        print('알림 권한 상태 확인: $currentStatus');
+        if (currentStatus == AuthorizationStatus.denied) {
           print('💡 알림 권한이 거부되었습니다. 설정 화면에서 다시 요청할 수 있습니다.');
+        } else if (currentStatus == AuthorizationStatus.notDetermined) {
+          print('💡 알림 권한이 아직 요청되지 않았습니다. 사용자가 설정 화면에서 요청할 수 있습니다.');
         }
       }
       

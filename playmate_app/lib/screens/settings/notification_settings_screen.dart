@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show Platform;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -129,14 +131,22 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
 
   void _showPermissionDeniedDialog() {
+    final isIOS = !kIsWeb && Platform.isIOS;
+    
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('알림 권한이 필요합니다'),
-          content: const Text(
-            '매칭 요청, 채팅 메시지, 커뮤니티 활동 등 중요한 알림을 받기 위해 알림 권한이 필요합니다.\n\n'
-            '설정에서 알림 권한을 허용해주세요.',
+          content: Text(
+            isIOS
+                ? '매칭 요청, 채팅 메시지, 커뮤니티 활동 등 중요한 알림을 받기 위해 알림 권한이 필요합니다.\n\n'
+                    '설정 앱에서:\n'
+                    '1. "Playmate App"을 찾아주세요\n'
+                    '2. "알림"을 선택해주세요\n'
+                    '3. 알림을 허용해주세요'
+                : '매칭 요청, 채팅 메시지, 커뮤니티 활동 등 중요한 알림을 받기 위해 알림 권한이 필요합니다.\n\n'
+                    '설정에서 알림 권한을 허용해주세요.',
           ),
           actions: [
             TextButton(
@@ -148,7 +158,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                 Navigator.of(context).pop();
                 openAppSettings();
               },
-              child: const Text('설정으로 이동'),
+              child: Text(isIOS ? '설정 앱 열기' : '설정으로 이동'),
             ),
           ],
         );
@@ -377,9 +387,50 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                     foregroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: const Text('설정으로 이동'),
+                  child: Text(!kIsWeb && Platform.isIOS ? '설정 앱 열기' : '설정으로 이동'),
                 ),
               ),
+              if (!kIsWeb && Platform.isIOS) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            '설정 앱에서 찾는 방법',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue[700],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '1. 설정 앱 열기\n'
+                        '2. 아래로 스크롤하여 "Playmate App" 찾기\n'
+                        '3. "알림" 탭 선택\n'
+                        '4. 알림 허용',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700],
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ],
         ],
