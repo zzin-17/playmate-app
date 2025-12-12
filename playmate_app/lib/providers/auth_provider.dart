@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../utils/error_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthProvider extends ChangeNotifier {
@@ -131,7 +132,7 @@ class AuthProvider extends ChangeNotifier {
 
   // 에러 설정
   void _setError(String error) {
-    _error = error;
+    _error = ErrorHandler.getUserFriendlyMessage(error);
     notifyListeners();
   }
 
@@ -222,7 +223,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _setError(e.toString());
+      _setError(e);
       _setLoading(false);
       return false;
     }
@@ -302,7 +303,7 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     } catch (e) {
-      _setError(e.toString());
+      _setError(e);
       _setLoading(false);
       return false;
     }

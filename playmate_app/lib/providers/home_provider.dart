@@ -3,6 +3,7 @@ import 'dart:async';
 import '../models/matching.dart';
 import '../models/location.dart';
 import '../services/matching_data_service.dart';
+import '../utils/error_handler.dart';
 
 class HomeProvider extends ChangeNotifier {
   // 매칭 데이터
@@ -410,31 +411,9 @@ class HomeProvider extends ChangeNotifier {
     };
   }
 
-  // 사용자 친화적인 에러 메시지 생성
+  // 사용자 친화적인 에러 메시지 생성 (ErrorHandler 사용)
   String _getUserFriendlyErrorMessage(dynamic error) {
-    final errorString = error.toString().toLowerCase();
-    
-    if (errorString.contains('connection refused') || 
-        errorString.contains('socketexception') ||
-        errorString.contains('failed host lookup')) {
-      return '서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.';
-    } else if (errorString.contains('timeout')) {
-      return '요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.';
-    } else if (errorString.contains('unauthorized') || 
-               errorString.contains('401')) {
-      return '로그인이 필요합니다. 다시 로그인해주세요.';
-    } else if (errorString.contains('forbidden') || 
-               errorString.contains('403')) {
-      return '접근 권한이 없습니다.';
-    } else if (errorString.contains('not found') || 
-               errorString.contains('404')) {
-      return '요청한 데이터를 찾을 수 없습니다.';
-    } else if (errorString.contains('server error') || 
-               errorString.contains('500')) {
-      return '서버에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해주세요.';
-    } else {
-      return '데이터를 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
-    }
+    return ErrorHandler.getUserFriendlyMessage(error);
   }
 
   // 유틸리티 메서드들
