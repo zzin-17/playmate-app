@@ -678,6 +678,201 @@ const confirmMatching = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Cancel matching
+// @route   POST /api/matchings/:id/cancel
+// @access  Private (Host only)
+const cancelMatching = asyncHandler(async (req, res) => {
+  try {
+    const matchingId = parseInt(req.params.id);
+    const userId = req.user.id;
+    
+    console.log(`🔍 매칭 취소 요청: 사용자 ${userId} -> 매칭 ${matchingId}`);
+    
+    // 메모리에서 매칭 찾기
+    const matching = memoryStore.matchings.get(matchingId);
+    
+    if (!matching) {
+      console.log(`❌ 매칭을 찾을 수 없음: ${matchingId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Matching not found'
+      });
+    }
+    
+    // 호스트 권한 확인
+    if (matching.host.id !== userId) {
+      console.log(`❌ 매칭 취소 권한 없음: 사용자 ${userId}, 호스트 ${matching.host.id}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Only host can cancel matching'
+      });
+    }
+    
+    // 매칭 상태를 cancelled로 변경
+    matching.status = 'cancelled';
+    matching.cancelledAt = new Date().toISOString();
+    matching.updatedAt = new Date().toISOString();
+    
+    // 메모리 업데이트
+    memoryStore.matchings.set(matchingId, matching);
+    
+    // 파일에 저장
+    saveToFile();
+    
+    console.log(`✅ 매칭 취소 완료: 매칭 ${matchingId}`);
+    
+    res.json({
+      success: true,
+      message: 'Matching cancelled successfully',
+      data: {
+        matchingId: matchingId,
+        status: matching.status,
+        cancelledAt: matching.cancelledAt
+      }
+    });
+  } catch (error) {
+    console.error('❌ 매칭 취소 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel matching',
+      error: error.message
+    });
+  }
+});
+
+// @desc    Complete matching
+// @route   POST /api/matchings/:id/complete
+// @access  Private (Host only)
+const completeMatching = asyncHandler(async (req, res) => {
+  try {
+    const matchingId = parseInt(req.params.id);
+    const userId = req.user.id;
+    
+    console.log(`🔍 매칭 완료 요청: 사용자 ${userId} -> 매칭 ${matchingId}`);
+    
+    // 메모리에서 매칭 찾기
+    const matching = memoryStore.matchings.get(matchingId);
+    
+    if (!matching) {
+      console.log(`❌ 매칭을 찾을 수 없음: ${matchingId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Matching not found'
+      });
+    }
+    
+    // 호스트 권한 확인
+    if (matching.host.id !== userId) {
+      console.log(`❌ 매칭 완료 권한 없음: 사용자 ${userId}, 호스트 ${matching.host.id}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Only host can complete matching'
+      });
+    }
+    
+    // 매칭 상태를 completed로 변경
+    matching.status = 'completed';
+    matching.completedAt = new Date().toISOString();
+    matching.updatedAt = new Date().toISOString();
+    
+    // 메모리 업데이트
+    memoryStore.matchings.set(matchingId, matching);
+    
+    // 파일에 저장
+    saveToFile();
+    
+    console.log(`✅ 매칭 완료: 매칭 ${matchingId}`);
+    
+    res.json({
+      success: true,
+      message: 'Matching completed successfully',
+      data: {
+        matchingId: matchingId,
+        status: matching.status,
+        completedAt: matching.completedAt
+      }
+    });
+  } catch (error) {
+    console.error('❌ 매칭 완료 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to complete matching',
+      error: error.message
+    });
+  }
+});
+
+// @desc    Cancel matching confirmation (확정 취소)
+// @route   POST /api/matchings/:id/cancel-confirmation
+// @access  Private (Host only)
+const cancelMatchingConfirmation = asyncHandler(async (req, res) => {
+  try {
+    const matchingId = parseInt(req.params.id);
+    const userId = req.user.id;
+    
+    console.log(`🔍 매칭 확정 취소 요청: 사용자 ${userId} -> 매칭 ${matchingId}`);
+    
+    // 메모리에서 매칭 찾기
+    const matching = memoryStore.matchings.get(matchingId);
+    
+    if (!matching) {
+      console.log(`❌ 매칭을 찾을 수 없음: ${matchingId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Matching not found'
+      });
+    }
+    
+    // 호스트 권한 확인
+    if (matching.host.id !== userId) {
+      console.log(`❌ 매칭 확정 취소 권한 없음: 사용자 ${userId}, 호스트 ${matching.host.id}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Only host can cancel matching confirmation'
+      });
+    }
+    
+    // 매칭 상태를 recruiting으로 변경 (확정 취소)
+    matching.status = 'recruiting';
+    matching.updatedAt = new Date().toISOString();
+    
+    // 확정자들을 다시 신청자로 이동
+    if (matching.confirmedUserIds && matching.confirmedUserIds.length > 0) {
+      if (!matching.appliedUserIds) {
+        matching.appliedUserIds = [];
+      }
+      matching.appliedUserIds.push(...matching.confirmedUserIds);
+      matching.confirmedUserIds = []; // 확정자 목록 초기화
+    }
+    
+    // 메모리 업데이트
+    memoryStore.matchings.set(matchingId, matching);
+    
+    // 파일에 저장
+    saveToFile();
+    
+    console.log(`✅ 매칭 확정 취소 완료: 매칭 ${matchingId}`);
+    
+    res.json({
+      success: true,
+      message: 'Matching confirmation cancelled successfully',
+      data: {
+        matchingId: matchingId,
+        status: matching.status,
+        appliedUserIds: matching.appliedUserIds,
+        confirmedUserIds: matching.confirmedUserIds
+      }
+    });
+  } catch (error) {
+    console.error('❌ 매칭 확정 취소 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel matching confirmation',
+      error: error.message
+    });
+  }
+});
+
 module.exports = {
   getMatchings,
   getMatching,
@@ -687,5 +882,8 @@ module.exports = {
   deleteMatching,
   joinMatching,
   leaveMatching,
-  confirmMatching
+  confirmMatching,
+  cancelMatching,
+  completeMatching,
+  cancelMatchingConfirmation
 };

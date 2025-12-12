@@ -997,6 +997,94 @@ class ApiService {
     }
   }
 
+  // 매칭 확정
+  static Future<Map<String, dynamic>> confirmMatching(int matchingId, String token) async {
+    try {
+      final uri = Uri.parse('$baseUrl/matchings/$matchingId/confirm');
+      
+      final response = await http.post(
+        uri,
+        headers: getAuthHeaders(token),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final errorBody = json.decode(response.body);
+        throw ApiException('매칭 확정 실패: ${errorBody['message'] ?? response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+
+  // 매칭 취소
+  static Future<Map<String, dynamic>> cancelMatching(int matchingId, String token) async {
+    try {
+      final uri = Uri.parse('$baseUrl/matchings/$matchingId/cancel');
+      
+      final response = await http.post(
+        uri,
+        headers: getAuthHeaders(token),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final errorBody = json.decode(response.body);
+        throw ApiException('매칭 취소 실패: ${errorBody['message'] ?? response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+
+  // 매칭 완료
+  static Future<Map<String, dynamic>> completeMatching(int matchingId, String token) async {
+    try {
+      final uri = Uri.parse('$baseUrl/matchings/$matchingId/complete');
+      
+      final response = await http.post(
+        uri,
+        headers: getAuthHeaders(token),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final errorBody = json.decode(response.body);
+        throw ApiException('매칭 완료 실패: ${errorBody['message'] ?? response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+
+  // 매칭 확정 취소
+  static Future<Map<String, dynamic>> cancelMatchingConfirmation(int matchingId, String token) async {
+    try {
+      final uri = Uri.parse('$baseUrl/matchings/$matchingId/cancel-confirmation');
+      
+      final response = await http.post(
+        uri,
+        headers: getAuthHeaders(token),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final errorBody = json.decode(response.body);
+        throw ApiException('매칭 확정 취소 실패: ${errorBody['message'] ?? response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+
   // ==================== 후기 관련 API ====================
   
   // 내 후기 목록 조회

@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'matching_notification_service.dart';
+import 'api_service.dart';
 
 class MatchingStateService extends ChangeNotifier {
   static final MatchingStateService _instance = MatchingStateService._internal();
@@ -61,26 +63,42 @@ class MatchingStateService extends ChangeNotifier {
     }
   }
 
+  // 인증 토큰 가져오기
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('playmate_auth_token');
+    } catch (e) {
+      return null;
+    }
+  }
+
   // 매칭 확정
   Future<bool> confirmMatching(int matchingId) async {
     try {
-      // TODO: 실제 API 호출로 매칭 확정 처리
-      await Future.delayed(const Duration(milliseconds: 500)); // API 호출 시뮬레이션
-      
-      // 상태 변경
-      setMatchingStatus(matchingId, 'confirmed');
-      
-      // 매칭 확정 알림 생성
-      final notificationService = MatchingNotificationService();
-      // TODO: 실제 매칭과 호스트 정보를 가져와서 알림 생성
-      // 현재는 테스트용으로 임시 알림 생성
-      notificationService.createSampleNotifications();
-      
-      if (kDebugMode) {
-        print('매칭 확정 완료 및 알림 생성: $matchingId');
+      final token = await _getAuthToken();
+      if (token == null) {
+        if (kDebugMode) {
+          print('매칭 확정 실패: 인증 토큰이 없습니다.');
+        }
+        return false;
       }
+
+      // 실제 API 호출
+      final response = await ApiService.confirmMatching(matchingId, token);
       
-      return true;
+      if (response['success'] == true) {
+        // 상태 변경
+        setMatchingStatus(matchingId, 'confirmed');
+        
+        if (kDebugMode) {
+          print('매칭 확정 완료: $matchingId');
+        }
+        
+        return true;
+      } else {
+        throw Exception(response['message'] ?? '매칭 확정 실패');
+      }
     } catch (e) {
       if (kDebugMode) {
         print('매칭 확정 실패: $e');
@@ -92,23 +110,29 @@ class MatchingStateService extends ChangeNotifier {
   // 매칭 확정 취소
   Future<bool> cancelMatchingConfirmation(int matchingId) async {
     try {
-      // TODO: 실제 API 호출로 매칭 확정 취소 처리
-      await Future.delayed(const Duration(milliseconds: 500)); // API 호출 시뮬레이션
-      
-      // 상태 변경
-      setMatchingStatus(matchingId, 'recruiting');
-      
-      // 매칭 취소 알림 생성
-      final notificationService = MatchingNotificationService();
-      // TODO: 실제 매칭과 호스트 정보를 가져와서 알림 생성
-      // 현재는 테스트용으로 임시 알림 생성
-      notificationService.createSampleNotifications();
-      
-      if (kDebugMode) {
-        print('매칭 확정 취소 완료 및 알림 생성: $matchingId');
+      final token = await _getAuthToken();
+      if (token == null) {
+        if (kDebugMode) {
+          print('매칭 확정 취소 실패: 인증 토큰이 없습니다.');
+        }
+        return false;
       }
+
+      // 실제 API 호출
+      final response = await ApiService.cancelMatchingConfirmation(matchingId, token);
       
-      return true;
+      if (response['success'] == true) {
+        // 상태 변경
+        setMatchingStatus(matchingId, 'recruiting');
+        
+        if (kDebugMode) {
+          print('매칭 확정 취소 완료: $matchingId');
+        }
+        
+        return true;
+      } else {
+        throw Exception(response['message'] ?? '매칭 확정 취소 실패');
+      }
     } catch (e) {
       if (kDebugMode) {
         print('매칭 확정 취소 실패: $e');
@@ -120,12 +144,29 @@ class MatchingStateService extends ChangeNotifier {
   // 매칭 완료
   Future<bool> completeMatching(int matchingId) async {
     try {
-      // TODO: 실제 API 호출로 매칭 완료 처리
-      await Future.delayed(const Duration(milliseconds: 500)); // API 호출 시뮬레이션
+      final token = await _getAuthToken();
+      if (token == null) {
+        if (kDebugMode) {
+          print('매칭 완료 실패: 인증 토큰이 없습니다.');
+        }
+        return false;
+      }
+
+      // 실제 API 호출
+      final response = await ApiService.completeMatching(matchingId, token);
       
-      // 상태 변경
-      setMatchingStatus(matchingId, 'completed');
-      return true;
+      if (response['success'] == true) {
+        // 상태 변경
+        setMatchingStatus(matchingId, 'completed');
+        
+        if (kDebugMode) {
+          print('매칭 완료: $matchingId');
+        }
+        
+        return true;
+      } else {
+        throw Exception(response['message'] ?? '매칭 완료 실패');
+      }
     } catch (e) {
       if (kDebugMode) {
         print('매칭 완료 실패: $e');
@@ -137,12 +178,29 @@ class MatchingStateService extends ChangeNotifier {
   // 매칭 취소
   Future<bool> cancelMatching(int matchingId) async {
     try {
-      // TODO: 실제 API 호출로 매칭 취소 처리
-      await Future.delayed(const Duration(milliseconds: 500)); // API 호출 시뮬레이션
+      final token = await _getAuthToken();
+      if (token == null) {
+        if (kDebugMode) {
+          print('매칭 취소 실패: 인증 토큰이 없습니다.');
+        }
+        return false;
+      }
+
+      // 실제 API 호출
+      final response = await ApiService.cancelMatching(matchingId, token);
       
-      // 상태 변경
-      setMatchingStatus(matchingId, 'cancelled');
-      return true;
+      if (response['success'] == true) {
+        // 상태 변경
+        setMatchingStatus(matchingId, 'cancelled');
+        
+        if (kDebugMode) {
+          print('매칭 취소 완료: $matchingId');
+        }
+        
+        return true;
+      } else {
+        throw Exception(response['message'] ?? '매칭 취소 실패');
+      }
     } catch (e) {
       if (kDebugMode) {
         print('매칭 취소 실패: $e');
