@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "NODE_ENV=development PORT=3000 node src/server.js",
     "dev:stable": "node start-stable.js",
+    "dev:persistent": "node start-persistent.js",
     "staging": "NODE_ENV=staging node src/server.js",
     "prod": "NODE_ENV=production node src/server.js",
     "dev:watch": "nodemon --env-file=config.development.env src/server.js",
