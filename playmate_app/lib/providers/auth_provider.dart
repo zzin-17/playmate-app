@@ -382,22 +382,58 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // 프로필 업데이트 (임시 구현)
+  // 프로필 업데이트
   Future<bool> updateProfile({
     String? nickname,
     String? location,
+    String? bio,
+    String? profileImage,
   }) async {
     _setLoading(true);
     _clearError();
 
     try {
-      // TODO: 실제 프로필 업데이트 구현
-      await Future.delayed(const Duration(seconds: 1));
-      _setError('프로필 업데이트는 아직 구현되지 않았습니다.');
+      // 토큰 확인
+      final token = await _getToken();
+      if (token == null) {
+        _setError('로그인이 필요합니다.');
+        _setLoading(false);
+        return false;
+      }
+
+      // 업데이트할 데이터 준비
+      final profileData = <String, dynamic>{};
+      if (nickname != null && nickname.isNotEmpty) {
+        profileData['nickname'] = nickname;
+      }
+      if (location != null) {
+        profileData['location'] = location;
+      }
+      if (bio != null) {
+        profileData['bio'] = bio;
+      }
+      if (profileImage != null) {
+        profileData['profileImage'] = profileImage;
+      }
+
+      // 빈 데이터 체크
+      if (profileData.isEmpty) {
+        _setError('업데이트할 정보가 없습니다.');
+        _setLoading(false);
+        return false;
+      }
+
+      // API 호출
+      final updatedUser = await ApiService.updateProfile(profileData, token);
+      
+      // 현재 사용자 정보 업데이트
+      _currentUser = updatedUser;
+      
       _setLoading(false);
-      return false;
+      notifyListeners();
+      return true;
     } catch (e) {
-      _setError(e.toString());
+      _setError('프로필 업데이트 실패: $e');
       _setLoading(false);
       return false;
     }

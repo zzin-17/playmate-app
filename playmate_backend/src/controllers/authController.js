@@ -205,17 +205,11 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const updateProfile = asyncHandler(async (req, res) => {
-  const { nickname, bio, location } = req.body;
+  const { nickname, bio, location, profileImage } = req.body;
   const userId = req.user.id;
   
-  // 사용자 찾기
-  let user = null;
-  for (const [email, u] of memoryStore.users) {
-    if (u.id === userId) {
-      user = u;
-      break;
-    }
-  }
+  // 통합 저장소에서 사용자 찾기
+  const user = userStore.getUserById(userId);
   
   if (!user) {
     res.status(404);
@@ -226,10 +220,13 @@ const updateProfile = asyncHandler(async (req, res) => {
   if (nickname) user.nickname = nickname;
   if (bio !== undefined) user.bio = bio;
   if (location !== undefined) user.location = location;
+  if (profileImage !== undefined) user.profileImage = profileImage;
   user.updatedAt = new Date();
   
   // 파일에 저장 (비동기)
-  saveUsersToFile().catch(console.error);
+  userStore.saveUsersToFile().catch(console.error);
+  
+  console.log(`🔍 프로필 업데이트 - ID: ${userId}, 닉네임: ${nickname || user.nickname}`);
   
   res.json({
     success: true,
