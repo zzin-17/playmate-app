@@ -181,13 +181,23 @@ class _LoginScreenState extends State<LoginScreen> {
           Navigator.of(context).pushReplacementNamed('/main');
         }
                     } else {
-        // 로컬 에러 상태 설정 (안전하게)
+        // 로그인 실패 시 에러 메시지 표시
         if (mounted) {
+          final errorMessage = authProvider.error ?? '로그인에 실패했습니다.';
           setState(() {
-            _errorMessage = authProvider.error ?? '로그인에 실패했습니다.';
+            _errorMessage = errorMessage;
             // 비밀번호만 초기화 (아이디는 유지)
             _passwordController.clear();
           });
+          
+          // 스낵바로도 에러 메시지 표시
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: AppColors.error,
+              duration: const Duration(seconds: 3),
+            ),
+          );
         } else {
           // 에러 메시지를 SharedPreferences에 저장하여 다음 화면 로드 시 표시
           _saveErrorForNextScreen(authProvider.error ?? '로그인에 실패했습니다.');
@@ -196,9 +206,19 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (mounted) {
         // 예외 발생 시에도 에러 메시지를 로컬 상태로 설정
+        final errorMessage = '로그인 중 오류가 발생했습니다: $e';
         setState(() {
-          _errorMessage = '로그인 중 오류가 발생했습니다: $e';
+          _errorMessage = errorMessage;
         });
+        
+        // 스낵바로도 에러 메시지 표시
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     } finally {
       // 로딩 상태 해제
