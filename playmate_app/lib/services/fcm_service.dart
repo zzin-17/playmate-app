@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 class FCMService {
@@ -28,15 +29,29 @@ class FCMService {
       // 로컬 알림 초기화
       await _initializeLocalNotifications();
       
-      // FCM 권한 상태 확인 (앱 시작 시에는 팝업 없이 확인만)
       // iOS에서 알림 설정이 보이려면 최소한 한 번은 권한을 요청해야 함
-      final currentStatus = await getNotificationPermissionStatus();
-      if (kDebugMode) {
-        print('알림 권한 상태 확인: $currentStatus');
-        if (currentStatus == AuthorizationStatus.denied) {
-          print('💡 알림 권한이 거부되었습니다. 설정 화면에서 다시 요청할 수 있습니다.');
-        } else if (currentStatus == AuthorizationStatus.notDetermined) {
-          print('💡 알림 권한이 아직 요청되지 않았습니다. 사용자가 설정 화면에서 요청할 수 있습니다.');
+      // 앱 첫 실행 시에만 조용히 권한을 요청 (팝업 없이)
+      final prefs = await SharedPreferences.getInstance();
+      final hasRequestedPermission = prefs.getBool('notification_permission_requested') ?? false;
+      
+      if (!hasRequestedPermission) {
+        // 첫 실행 시 권한 요청 (iOS 설정에 알림 항목이 나타나도록)
+        final permissionStatus = await _requestNotificationPermission();
+        await prefs.setBool('notification_permission_requested', true);
+        
+        if (kDebugMode) {
+          print('알림 권한 첫 요청 완료: $permissionStatus');
+          if (permissionStatus == AuthorizationStatus.authorized) {
+            print('✅ 알림 권한이 허용되었습니다.');
+          } else if (permissionStatus == AuthorizationStatus.denied) {
+            print('💡 알림 권한이 거부되었습니다. 설정에서 허용할 수 있습니다.');
+          }
+        }
+      } else {
+        // 이후 실행 시에는 상태만 확인
+        final currentStatus = await getNotificationPermissionStatus();
+        if (kDebugMode) {
+          print('알림 권한 상태 확인: $currentStatus');
         }
       }
       
