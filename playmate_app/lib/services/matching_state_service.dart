@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'matching_notification_service.dart';
 import 'api_service.dart';
 
 class MatchingStateService extends ChangeNotifier {
