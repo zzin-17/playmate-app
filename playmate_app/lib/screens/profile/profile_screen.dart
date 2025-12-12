@@ -15,6 +15,7 @@ import 'my_commented_posts_screen.dart';
 import '../review/my_reviews_screen.dart';
 import '../community/community_screen.dart';
 import '../profile/edit_profile_screen.dart';
+import '../settings/notification_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -200,7 +201,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: '알림 설정',
                       subtitle: '푸시 알림 관리',
                       onTap: () {
-                        // 알림 설정 페이지로 이동
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const NotificationSettingsScreen(),
+                          ),
+                        );
                       },
                     ),
                     MenuItem(

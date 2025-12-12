@@ -28,8 +28,13 @@ class FCMService {
       // 로컬 알림 초기화
       await _initializeLocalNotifications();
       
-      // FCM 권한 요청
-      await _requestNotificationPermission();
+      // FCM 권한 요청 (앱 시작 시에는 조용히 확인만, 사용자가 명시적으로 요청할 때만 팝업 표시)
+      final permissionStatus = await _requestNotificationPermission();
+      if (kDebugMode) {
+        if (permissionStatus == AuthorizationStatus.denied) {
+          print('💡 알림 권한이 거부되었습니다. 설정 화면에서 다시 요청할 수 있습니다.');
+        }
+      }
       
       // FCM 토큰 가져오기 (실패해도 계속 진행)
       try {
@@ -82,20 +87,50 @@ class FCMService {
   }
 
   // 알림 권한 요청
-  Future<void> _requestNotificationPermission() async {
-    final settings = await _firebaseMessaging.requestPermission(
-      alert: true,
-      announcement: false,
-      badge: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
-      sound: true,
-    );
-    
-    if (kDebugMode) {
-      print('알림 권한 상태: ${settings.authorizationStatus}');
+  Future<AuthorizationStatus> _requestNotificationPermission() async {
+    try {
+      final settings = await _firebaseMessaging.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
+      
+      if (kDebugMode) {
+        print('알림 권한 상태: ${settings.authorizationStatus}');
+        if (settings.authorizationStatus == AuthorizationStatus.denied) {
+          print('💡 알림 권한이 거부되었습니다. 설정에서 수동으로 허용할 수 있습니다.');
+        }
+      }
+      
+      return settings.authorizationStatus;
+    } catch (e) {
+      if (kDebugMode) {
+        print('알림 권한 요청 실패: $e');
+      }
+      return AuthorizationStatus.notDetermined;
     }
+  }
+
+  // 알림 권한 상태 확인
+  Future<AuthorizationStatus> getNotificationPermissionStatus() async {
+    try {
+      final settings = await _firebaseMessaging.getNotificationSettings();
+      return settings.authorizationStatus;
+    } catch (e) {
+      if (kDebugMode) {
+        print('알림 권한 상태 확인 실패: $e');
+      }
+      return AuthorizationStatus.notDetermined;
+    }
+  }
+
+  // 알림 권한 요청 (공개 메서드)
+  Future<AuthorizationStatus> requestNotificationPermission() async {
+    return await _requestNotificationPermission();
   }
 
   // FCM 토큰 가져오기
