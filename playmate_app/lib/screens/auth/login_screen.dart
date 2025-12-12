@@ -1,4 +1,6 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // 추가
 import '../../providers/auth_provider.dart';
@@ -31,6 +33,12 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = false; // 추가: 아이디/비번 저장 체크박스
   bool _isLoading = false; // 추가: 로딩 상태
   String? _errorMessage; // 추가: 로컬 에러 메시지
+
+  // Apple 로그인 사용 가능 여부 확인 (iOS만 지원)
+  bool _isAppleSignInAvailable() {
+    if (kIsWeb) return false;
+    return Platform.isIOS;
+  }
 
   @override
   void initState() {
@@ -508,32 +516,46 @@ class _LoginScreenState extends State<LoginScreen> {
                             type: ButtonType.secondary,
                             icon: Icons.chat_bubble_outline,
                             isLoading: auth.isLoading,
-                                                      onPressed: () async {
-                            final ok = await context.read<AuthProvider>().loginWithKakao();
-                            if (ok && mounted) {
-                              Navigator.of(context).pushReplacementNamed('/main');
-                            }
-                          },
+                            onPressed: () async {
+                              final ok = await context.read<AuthProvider>().loginWithKakao();
+                              if (ok && mounted) {
+                                Navigator.of(context).pushReplacementNamed('/main');
+                              }
+                            },
                           ),
                         ),
                       ),
-                      const SizedBox(width: 50),
-                      Expanded(
-                        child: Consumer<AuthProvider>(
-                          builder: (context, auth, _) => AppButton(
-                            text: 'Apple 로그인',
-                            type: ButtonType.secondary,
-                            icon: Icons.apple,
-                            isLoading: auth.isLoading,
-                                                      onPressed: () async {
-                            final ok = await context.read<AuthProvider>().loginWithApple();
-                            if (ok && mounted) {
-                              Navigator.of(context).pushReplacementNamed('/main');
-                            }
-                          },
+                      // Apple 로그인은 iOS에서만 표시
+                      if (_isAppleSignInAvailable()) ...[
+                        const SizedBox(width: 50),
+                        Expanded(
+                          child: Consumer<AuthProvider>(
+                            builder: (context, auth, _) => AppButton(
+                              text: 'Apple 로그인',
+                              type: ButtonType.secondary,
+                              icon: Icons.apple,
+                              isLoading: auth.isLoading,
+                              onPressed: () async {
+                                try {
+                                  final ok = await context.read<AuthProvider>().loginWithApple();
+                                  if (ok && mounted) {
+                                    Navigator.of(context).pushReplacementNamed('/main');
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Apple 로그인에 실패했습니다: ${e.toString()}'),
+                                        backgroundColor: AppColors.error,
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   

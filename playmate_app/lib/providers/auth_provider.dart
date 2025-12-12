@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../models/user.dart';
@@ -315,6 +317,11 @@ class AuthProvider extends ChangeNotifier {
     _clearError();
 
     try {
+      // 플랫폼 체크 (iOS만 지원)
+      if (!_isIOSPlatform()) {
+        throw Exception('Apple 로그인은 iOS에서만 사용할 수 있습니다.');
+      }
+
       // Apple Sign In 요청
       final appleCredential = await SignInWithApple.getAppleIDCredential(
         scopes: [
@@ -381,6 +388,12 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       return false;
     }
+  }
+
+  // iOS 플랫폼 체크
+  bool _isIOSPlatform() {
+    if (kIsWeb) return false;
+    return Platform.isIOS;
   }
 
   // 프로필 업데이트
