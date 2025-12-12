@@ -249,9 +249,127 @@ const updateProfile = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Apple Sign In
+// @route   POST /api/auth/apple
+// @access  Public
+const loginWithApple = asyncHandler(async (req, res) => {
+  const { identityToken, authorizationCode, userIdentifier, email, fullName } = req.body;
+  
+  // 필수 필드 검증
+  if (!identityToken && !userIdentifier) {
+    res.status(400);
+    throw new Error('Apple authentication token is required');
+  }
+  
+  // userIdentifier를 사용하여 기존 사용자 찾기
+  const appleId = userIdentifier || identityToken;
+  let user = null;
+  
+  // Apple ID로 기존 사용자 찾기 (임시로 email로 검색, 실제로는 Apple ID 저장 필요)
+  if (email) {
+    user = userStore.getUserByEmail(email);
+  }
+  
+  if (user) {
+    // 기존 사용자 로그인
+    const token = jwt.sign({ 
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname
+    }, process.env.JWT_SECRET);
+    
+    res.json({
+      success: true,
+      message: 'Apple login successful',
+      data: {
+        id: user.id,
+        email: user.email,
+        nickname: user.nickname,
+        profileImage: user.profileImage,
+        bio: user.bio,
+        birthYear: user.birthYear,
+        gender: user.gender,
+        location: user.location,
+        isVerified: user.isVerified,
+        token: token
+      }
+    });
+  } else {
+    // 신규 사용자 등록
+    if (!email) {
+      res.status(400);
+      throw new Error('Email is required for new user registration');
+    }
+    
+    // 사용자 수 제한 확인
+    if (userStore.getUserCount() >= userStore.maxUsers) {
+      res.status(503);
+      throw new Error('서버 용량 초과: 최대 사용자 수에 도달했습니다.');
+    }
+    
+    // 고유 ID 생성
+    const userId = userStore.generateUniqueUserId();
+    if (!userId) {
+      res.status(503);
+      throw new Error('사용자 ID 생성 실패: 사용 가능한 ID가 없습니다.');
+    }
+    
+    // 닉네임 생성 (fullName이 있으면 사용, 없으면 email 기반)
+    const nickname = fullName || email.split('@')[0] || `User${userId}`;
+    
+    const newUser = {
+      id: userId,
+      email: email,
+      password: null, // Apple 로그인은 비밀번호 없음
+      nickname: nickname,
+      profileImage: null,
+      bio: '',
+      birthYear: 1990, // 기본값, 나중에 프로필 설정에서 수정 가능
+      gender: 'male', // 기본값, 나중에 프로필 설정에서 수정 가능
+      location: '',
+      isVerified: true, // Apple 로그인은 이메일 인증됨
+      appleId: appleId, // Apple ID 저장
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    console.log(`🔍 Apple 로그인으로 새 사용자 생성 - ID: ${userId}, 이메일: ${email}, 닉네임: ${nickname}`);
+    
+    // 통합 저장소에 저장
+    userStore.addUser(newUser);
+    
+    // 파일에 저장 (비동기)
+    userStore.saveUsersToFile().catch(console.error);
+    
+    // JWT 토큰 생성
+    const token = jwt.sign({ 
+      id: newUser.id,
+      email: newUser.email,
+      nickname: newUser.nickname
+    }, process.env.JWT_SECRET);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Apple registration successful',
+      data: {
+        id: newUser.id,
+        email: newUser.email,
+        nickname: newUser.nickname,
+        profileImage: newUser.profileImage,
+        bio: newUser.bio,
+        birthYear: newUser.birthYear,
+        gender: newUser.gender,
+        location: newUser.location,
+        isVerified: newUser.isVerified,
+        token: token
+      }
+    });
+  }
+});
+
 // Generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET);
 };
 
-module.exports = { registerUser, loginUser, getCurrentUser, getMe, updateProfile };
+module.exports = { registerUser, loginUser, getCurrentUser, getMe, updateProfile, loginWithApple };

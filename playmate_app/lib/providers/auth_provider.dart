@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -307,19 +308,75 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // 애플 로그인 (임시 구현)
+  // 애플 로그인
   Future<bool> loginWithApple() async {
     _setLoading(true);
     _clearError();
 
     try {
-      // TODO: 실제 애플 로그인 구현
-      await Future.delayed(const Duration(seconds: 1));
-      _setError('애플 로그인은 아직 구현되지 않았습니다.');
+      // Apple Sign In 요청
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      // Apple 인증 정보 추출
+      final identityToken = appleCredential.identityToken;
+      final authorizationCode = appleCredential.authorizationCode;
+      final userIdentifier = appleCredential.userIdentifier;
+      final email = appleCredential.email;
+      final fullName = appleCredential.givenName != null || appleCredential.familyName != null
+          ? '${appleCredential.givenName ?? ''} ${appleCredential.familyName ?? ''}'.trim()
+          : null;
+
+      if (identityToken == null && userIdentifier == null) {
+        throw Exception('Apple 인증 정보를 가져올 수 없습니다.');
+      }
+
+      // 백엔드 API 호출
+      final response = await ApiService.loginWithApple(
+        identityToken: identityToken,
+        authorizationCode: authorizationCode,
+        userIdentifier: userIdentifier,
+        email: email,
+        fullName: fullName,
+      );
+
+      // API 응답 처리
+      if (response['success'] == true && response['data'] != null) {
+        final data = response['data'] as Map<String, dynamic>;
+        
+        await _saveToken(data['token'] as String);
+        
+        // API 응답에 누락된 필드 추가
+        final userData = Map<String, dynamic>.from(data);
+        userData['createdAt'] = userData['createdAt'] ?? DateTime.now().toIso8601String();
+        userData['updatedAt'] = userData['updatedAt'] ?? DateTime.now().toIso8601String();
+        
+        _currentUser = User.fromJson(userData);
+        
+        // 프로필 자동 동기화 시작
+        _startProfileSync();
+        
+        _setLoading(false);
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception('애플 로그인 실패: ${response['message'] ?? '알 수 없는 오류'}');
+      }
+    } on SignInWithAppleAuthorizationException catch (e) {
+      // 사용자가 취소한 경우
+      if (e.code == AuthorizationErrorCode.canceled) {
+        _setError('로그인이 취소되었습니다.');
+      } else {
+        _setError('애플 로그인 실패: ${e.message}');
+      }
       _setLoading(false);
       return false;
     } catch (e) {
-      _setError(e.toString());
+      _setError('애플 로그인 실패: $e');
       _setLoading(false);
       return false;
     }

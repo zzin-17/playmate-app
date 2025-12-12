@@ -461,6 +461,41 @@ class ApiService {
     }
   }
   
+  // 애플 로그인
+  static Future<Map<String, dynamic>> loginWithApple({
+    String? identityToken,
+    String? authorizationCode,
+    String? userIdentifier,
+    String? email,
+    String? fullName,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/auth/apple');
+      
+      final response = await http.post(
+        uri,
+        headers: _headers,
+        body: json.encode({
+          'identityToken': identityToken,
+          'authorizationCode': authorizationCode,
+          'userIdentifier': userIdentifier,
+          'email': email,
+          'fullName': fullName,
+        }),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return json.decode(response.body);
+      } else {
+        final errorBody = json.decode(response.body);
+        throw ApiException('애플 로그인 실패: ${errorBody['message'] ?? response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+
   // 회원가입
   static Future<Map<String, dynamic>> register({
     required String email,
