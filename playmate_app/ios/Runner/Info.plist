@@ -45,9 +45,14 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<!-- 알림 권한 요청 차단 -->
-	<key>NSUserNotificationUsageDescription</key>
-	<string></string>
+	<!-- 알림 권한 사용 설명 (iOS 10 이상에서는 선택사항이지만, 설정에 알림이 나타나도록 하려면 권장) -->
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>매칭 요청, 채팅 메시지, 커뮤니티 활동 등 중요한 알림을 받기 위해 알림 권한이 필요합니다.</string>
+	<!-- 백그라운드 알림 모드 (FCM 푸시 알림 수신을 위해 필요) -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<!-- 사진/카메라 접근 권한 문구 -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>프로필 사진을 선택하기 위해 사진 보관함 접근 권한이 필요합니다.</string>
