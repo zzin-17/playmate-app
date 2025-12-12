@@ -68,7 +68,10 @@ class FCMService {
 
   // 로컬 알림 초기화
   Future<void> _initializeLocalNotifications() async {
+    // Android 알림 채널 생성 (시스템 설정에서 토글이 작동하려면 채널이 필요)
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    
+    // iOS 설정
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -84,6 +87,62 @@ class FCMService {
       initSettings,
       onDidReceiveNotificationResponse: _onLocalNotificationTap,
     );
+    
+    // Android 알림 채널 생성 (앱 초기화 시 채널을 생성해야 시스템 설정에서 토글이 작동)
+    await _createAndroidNotificationChannels();
+  }
+
+  // Android 알림 채널 생성
+  Future<void> _createAndroidNotificationChannels() async {
+    try {
+      // 매칭 알림 채널
+      const matchingChannel = AndroidNotificationChannel(
+        'matching_notifications',
+        '매칭 알림',
+        description: '매칭 요청, 확정, 취소 등 매칭 관련 알림',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+      );
+
+      // 채팅 알림 채널
+      const chatChannel = AndroidNotificationChannel(
+        'chat_notifications',
+        '채팅 알림',
+        description: '새로운 메시지 알림',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+      );
+
+      // 커뮤니티 알림 채널
+      const communityChannel = AndroidNotificationChannel(
+        'community_notifications',
+        '커뮤니티 알림',
+        description: '댓글, 좋아요, 팔로우 등 커뮤니티 활동 알림',
+        importance: Importance.defaultImportance,
+        playSound: true,
+        enableVibration: false,
+      );
+
+      // 채널 생성
+      final androidImplementation = _localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      
+      if (androidImplementation != null) {
+        await androidImplementation.createNotificationChannel(matchingChannel);
+        await androidImplementation.createNotificationChannel(chatChannel);
+        await androidImplementation.createNotificationChannel(communityChannel);
+        
+        if (kDebugMode) {
+          print('✅ Android 알림 채널 생성 완료');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Android 알림 채널 생성 실패: $e');
+      }
+    }
   }
 
   // 알림 권한 요청
