@@ -131,7 +131,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // 에러 설정
-  void _setError(String error) {
+  void _setError(dynamic error) {
     _error = ErrorHandler.getUserFriendlyMessage(error);
     notifyListeners();
   }
@@ -248,7 +248,7 @@ class AuthProvider extends ChangeNotifier {
       _setLoading(false);
       notifyListeners();
     } catch (e) {
-      _setError(e.toString());
+      _setError(e);
       _setLoading(false);
     }
   }
@@ -372,12 +372,12 @@ class AuthProvider extends ChangeNotifier {
       if (e.code == AuthorizationErrorCode.canceled) {
         _setError('로그인이 취소되었습니다.');
       } else {
-        _setError('애플 로그인 실패: ${e.message}');
+        _setError(e);
       }
       _setLoading(false);
       return false;
     } catch (e) {
-      _setError('애플 로그인 실패: $e');
+      _setError(e);
       _setLoading(false);
       return false;
     }
