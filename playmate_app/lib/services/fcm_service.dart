@@ -50,9 +50,9 @@ class FCMService {
       
       // FCM 핸들러 설정 (토큰이 있을 때만)
       if (_fcmToken != null) {
-        _firebaseMessagingInstance.onMessage.listen(_handleForegroundMessage);
+        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
         FirebaseMessaging.onBackgroundMessage(_handleBackgroundMessage);
-        _firebaseMessagingInstance.onMessageOpenedApp.listen(_handleNotificationTap);
+        FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
       }
       
       _isInitialized = true;
