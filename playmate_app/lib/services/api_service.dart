@@ -1109,11 +1109,24 @@ class ApiService {
   // 후기 작성
   static Future<void> createReview(Map<String, dynamic> reviewData, String token) async {
     try {
+      // 백엔드 API 스펙에 맞춰 데이터 변환
+      // 백엔드: { revieweeId, matchingId, rating, content, tags }
+      // 프론트엔드: { reviewedUserId, matchingId, ntrpScore, mannerScore, comment }
+      final requestData = {
+        'revieweeId': reviewData['reviewedUserId'],
+        'matchingId': reviewData['matchingId'],
+        'rating': (reviewData['mannerScore'] as num).toInt().clamp(1, 5), // mannerScore를 1-5 범위로 변환
+        'content': reviewData['comment'],
+        'tags': [
+          'NTRP: ${(reviewData['ntrpScore'] as num).toStringAsFixed(1)}',
+        ],
+      };
+      
       await _makeRequest(
         'POST',
         '/reviews',
         headers: _getAuthHeaders(token),
-        body: json.encode(reviewData),
+        body: json.encode(requestData),
       );
     } catch (e) {
       throw ApiException('후기 작성 실패: $e');

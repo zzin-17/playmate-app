@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../models/user.dart';
 import '../../models/matching.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
+import '../../services/review_service.dart';
+import '../../utils/error_handler.dart';
+import '../../providers/auth_provider.dart';
 
 class WriteReviewScreen extends StatefulWidget {
   final User targetUser; // 리뷰 대상자
@@ -510,11 +514,20 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   // 후기 제출
   Future<void> _submitReview() async {
     if (_commentController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('후기 내용을 입력해주세요.'),
-          backgroundColor: AppColors.error,
-        ),
+      ErrorHandler.showErrorSnackBar(
+        context,
+        '후기 내용을 입력해주세요.',
+      );
+      return;
+    }
+
+    final authProvider = context.read<AuthProvider>();
+    final currentUser = authProvider.currentUser;
+    
+    if (currentUser == null) {
+      ErrorHandler.showErrorSnackBar(
+        context,
+        '로그인이 필요합니다.',
       );
       return;
     }
@@ -524,27 +537,44 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
     });
 
     try {
-      // TODO: 실제 API 호출로 대체
-      await Future.delayed(const Duration(seconds: 2)); // API 호출 시뮬레이션
+      // Review 객체 생성
+      // 백엔드 API 스펙에 맞춰서 mannerScore를 rating으로, ntrpScore는 tags에 포함
+      final review = Review(
+        id: 0, // 서버에서 생성
+        matchingId: widget.matching.id,
+        reviewerId: currentUser.id,
+        reviewedUserId: widget.targetUser.id,
+        ntrpScore: _ntrpScore,
+        mannerScore: _mannerScore,
+        comment: _commentController.text.trim(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      // ReviewService를 통해 API 호출
+      final success = await ReviewService.createReview(review);
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('후기가 성공적으로 작성되었습니다!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        
-        // 이전 화면으로 돌아가기
-        Navigator.of(context).pop(true);
+        if (success) {
+          ErrorHandler.showSuccessSnackBar(
+            context,
+            '후기가 성공적으로 작성되었습니다!',
+          );
+          
+          // 이전 화면으로 돌아가기
+          Navigator.of(context).pop(true);
+        } else {
+          ErrorHandler.showErrorSnackBar(
+            context,
+            '후기 작성에 실패했습니다.',
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('후기 작성에 실패했습니다: $e'),
-            backgroundColor: AppColors.error,
-          ),
+        ErrorHandler.showErrorSnackBar(
+          context,
+          e,
         );
       }
     } finally {

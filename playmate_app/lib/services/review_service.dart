@@ -25,8 +25,8 @@ class ReviewService {
       await ApiService.createReview(review.toJson(), token);
       return true;
     } catch (e) {
-      print('후기 작성 오류: $e');
-      return false;
+      // 에러를 다시 throw하여 호출자가 처리할 수 있도록 함
+      rethrow;
     }
   }
 
