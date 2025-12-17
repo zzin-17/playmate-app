@@ -1,5 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/logger.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -36,16 +37,16 @@ class NotificationService {
       );
 
       _isInitialized = true;
-      print('알림 서비스 초기화 완료');
+      Logger.info('알림 서비스 초기화 완료', tag: 'NotificationService');
     } catch (e) {
-      print('알림 서비스 초기화 실패: $e');
+      Logger.error('알림 서비스 초기화 실패', tag: 'NotificationService', error: e);
     }
   }
 
   /// 알림 탭 처리
   void _onNotificationTapped(NotificationResponse response) {
     // TODO: 알림 탭 시 해당 화면으로 이동
-    print('알림 탭됨: ${response.payload}');
+    Logger.info('알림 탭됨: ${response.payload}', tag: 'NotificationService');
   }
 
   /// 댓글 알림
@@ -157,7 +158,7 @@ class NotificationService {
       await _saveNotificationHistory(title, body, payload);
       
     } catch (e) {
-      print('알림 표시 실패: $e');
+      Logger.error('알림 표시 실패', tag: 'NotificationService', error: e);
     }
   }
 
@@ -183,7 +184,7 @@ class NotificationService {
       
       await prefs.setStringList('notification_history', history);
     } catch (e) {
-      print('알림 히스토리 저장 실패: $e');
+      Logger.error('알림 히스토리 저장 실패', tag: 'NotificationService', error: e);
     }
   }
 
@@ -211,7 +212,7 @@ class NotificationService {
         return notification;
       }).toList();
     } catch (e) {
-      print('알림 히스토리 가져오기 실패: $e');
+      Logger.error('알림 히스토리 가져오기 실패', tag: 'NotificationService', error: e);
       return [];
     }
   }
@@ -222,7 +223,7 @@ class NotificationService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('notification_history');
     } catch (e) {
-      print('알림 히스토리 삭제 실패: $e');
+      Logger.error('알림 히스토리 삭제 실패', tag: 'NotificationService', error: e);
     }
   }
 
@@ -241,7 +242,7 @@ class NotificationService {
       // Android는 권한이 필요하지 않음 (로컬 알림), iOS만 체크
       return iosGranted ?? true;
     } catch (e) {
-      print('알림 권한 요청 실패: $e');
+      Logger.error('알림 권한 요청 실패', tag: 'NotificationService', error: e);
       return false;
     }
   }
@@ -257,7 +258,7 @@ class NotificationService {
         'shares': prefs.getBool('notify_shares') ?? true,
       };
     } catch (e) {
-      print('알림 설정 가져오기 실패: $e');
+      Logger.error('알림 설정 가져오기 실패', tag: 'NotificationService', error: e);
       return {
         'comments': true,
         'likes': true,
@@ -275,7 +276,7 @@ class NotificationService {
         await prefs.setBool('notify_${entry.key}', entry.value);
       }
     } catch (e) {
-      print('알림 설정 저장 실패: $e');
+      Logger.error('알림 설정 저장 실패', tag: 'NotificationService', error: e);
     }
   }
 }

@@ -3,7 +3,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../models/post.dart';
 import '../../services/community_service.dart';
-// import '../community/post_detail_screen.dart'; // PostDetailScreen이 없으므로 주석 처리
+// import '../community/post_detail_screen.dart'; // PostDetailScreen이 없으므로 주석 처리b
 
 class MyBookmarksScreen extends StatefulWidget {
   const MyBookmarksScreen({super.key});
