@@ -21,16 +21,10 @@ import 'services/connection_monitor_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Firebase 초기화
-  try {
-    await Firebase.initializeApp();
-    
-    // FCM 서비스 초기화
-    final fcmService = FCMService();
-    await fcmService.initialize();
-  } catch (e) {
-    // Firebase 초기화 실패 시에도 앱은 계속 실행
-  }
+  // FCM 서비스 초기화 (Firebase 초기화와 무관하게 먼저 실행)
+  // 이렇게 하면 Firebase 초기화 실패해도 알림 권한은 요청됨
+  final fcmService = FCMService();
+  await fcmService.initialize();
   
   // 연결 상태 모니터링 시작
   ConnectionMonitorService().startMonitoring();
