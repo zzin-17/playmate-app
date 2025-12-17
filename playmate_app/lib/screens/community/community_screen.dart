@@ -522,13 +522,12 @@ class _CommunityScreenState extends State<CommunityScreen>
       child: _myPosts.isEmpty
           ? _buildEmptyMyPosts()
           : ListView.builder(
+              key: const PageStorageKey('my_posts_list'),
               itemCount: _myPosts.length,
               itemBuilder: (context, index) {
                 try {
-                  print('🔍 게시글 ${index} 렌더링: ${_myPosts[index].content}');
                   return _buildPostCard(_myPosts[index]);
                 } catch (e) {
-                  print('❌ 게시글 ${index} 렌더링 오류: $e');
                   return Container(
                     padding: const EdgeInsets.all(16),
                     child: Text('게시글을 불러올 수 없습니다: $e'),

@@ -1078,9 +1078,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           bottom: 120, // 플로팅 버튼 높이(56) + 하단 네비게이션(56) + 여유 공간(40) + 카드 간격(16)
                         ),
                         itemCount: _filteredMatchings.length,
+                        key: const PageStorageKey('matching_list'),
               itemBuilder: (context, index) {
                           final matching = _filteredMatchings[index];
-                print('🎯 ListView 렌더링 ${index+1}/${_filteredMatchings.length}: ${matching.courtName} (ID: ${matching.id})');
                 // ListView 렌더링
                 return _buildMatchingCard(matching);
               },

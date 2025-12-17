@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
@@ -160,19 +161,25 @@ class _EditPostScreenState extends State<EditPostScreen> {
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                _existingImages[index],
+                              child: CachedNetworkImage(
+                                imageUrl: _existingImages[index],
                                 width: 100,
                                 height: 100,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    width: 100,
-                                    height: 100,
-                                    color: AppColors.surface,
-                                    child: const Icon(Icons.image),
-                                  );
-                                },
+                                placeholder: (context, url) => Container(
+                                  width: 100,
+                                  height: 100,
+                                  color: AppColors.surface,
+                                  child: const Center(
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  width: 100,
+                                  height: 100,
+                                  color: AppColors.surface,
+                                  child: const Icon(Icons.image),
+                                ),
                               ),
                             ),
                             Positioned(
