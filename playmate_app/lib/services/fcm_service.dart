@@ -22,38 +22,16 @@ class FCMService {
 
   // FCM 초기화
   Future<void> initialize() async {
+    // 로컬 알림 초기화 (Firebase와 무관하게 먼저 초기화)
+    await _initializeLocalNotifications();
+    
+    // iOS에서 알림 설정이 보이려면 최소한 한 번은 권한을 요청해야 함
+    // 앱 첫 실행 시에만 조용히 권한을 요청 (Firebase와 무관하게)
+    await _requestInitialNotificationPermission();
+    
     try {
       // Firebase 초기화 확인
       await Firebase.initializeApp();
-      
-      // 로컬 알림 초기화
-      await _initializeLocalNotifications();
-      
-      // iOS에서 알림 설정이 보이려면 최소한 한 번은 권한을 요청해야 함
-      // 앱 첫 실행 시에만 조용히 권한을 요청 (팝업 없이)
-      final prefs = await SharedPreferences.getInstance();
-      final hasRequestedPermission = prefs.getBool('notification_permission_requested') ?? false;
-      
-      if (!hasRequestedPermission) {
-        // 첫 실행 시 권한 요청 (iOS 설정에 알림 항목이 나타나도록)
-        final permissionStatus = await _requestNotificationPermission();
-        await prefs.setBool('notification_permission_requested', true);
-        
-        if (kDebugMode) {
-          print('알림 권한 첫 요청 완료: $permissionStatus');
-          if (permissionStatus == AuthorizationStatus.authorized) {
-            print('✅ 알림 권한이 허용되었습니다.');
-          } else if (permissionStatus == AuthorizationStatus.denied) {
-            print('💡 알림 권한이 거부되었습니다. 설정에서 허용할 수 있습니다.');
-          }
-        }
-      } else {
-        // 이후 실행 시에는 상태만 확인
-        final currentStatus = await getNotificationPermissionStatus();
-        if (kDebugMode) {
-          print('알림 권한 상태 확인: $currentStatus');
-        }
-      }
       
       // FCM 토큰 가져오기 (실패해도 계속 진행)
       try {
@@ -160,6 +138,49 @@ class FCMService {
     } catch (e) {
       if (kDebugMode) {
         print('❌ Android 알림 채널 생성 실패: $e');
+      }
+    }
+  }
+
+  // 앱 첫 실행 시 알림 권한 요청 (Firebase와 무관하게)
+  Future<void> _requestInitialNotificationPermission() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hasRequestedPermission = prefs.getBool('notification_permission_requested') ?? false;
+      
+      if (!hasRequestedPermission) {
+        // flutter_local_notifications를 사용해서 iOS 권한 요청
+        // 이렇게 하면 Firebase 초기화 실패해도 권한은 요청됨
+        final iosPlugin = _localNotifications.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+        if (iosPlugin != null) {
+          final granted = await iosPlugin.requestPermissions(
+            alert: true,
+            badge: true,
+            sound: true,
+          );
+          
+          await prefs.setBool('notification_permission_requested', true);
+          
+          if (kDebugMode) {
+            print('알림 권한 첫 요청 완료 (flutter_local_notifications): $granted');
+            if (granted == true) {
+              print('✅ 알림 권한이 허용되었습니다.');
+            } else {
+              print('💡 알림 권한이 거부되었습니다. 설정에서 허용할 수 있습니다.');
+            }
+          }
+        } else {
+          // Android는 권한이 필요 없음
+          await prefs.setBool('notification_permission_requested', true);
+        }
+      } else {
+        if (kDebugMode) {
+          print('알림 권한은 이미 요청되었습니다.');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('알림 권한 요청 중 오류 발생: $e');
       }
     }
   }

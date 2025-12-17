@@ -181,3 +181,4 @@ tail -f logs/error.log
 - **개발 중**: `npm run dev:stable` 사용 가능 (터미널 열어둔 상태)
 - **프로덕션**: 반드시 PM2 사용 권장
 
+

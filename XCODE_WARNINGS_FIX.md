@@ -84,3 +84,4 @@ flutter pub upgrade file_picker sign_in_with_apple
 
 **참고**: 대부분의 경고는 무시해도 되지만, Xcode 설정 업데이트는 권장됩니다.
 
+

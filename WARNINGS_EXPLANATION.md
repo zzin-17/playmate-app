@@ -82,3 +82,4 @@ warning: [options] target value 8 is obsolete and will be removed in a future re
 
 **결론**: 현재 경고들은 모두 무시해도 됩니다. 앱이 정상 작동하고 있으므로 기능 개발을 계속 진행하세요! 🚀
 
+
