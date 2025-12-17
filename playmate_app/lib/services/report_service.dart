@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/logger.dart';
 
 enum ReportType {
   post,
@@ -42,7 +43,7 @@ class ReportService {
         );
       }
     } catch (e) {
-      print('신고 실패: $e');
+      Logger.error('신고 실패', tag: 'ReportService', error: e);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -64,9 +65,9 @@ class ReportService {
     // TODO: 실제 API 호출로 신고 처리
     await Future.delayed(const Duration(milliseconds: 500));
     
-    print('신고 처리됨: $type, ID: $targetId, 이유: $reason');
+    Logger.info('신고 처리됨: $type, ID: $targetId, 이유: $reason', tag: 'ReportService');
     if (description != null) {
-      print('설명: $description');
+      Logger.debug('신고 설명: $description', tag: 'ReportService');
     }
   }
 

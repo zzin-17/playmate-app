@@ -1,6 +1,9 @@
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/post.dart';
+import '../utils/logger.dart';
 
 class ShareService {
   static final ShareService _instance = ShareService._internal();
@@ -28,7 +31,7 @@ class ShareService {
         }
       }
     } catch (e) {
-      print('공유 실패: $e');
+      Logger.error('공유 실패', tag: 'ShareService', error: e);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -153,27 +156,35 @@ class ShareService {
 
   /// 링크를 클립보드에 복사
   Future<void> _copyLinkToClipboard(Post post) async {
-    final url = 'https://playmate.app/post/${post.id}';
-    
-    // Flutter의 클립보드 서비스 사용
-    // TODO: 실제 클립보드 서비스 구현
-    print('링크 복사됨: $url');
+    try {
+      final url = 'https://playmate.app/post/${post.id}';
+      await Clipboard.setData(ClipboardData(text: url));
+      Logger.info('링크 클립보드에 복사됨: $url', tag: 'ShareService');
+    } catch (e) {
+      Logger.error('클립보드 복사 실패', tag: 'ShareService', error: e);
+      rethrow;
+    }
   }
 
   /// 기타 앱으로 공유
   Future<void> _shareToOtherApps(Post post) async {
-    final text = '${post.content}\n\n#플메 #테니스';
-    final url = 'https://playmate.app/post/${post.id}';
-    
-    // 시스템 공유 다이얼로그 호출
-    // TODO: 실제 시스템 공유 구현
-    print('시스템 공유: $text\n$url');
+    try {
+      final text = '${post.content}\n\n#플메 #테니스';
+      final url = 'https://playmate.app/post/${post.id}';
+      final shareText = '$text\n$url';
+      
+      await Share.share(shareText);
+      Logger.info('시스템 공유 완료', tag: 'ShareService');
+    } catch (e) {
+      Logger.error('시스템 공유 실패', tag: 'ShareService', error: e);
+      rethrow;
+    }
   }
 
   /// 공유 카운트 증가
   void _incrementShareCount(Post post) {
     // TODO: 실제 API 호출로 공유 카운트 증가
-    print('공유 카운트 증가: ${post.id}');
+    Logger.debug('공유 카운트 증가: ${post.id}', tag: 'ShareService');
   }
 
   /// 공유 통계 가져오기
