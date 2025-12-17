@@ -10,11 +10,17 @@ class FCMService {
   factory FCMService() => _instance;
   FCMService._internal();
 
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  FirebaseMessaging? _firebaseMessaging;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   
   String? _fcmToken;
   bool _isInitialized = false;
+  
+  // FirebaseMessaging 인스턴스 getter (lazy initialization)
+  FirebaseMessaging get _firebaseMessagingInstance {
+    _firebaseMessaging ??= FirebaseMessaging.instance;
+    return _firebaseMessaging!;
+  }
 
   // FCM 토큰 getter
   String? get fcmToken => _fcmToken;
@@ -44,9 +50,9 @@ class FCMService {
       
       // FCM 핸들러 설정 (토큰이 있을 때만)
       if (_fcmToken != null) {
-        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+        _firebaseMessagingInstance.onMessage.listen(_handleForegroundMessage);
         FirebaseMessaging.onBackgroundMessage(_handleBackgroundMessage);
-        FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+        _firebaseMessagingInstance.onMessageOpenedApp.listen(_handleNotificationTap);
       }
       
       _isInitialized = true;
@@ -188,7 +194,7 @@ class FCMService {
   // 알림 권한 요청
   Future<AuthorizationStatus> _requestNotificationPermission() async {
     try {
-      final settings = await _firebaseMessaging.requestPermission(
+      final settings = await _firebaseMessagingInstance.requestPermission(
         alert: true,
         announcement: false,
         badge: true,
@@ -217,7 +223,7 @@ class FCMService {
   // 알림 권한 상태 확인
   Future<AuthorizationStatus> getNotificationPermissionStatus() async {
     try {
-      final settings = await _firebaseMessaging.getNotificationSettings();
+      final settings = await _firebaseMessagingInstance.getNotificationSettings();
       return settings.authorizationStatus;
     } catch (e) {
       if (kDebugMode) {
@@ -235,10 +241,10 @@ class FCMService {
   // FCM 토큰 가져오기
   Future<void> _getFCMToken() async {
     try {
-      _fcmToken = await _firebaseMessaging.getToken();
+      _fcmToken = await _firebaseMessagingInstance.getToken();
       
       // 토큰 갱신 리스너
-      _firebaseMessaging.onTokenRefresh.listen((newToken) {
+      _firebaseMessagingInstance.onTokenRefresh.listen((newToken) {
         _fcmToken = newToken;
         if (kDebugMode) {
           print('FCM 토큰 갱신: $newToken');
@@ -345,7 +351,7 @@ class FCMService {
   // 특정 토픽 구독
   Future<void> subscribeToTopic(String topic) async {
     try {
-      await _firebaseMessaging.subscribeToTopic(topic);
+      await _firebaseMessagingInstance.subscribeToTopic(topic);
       if (kDebugMode) {
         print('토픽 구독 완료: $topic');
       }
@@ -359,7 +365,7 @@ class FCMService {
   // 특정 토픽 구독 해제
   Future<void> unsubscribeFromTopic(String topic) async {
     try {
-      await _firebaseMessaging.unsubscribeFromTopic(topic);
+      await _firebaseMessagingInstance.unsubscribeFromTopic(topic);
       if (kDebugMode) {
         print('토픽 구독 해제 완료: $topic');
       }
