@@ -1246,6 +1246,56 @@ class ApiService {
       throw ApiException('알림 개수 조회 실패: $e');
     }
   }
+
+  // 매칭 신청자 목록 조회
+  static Future<List<Map<String, dynamic>>> getMatchingApplicants(int matchingId, String token) async {
+    try {
+      final response = await _makeRequest(
+        'GET',
+        '/matchings/$matchingId/applicants',
+        headers: _getAuthHeaders(token),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return List<Map<String, dynamic>>.from(data['data']);
+        } else {
+          throw ApiException('신청자 목록 조회 실패: ${data['message']}');
+        }
+      } else {
+        throw ApiException('신청자 목록 조회 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('신청자 목록 조회 실패: $e');
+    }
+  }
+
+  // 게시글 공유 통계 조회
+  static Future<Map<String, dynamic>> getPostShareStatistics(int postId, String token) async {
+    try {
+      final response = await _makeRequest(
+        'GET',
+        '/community/posts/$postId/share-statistics',
+        headers: _getAuthHeaders(token),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return Map<String, dynamic>.from(data['data']);
+        } else {
+          throw ApiException('공유 통계 조회 실패: ${data['message']}');
+        }
+      } else {
+        throw ApiException('공유 통계 조회 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('공유 통계 조회 실패: $e');
+    }
+  }
 }
 
 // API 예외 클래스

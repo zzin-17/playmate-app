@@ -2,8 +2,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/post.dart';
 import '../utils/logger.dart';
+import 'api_service.dart';
 
 class ShareService {
   static final ShareService _instance = ShareService._internal();

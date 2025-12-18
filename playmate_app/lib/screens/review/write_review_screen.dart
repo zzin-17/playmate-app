@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/user.dart';
 import '../../models/matching.dart';
+import '../../models/review.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../services/review_service.dart';

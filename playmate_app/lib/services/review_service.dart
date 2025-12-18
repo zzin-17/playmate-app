@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/review.dart';
 import 'api_service.dart';
+import '../utils/logger.dart';
 
 class ReviewService {
   // 내 후기 목록 조회
