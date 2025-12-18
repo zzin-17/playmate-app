@@ -552,23 +552,16 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
       );
 
       // ReviewService를 통해 API 호출
-      final success = await ReviewService.createReview(review);
+      await ReviewService.createReview(review);
       
       if (mounted) {
-        if (success) {
-          ErrorHandler.showSuccessSnackBar(
-            context,
-            '후기가 성공적으로 작성되었습니다!',
-          );
-          
-          // 이전 화면으로 돌아가기
-          Navigator.of(context).pop(true);
-        } else {
-          ErrorHandler.showErrorSnackBar(
-            context,
-            '후기 작성에 실패했습니다.',
-          );
-        }
+        ErrorHandler.showSuccessSnackBar(
+          context,
+          '후기가 성공적으로 작성되었습니다!',
+        );
+        
+        // 이전 화면으로 돌아가기
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       if (mounted) {

@@ -11,7 +11,7 @@ class ReviewService {
       
       return await ApiService.getMyReviews(token);
     } catch (e) {
-      print('내 후기 목록 조회 오류: $e');
+      Logger.error('내 후기 목록 조회 오류', tag: 'ReviewService', error: e);
       return [];
     }
   }
@@ -25,6 +25,8 @@ class ReviewService {
       await ApiService.createReview(review.toJson(), token);
       return true;
     } catch (e) {
+      // 에러 로깅
+      Logger.error('후기 작성 오류', tag: 'ReviewService', error: e);
       // 에러를 다시 throw하여 호출자가 처리할 수 있도록 함
       rethrow;
     }
@@ -39,7 +41,7 @@ class ReviewService {
       await ApiService.updateReview(reviewId, review.toJson(), token);
       return true;
     } catch (e) {
-      print('후기 수정 오류: $e');
+      Logger.error('후기 수정 오류', tag: 'ReviewService', error: e);
       return false;
     }
   }
@@ -53,7 +55,7 @@ class ReviewService {
       await ApiService.deleteReview(reviewId, token);
       return true;
     } catch (e) {
-      print('후기 삭제 오류: $e');
+      Logger.error('후기 삭제 오류', tag: 'ReviewService', error: e);
       return false;
     }
   }
@@ -66,7 +68,7 @@ class ReviewService {
       
       return await ApiService.getUserReviews(userId, token);
     } catch (e) {
-      print('사용자 후기 목록 조회 오류: $e');
+      Logger.error('사용자 후기 목록 조회 오류', tag: 'ReviewService', error: e);
       return [];
     }
   }
@@ -93,7 +95,7 @@ class ReviewService {
       
       return token;
     } catch (e) {
-      print('토큰 가져오기 오류: $e');
+      Logger.error('토큰 가져오기 오류', tag: 'ReviewService', error: e);
       return null;
     }
   }
