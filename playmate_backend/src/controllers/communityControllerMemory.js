@@ -883,6 +883,47 @@ const getMyCommentedPosts = (req, res) => {
   }
 };
 
+// 게시글 공유 통계 조회
+const getPostShareStatistics = (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    
+    console.log(`게시글 공유 통계 조회 요청: 게시글 ID ${postId}`);
+    
+    const post = posts.find(p => p.id === postId);
+    
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: '게시글을 찾을 수 없습니다.'
+      });
+    }
+    
+    // 현재는 기본 공유 수만 반환 (추후 공유 타입별 통계 추가 가능)
+    const statistics = {
+      totalShares: post.shares || 0,
+      kakaoShares: 0, // 추후 구현
+      linkCopies: 0, // 추후 구현
+      otherShares: 0, // 추후 구현
+      trendingRank: 0, // 추후 구현
+    };
+    
+    console.log(`게시글 공유 통계 반환: 총 ${statistics.totalShares}회`);
+    
+    res.json({
+      success: true,
+      data: statistics
+    });
+  } catch (error) {
+    console.error('게시글 공유 통계 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '공유 통계 조회에 실패했습니다.',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getPosts,
   getPostById,
@@ -900,6 +941,7 @@ module.exports = {
   getMyBookmarks,
   getMyLikes,
   getMyCommentedPosts,
+  getPostShareStatistics,
   loadFromFile,
   saveToFile
 };

@@ -189,15 +189,34 @@ class ShareService {
 
   /// 공유 통계 가져오기
   Future<Map<String, dynamic>> getShareStatistics(int postId) async {
-    // TODO: 실제 API 호출로 공유 통계 가져오기
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    return {
-      'totalShares': 15,
-      'kakaoShares': 8,
-      'linkCopies': 4,
-      'otherShares': 3,
-      'trendingRank': 5,
-    };
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('인증 토큰이 없습니다.');
+      }
+
+      return await ApiService.getPostShareStatistics(postId, token);
+    } catch (e) {
+      Logger.error('공유 통계 조회 실패', tag: 'ShareService', error: e);
+      // 에러 발생 시 기본값 반환
+      return {
+        'totalShares': 0,
+        'kakaoShares': 0,
+        'linkCopies': 0,
+        'otherShares': 0,
+        'trendingRank': 0,
+      };
+    }
+  }
+
+  /// 인증 토큰 가져오기
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('playmate_auth_token');
+    } catch (e) {
+      Logger.error('토큰 가져오기 오류', tag: 'ShareService', error: e);
+      return null;
+    }
   }
 }

@@ -17,7 +17,8 @@ const {
   getUserPosts,
   getMyBookmarks,
   getMyLikes,
-  getMyCommentedPosts
+  getMyCommentedPosts,
+  getPostShareStatistics
 } = require('../controllers/communityControllerMemory');
 
 // 커뮤니티 관련 라우트
@@ -51,6 +52,9 @@ router.route('/posts/:id')
 
 router.route('/posts/:id/like')
   .post(protect, togglePostLike);
+
+router.route('/posts/:id/share-statistics')
+  .get(protect, getPostShareStatistics);
 
 router.route('/posts/:id/comments')
   .get(protect, getComments)
