@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/matching.dart';
 import '../models/location.dart';
 import '../services/matching_data_service.dart';
+import '../services/api_service.dart';
 import '../utils/error_handler.dart';
 
 class HomeProvider extends ChangeNotifier {
@@ -11,6 +13,7 @@ class HomeProvider extends ChangeNotifier {
   List<Matching> _filteredMatchings = [];
   bool _isLoading = false;
   String? _error;
+  int _unreadNotificationCount = 0;
 
   // 필터 상태
   String _searchQuery = '';
@@ -67,6 +70,7 @@ class HomeProvider extends ChangeNotifier {
   List<String> get selectedDistrictIds => _selectedDistrictIds;
   String get sortBy => _sortBy;
   bool get sortAscending => _sortAscending;
+  int get unreadNotificationCount => _unreadNotificationCount;
 
   // 초기화
   void initialize() {
@@ -74,7 +78,23 @@ class HomeProvider extends ChangeNotifier {
     _selectedCityId = null;
     _selectedDistrictIds = [];
     loadMatchings();
+    loadNotificationCount();
     _startAutoRefreshTimer();
+  }
+
+  // 알림 개수 로딩
+  Future<void> loadNotificationCount() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('playmate_auth_token');
+      if (token != null) {
+        _unreadNotificationCount = await ApiService.getNotificationCount(token);
+        notifyListeners();
+      }
+    } catch (e) {
+      // 알림 개수 로드 실패는 무시 (앱 동작에 영향 없음)
+      _unreadNotificationCount = 0;
+    }
   }
 
   // 매칭 데이터 로딩

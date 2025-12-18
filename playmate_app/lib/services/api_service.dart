@@ -1221,6 +1221,31 @@ class ApiService {
       throw ApiException('매칭 삭제 실패: $e');
     }
   }
+
+  // 알림 개수 조회
+  static Future<int> getNotificationCount(String token) async {
+    try {
+      final response = await _makeRequest(
+        'GET',
+        '/notifications/count',
+        headers: _getAuthHeaders(token),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return data['data']['unreadCount'] as int;
+        } else {
+          throw ApiException('알림 개수 조회 실패: ${data['message']}');
+        }
+      } else {
+        throw ApiException('알림 개수 조회 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('알림 개수 조회 실패: $e');
+    }
+  }
 }
 
 // API 예외 클래스

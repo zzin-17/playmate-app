@@ -365,7 +365,7 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
               // 헤더
               HomeHeader(
                 isLoading: homeProvider.isLoading,
-                unreadNotificationCount: 0, // TODO: 실제 알림 개수 연동
+                unreadNotificationCount: homeProvider.unreadNotificationCount,
                 onRefresh: _refresh,
                 onNotificationTap: _onNotificationTap,
               ),
