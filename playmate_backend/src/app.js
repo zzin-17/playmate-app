@@ -16,6 +16,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const healthRoutes = require('./routes/healthRoutes');
 const tennisCourtRoutes = require('./routes/tennisCourtRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
 // 에러 핸들러 import
 const { notFound, errorHandler } = require('./middleware/errorHandler');
@@ -49,6 +50,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/tennis-courts', tennisCourtRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Error handling middleware
 app.use(notFound);

@@ -152,6 +152,20 @@ class ApiService {
     return headers;
   }
 
+  // 신고 생성
+  static Future<void> createReport(Map<String, dynamic> reportData, String token) async {
+    try {
+      await _makeRequest(
+        'POST',
+        '/reports',
+        headers: _getAuthHeaders(token),
+        body: json.encode(reportData),
+      );
+    } catch (e) {
+      throw ApiException('신고 생성 실패: $e');
+    }
+  }
+
   // HTTP 요청 실행
   static Future<http.Response> _makeRequest(
     String method,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/logger.dart';
+import 'api_service.dart';
 
 enum ReportType {
   post,
@@ -62,12 +64,83 @@ class ReportService {
     ReportReason reason,
     String? description,
   ) async {
-    // TODO: 실제 API 호출로 신고 처리
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    Logger.info('신고 처리됨: $type, ID: $targetId, 이유: $reason', tag: 'ReportService');
-    if (description != null) {
-      Logger.debug('신고 설명: $description', tag: 'ReportService');
+    try {
+      final token = await _getAuthToken();
+      if (token == null) throw Exception('인증 토큰이 없습니다.');
+
+      // 백엔드 API 스펙에 맞춰 데이터 변환
+      final reportData = {
+        'type': _getReportTypeString(type),
+        'targetId': targetId,
+        'reason': _getReportReasonString(reason),
+        if (description != null && description.isNotEmpty) 'description': description,
+      };
+
+      await ApiService.createReport(reportData, token);
+      
+      Logger.info('신고 처리됨: $type, ID: $targetId, 이유: $reason', tag: 'ReportService');
+      if (description != null) {
+        Logger.debug('신고 설명: $description', tag: 'ReportService');
+      }
+    } catch (e) {
+      Logger.error('신고 처리 실패', tag: 'ReportService', error: e);
+      rethrow;
+    }
+  }
+
+  /// 인증 토큰 가져오기
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('playmate_auth_token');
+      
+      if (token == null) return null;
+      
+      // 토큰 만료 체크
+      final expiresAt = prefs.getString('token_expires_at');
+      if (expiresAt != null) {
+        final expiryDate = DateTime.parse(expiresAt);
+        if (DateTime.now().isAfter(expiryDate)) {
+          await prefs.remove('playmate_auth_token');
+          await prefs.remove('token_expires_at');
+          return null;
+        }
+      }
+      
+      return token;
+    } catch (e) {
+      Logger.error('토큰 가져오기 오류', tag: 'ReportService', error: e);
+      return null;
+    }
+  }
+
+  /// 신고 타입을 문자열로 변환
+  String _getReportTypeString(ReportType type) {
+    switch (type) {
+      case ReportType.post:
+        return 'post';
+      case ReportType.comment:
+        return 'comment';
+      case ReportType.user:
+        return 'user';
+    }
+  }
+
+  /// 신고 이유를 문자열로 변환
+  String _getReportReasonString(ReportReason reason) {
+    switch (reason) {
+      case ReportReason.spam:
+        return 'spam';
+      case ReportReason.inappropriate:
+        return 'inappropriate';
+      case ReportReason.harassment:
+        return 'harassment';
+      case ReportReason.violence:
+        return 'violence';
+      case ReportReason.copyright:
+        return 'copyright';
+      case ReportReason.other:
+        return 'other';
     }
   }
 
