@@ -89,8 +89,9 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
   }
 
   // 새로고침
-  void _refresh() {
-    context.read<HomeProvider>().refresh();
+  Future<void> _refresh() async {
+    await context.read<HomeProvider>().refresh();
+    await context.read<HomeProvider>().loadNotificationCount();
   }
 
   // 검색 쿼리 변경
