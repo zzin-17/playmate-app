@@ -873,6 +873,83 @@ const cancelMatchingConfirmation = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Get matching applicants
+// @route   GET /api/matchings/:id/applicants
+// @access  Private (Host only)
+const getMatchingApplicants = asyncHandler(async (req, res) => {
+  try {
+    const matchingId = parseInt(req.params.id);
+    const userId = req.user.id;
+    
+    console.log(`🔍 매칭 신청자 목록 조회: 매칭 ${matchingId}, 사용자 ${userId}`);
+    
+    // 메모리에서 매칭 찾기
+    const matching = memoryStore.matchings.get(matchingId);
+    
+    if (!matching) {
+      console.log(`❌ 매칭을 찾을 수 없음: ${matchingId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Matching not found'
+      });
+    }
+    
+    // 호스트 권한 확인
+    if (matching.host.id !== userId) {
+      console.log(`❌ 매칭 신청자 목록 조회 권한 없음: 사용자 ${userId}, 호스트 ${matching.host.id}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Only host can view applicants'
+      });
+    }
+    
+    // 신청자 ID 목록 가져오기
+    const appliedUserIds = matching.appliedUserIds || [];
+    
+    // UserStore에서 사용자 정보 가져오기
+    const userStore = require('../stores/userStore');
+    const applicants = [];
+    
+    for (const applicantId of appliedUserIds) {
+      const user = userStore.getUserById(applicantId);
+      if (user) {
+        // 이미 확정된 사용자는 제외
+        const isConfirmed = matching.confirmedUserIds && matching.confirmedUserIds.includes(applicantId);
+        if (!isConfirmed) {
+          applicants.push({
+            user: {
+              id: user.id,
+              email: user.email,
+              nickname: user.nickname,
+              profileImage: user.profileImage,
+              skillLevel: user.skillLevel || 'N/A',
+              region: user.location || 'N/A',
+              createdAt: user.createdAt,
+              updatedAt: user.updatedAt,
+            },
+            appliedAt: matching.createdAt, // 신청 시간은 매칭 생성 시간으로 임시 설정
+            message: '', // 신청 메시지는 추후 추가 가능
+          });
+        }
+      }
+    }
+    
+    console.log(`✅ 매칭 신청자 ${applicants.length}명 반환`);
+    
+    res.json({
+      success: true,
+      data: applicants
+    });
+  } catch (error) {
+    console.error('❌ 매칭 신청자 목록 조회 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get matching applicants',
+      error: error.message
+    });
+  }
+});
+
 module.exports = {
   getMatchings,
   getMatching,
@@ -885,5 +962,6 @@ module.exports = {
   confirmMatching,
   cancelMatching,
   completeMatching,
-  cancelMatchingConfirmation
+  cancelMatchingConfirmation,
+  getMatchingApplicants
 };

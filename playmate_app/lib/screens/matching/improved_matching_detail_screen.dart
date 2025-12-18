@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/matching.dart';
 import '../../models/user.dart';
 import '../../constants/app_colors.dart';
@@ -7,6 +8,7 @@ import '../../widgets/common/app_button.dart';
 import '../../services/matching_state_service.dart';
 import '../../services/user_service.dart';
 import '../../services/location_service.dart';
+import '../../services/api_service.dart';
 import '../chat/chat_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../review/write_review_screen.dart';
@@ -77,24 +79,46 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
   }
 
   Future<void> _loadApplicants() async {
+    // 호스트만 신청자 목록을 볼 수 있음
+    if (widget.matching.host.id != widget.currentUser.id) {
+      setState(() {
+        _applicants = [];
+        _isLoading = false;
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // TODO: 실제 신청자 목록 API 연동
-      // final matchingService = MatchingService();
-      // final applicants = await matchingService.getMatchingApplicants(widget.matching.id);
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('인증 토큰이 없습니다.');
+      }
+
+      final applicants = await ApiService.getMatchingApplicants(widget.matching.id, token);
       
       setState(() {
-        _applicants = []; // 임시로 빈 리스트
+        _applicants = applicants;
         _isLoading = false;
       });
     } catch (e) {
       print('신청자 목록 로드 실패: $e');
       setState(() {
+        _applicants = [];
         _isLoading = false;
       });
+    }
+  }
+
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('playmate_auth_token');
+    } catch (e) {
+      return null;
     }
   }
 

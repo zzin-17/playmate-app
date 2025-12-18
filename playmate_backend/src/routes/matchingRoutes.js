@@ -13,7 +13,8 @@ const {
   confirmMatching,
   cancelMatching,
   completeMatching,
-  cancelMatchingConfirmation
+  cancelMatchingConfirmation,
+  getMatchingApplicants
 } = require('../controllers/matchingController');
 
 // 매칭 관련 라우트 (순서 중요: 구체적인 경로를 먼저 정의)
@@ -30,6 +31,9 @@ router.route('/:id')
   .get(protect, getMatching)
   .put(protect, updateMatching)
   .delete(protect, deleteMatching);
+
+router.route('/:id/applicants')
+  .get(protect, getMatchingApplicants);
 
 router.route('/:id/join')
   .post(protect, joinMatching);
