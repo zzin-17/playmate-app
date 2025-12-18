@@ -120,44 +120,34 @@ class _CommentScreenState extends State<CommentScreen> {
     });
 
     try {
-      // TODO: 실제 API 호출로 변경
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      final newReply = Comment(
-        id: DateTime.now().millisecondsSinceEpoch,
+      print('🔍 답글 작성 시작: "${_replyController.text.trim()}"');
+      final newReply = await _communityService.createComment(
         postId: widget.post.id,
-        authorId: context.read<AuthProvider>().currentUser?.id ?? 1,
-        authorNickname: context.read<AuthProvider>().currentUser?.nickname ?? '사용자',
-        authorProfileImage: context.read<AuthProvider>().currentUser?.profileImage,
         content: _replyController.text.trim(),
         parentCommentId: _replyingTo!.id,
-        likeCount: 0,
-        isLikedByCurrentUser: false,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
       );
 
-      // 부모 댓글에 답글 추가
-      setState(() {
-        final parentIndex = _comments.indexWhere((c) => c.id == _replyingTo!.id);
-        if (parentIndex != -1) {
-          final parentComment = _comments[parentIndex];
-          final updatedParent = parentComment.copyWith(
-            replies: [...parentComment.replies, newReply],
-          );
-          _comments[parentIndex] = updatedParent;
-        }
-        _replyController.clear();
-        _replyingTo = null;
-      });
+      if (newReply != null) {
+        // 댓글 목록 새로고침하여 최신 상태 반영
+        await _loadComments();
+        
+        setState(() {
+          _replyController.clear();
+          _replyingTo = null;
+        });
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('답글이 작성되었습니다.')),
-        );
+        print('✅ 답글 작성 완료: ID ${newReply.id}');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('답글이 작성되었습니다.')),
+          );
+        }
+      } else {
+        throw Exception('답글 작성 응답이 null입니다');
       }
     } catch (e) {
-      print('답글 작성 실패: $e');
+      print('❌ 답글 작성 실패: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('답글 작성에 실패했습니다.')),
@@ -277,23 +267,23 @@ class _CommentScreenState extends State<CommentScreen> {
 
   Future<void> _toggleLike(Comment comment) async {
     try {
-      // TODO: 실제 API 호출로 변경
-      await Future.delayed(const Duration(milliseconds: 300));
+      print('🔍 댓글 좋아요 토글 시작: ID ${comment.id}');
+      final success = await _communityService.toggleCommentLike(comment.id);
       
-      setState(() {
-        final commentIndex = _comments.indexWhere((c) => c.id == comment.id);
-        if (commentIndex != -1) {
-          final updatedComment = _comments[commentIndex].copyWith(
-            isLikedByCurrentUser: !comment.isLikedByCurrentUser,
-            likeCount: comment.isLikedByCurrentUser 
-                ? comment.likeCount - 1 
-                : comment.likeCount + 1,
-          );
-          _comments[commentIndex] = updatedComment;
-        }
-      });
+      if (success) {
+        // 댓글 목록 새로고침하여 최신 상태 반영
+        await _loadComments();
+        print('✅ 댓글 좋아요 토글 완료');
+      } else {
+        throw Exception('댓글 좋아요 토글 실패');
+      }
     } catch (e) {
-      print('좋아요 토글 실패: $e');
+      print('❌ 댓글 좋아요 토글 실패: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('좋아요 처리에 실패했습니다.')),
+        );
+      }
     }
   }
 

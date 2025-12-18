@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../models/post.dart';
 import '../models/comment.dart';
 import 'api_service.dart';
+import '../utils/logger.dart';
 
 /// 커뮤니티 관련 API 서비스
 /// 게시글, 댓글, 좋아요 등의 기능을 제공
@@ -215,7 +216,7 @@ class CommunityService {
 
       final commentData = {
         'content': content,
-        if (parentCommentId != null) 'parent_comment_id': parentCommentId,
+        if (parentCommentId != null) 'parentCommentId': parentCommentId,
       };
 
       final response = await ApiService.post(
@@ -238,7 +239,7 @@ class CommunityService {
         throw Exception('댓글 작성 실패: ${response.statusCode}');
       }
     } catch (e) {
-      print('댓글 작성 오류: $e');
+      Logger.error('댓글 작성 오류', tag: 'CommunityService', error: e);
       return null;
     }
   }
@@ -276,7 +277,7 @@ class CommunityService {
         throw Exception('댓글 수정 실패: ${response.statusCode}');
       }
     } catch (e) {
-      print('댓글 수정 오류: $e');
+      Logger.error('댓글 수정 오류', tag: 'CommunityService', error: e);
       return null;
     }
   }
@@ -294,7 +295,7 @@ class CommunityService {
 
       return response.statusCode == 200;
     } catch (e) {
-      print('댓글 삭제 오류: $e');
+      Logger.error('댓글 삭제 오류', tag: 'CommunityService', error: e);
       return false;
     }
   }
@@ -312,7 +313,7 @@ class CommunityService {
 
       return response.statusCode == 200;
     } catch (e) {
-      print('댓글 좋아요 토글 오류: $e');
+      Logger.error('댓글 좋아요 토글 오류', tag: 'CommunityService', error: e);
       return false;
     }
   }
