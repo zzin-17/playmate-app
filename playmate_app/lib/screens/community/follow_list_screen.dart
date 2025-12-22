@@ -5,6 +5,7 @@ import '../../models/user.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../services/user_service.dart';
+import '../../utils/logger.dart';
 
 class FollowListScreen extends StatefulWidget {
   final String title;
@@ -43,92 +44,22 @@ class _FollowListScreenState extends State<FollowListScreen> {
       if (widget.isFollowing) {
         // 팔로잉 목록 조회
         _users = await _userService.getFollowing(widget.userId);
+        Logger.info('팔로잉 목록 로드 완료: ${_users.length}명', tag: 'FollowListScreen');
       } else {
         // 팔로워 목록 조회
         _users = await _userService.getFollowers(widget.userId);
-      }
-      
-      // API 호출이 실패하거나 빈 결과인 경우 Mock 데이터 사용
-      if (_users.isEmpty) {
-        _users = _getMockUsers();
+        Logger.info('팔로워 목록 로드 완료: ${_users.length}명', tag: 'FollowListScreen');
       }
     } catch (e) {
-      print('사용자 목록 로드 실패: $e');
-      // 오류 발생 시 Mock 데이터 사용
-      _users = _getMockUsers();
+      Logger.error('사용자 목록 로드 실패', tag: 'FollowListScreen', error: e);
+      setState(() {
+        _users = [];
+      });
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
-  }
-
-  List<User> _getMockUsers() {
-    return [
-      User(
-        id: 1,
-        email: 'user1@example.com',
-        nickname: '테니스왕김철수',
-        gender: 'male',
-        birthYear: 1990,
-        region: '서울 강남구',
-        skillLevel: 5,
-        startYearMonth: '2020-03',
-        preferredCourt: '하드코트',
-        preferredTime: ['저녁'],
-        playStyle: '공격적',
-        hasLesson: true,
-        mannerScore: 4.8,
-        profileImage: null,
-        createdAt: DateTime.now().subtract(const Duration(days: 30)),
-        updatedAt: DateTime.now(),
-        followingIds: [2, 3],
-        followerIds: [2, 4],
-        bio: '테니스 5년차입니다. 함께 즐겁게 치고 싶어요!',
-      ),
-      User(
-        id: 2,
-        email: 'user2@example.com',
-        nickname: '라켓마스터',
-        gender: 'female',
-        birthYear: 1988,
-        region: '서울 서초구',
-        skillLevel: 7,
-        startYearMonth: '2018-06',
-        preferredCourt: '클레이코트',
-        preferredTime: ['오전'],
-        playStyle: '전략적',
-        hasLesson: false,
-        mannerScore: 4.9,
-        profileImage: null,
-        createdAt: DateTime.now().subtract(const Duration(days: 60)),
-        updatedAt: DateTime.now(),
-        followingIds: [1, 3],
-        followerIds: [1, 3],
-        bio: '클레이코트를 좋아하는 테니스 애호가입니다.',
-      ),
-      User(
-        id: 3,
-        email: 'user3@example.com',
-        nickname: '스매셔',
-        gender: 'male',
-        birthYear: 1992,
-        region: '서울 송파구',
-        skillLevel: 6,
-        startYearMonth: '2019-01',
-        preferredCourt: '하드코트',
-        preferredTime: ['오후'],
-        playStyle: '파워풀',
-        hasLesson: true,
-        mannerScore: 4.7,
-        profileImage: null,
-        createdAt: DateTime.now().subtract(const Duration(days: 45)),
-        updatedAt: DateTime.now(),
-        followingIds: [1, 2],
-        followerIds: [1, 2],
-        bio: '강한 서브와 스매시가 특기입니다!',
-      ),
-    ];
   }
 
   @override

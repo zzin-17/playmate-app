@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/matching.dart';
 import '../../models/user.dart';
 import '../../constants/app_colors.dart';
@@ -8,6 +9,8 @@ import '../../services/matching_state_service.dart';
 import '../../services/matching_data_service.dart';
 import '../../services/matching_service.dart';
 import '../../services/user_service.dart';
+import '../../services/api_service.dart';
+import '../../utils/logger.dart';
 
 import '../chat/chat_screen.dart';
 import '../profile/user_profile_screen.dart';
@@ -37,10 +40,12 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
   String _currentMatchingStatus = 'recruiting'; // 현재 매칭 상태
   List<int> _confirmedUserIds = []; // 확정된 사용자 ID 목록
   bool _isFollowingHost = false; // 호스트 팔로우 상태
+  Matching? _currentMatching; // 최신 매칭 데이터
 
   @override
   void initState() {
     super.initState();
+    _currentMatching = widget.matching; // 초기값 설정
     _checkUserStatus();
     
     // 매칭 상태 서비스 초기화 및 리스너 등록
@@ -117,38 +122,67 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     }
   }
 
+  // 현재 매칭 데이터 가져오기 (최신 데이터 우선)
+  Matching get _matching => _currentMatching ?? widget.matching;
+
   // 사용자의 매칭 참여 상태 확인
   void _checkUserStatus() async {
     setState(() {
       _isLoading = true;
     });
     
-    // 팔로워 전용 매칭인 경우에만 팔로우 상태 확인
-    if (widget.matching.isFollowersOnly) {
-      await _checkFollowStatus();
-    }
-
     try {
-      // 호스트 여부 확인
-      
-      // 게스트로 참여 중인지 확인
-      // if (widget.matching.guests != null) {
-      //   _isParticipating = widget.matching.guests!.any((guest) => guest.id == currentUserId);
-      // }
-      
-      // 신청 중인지 확인 (임시 로직)
-      // _hasApplied = _applicants.any((applicant) => applicant['user'].id == currentUserId);
-      
-      // TODO: 실제 API 호출로 매칭 데이터 로딩
-      await Future.delayed(const Duration(milliseconds: 1000)); // 로딩 시뮬레이션
+      // 인증 토큰 가져오기
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('playmate_auth_token');
+
+      if (token == null) {
+        Logger.warning('인증 토큰이 없습니다', tag: 'MatchingDetailScreen');
+        setState(() {
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // 실제 API 호출로 매칭 데이터 로딩
+      final matching = await ApiService.getMatchingDetail(
+        widget.matching.id,
+        token,
+      );
+
+      // 팔로워 전용 매칭인 경우에만 팔로우 상태 확인
+      if (matching.isFollowersOnly) {
+        await _checkFollowStatus();
+      }
+
+      // 최신 매칭 데이터 업데이트
+      setState(() {
+        _currentMatching = matching;
+        _currentMatchingStatus = matching.status;
+        _confirmedUserIds = matching.confirmedUserIds ?? [];
+      });
+
+      Logger.info('매칭 데이터 로딩 완료: ${matching.id}', tag: 'MatchingDetailScreen');
       
     } catch (e) {
-      print('매칭 데이터 로딩 실패: $e');
-      // 에러 처리
+      Logger.error('매칭 데이터 로딩 실패: $e', tag: 'MatchingDetailScreen');
+      
+      // 에러 발생 시에도 기존 데이터 사용
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('매칭 정보를 불러오는 중 오류가 발생했습니다: ${e.toString()}'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -195,8 +229,8 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
     try {
       // 현재는 매칭의 guests 데이터를 사용
       // 실제로는 별도의 신청자 API가 있어야 함
-      if (widget.matching.guests != null && widget.matching.guests!.isNotEmpty) {
-        _applicants = widget.matching.guests!.map((guest) => {
+      if (_matching.guests != null && _matching.guests!.isNotEmpty) {
+        _applicants = _matching.guests!.map((guest) => {
           'user': guest,
           'status': 'pending',
           'message': '신청했습니다.',
@@ -1058,12 +1092,63 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
       ),
     );
   }
+  */
+
+  // 확정된 게스트 목록 섹션
+  Widget _buildConfirmedGuestsSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.check_circle,
+                color: AppColors.success,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '확정된 참여자',
+                style: AppTextStyles.h3.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_getConfirmedGuests().length}명 확정',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.success,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildConfirmedGuestsList(),
+        ],
+      ),
+    );
+  }
 
   // 확정된 게스트 목록 위젯
   Widget _buildConfirmedGuestsList() {
-    // 실제로는 API에서 확정된 게스트 정보를 가져와야 함
-    // 현재는 mock 데이터 사용
-    final confirmedGuests = _getMockConfirmedGuests();
+    // 실제 매칭 데이터에서 확정된 게스트 정보 가져오기
+    final confirmedGuests = _getConfirmedGuests();
     
     if (confirmedGuests.isEmpty) {
       return Container(
@@ -1093,52 +1178,99 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
       children: confirmedGuests.map((guest) => _buildConfirmedGuestCard(guest)).toList(),
     );
   }
-  */
 
-
-
-  // Mock 확정된 게스트 데이터 (사용되지 않음)
-  /*
-  List<Map<String, dynamic>> _getMockConfirmedGuests() {
-    // 실제로는 API에서 가져와야 함
-    return [
-      {
-        'user': User(
-          id: 5,
-          email: 'guest1@example.com',
-          nickname: '테니스러버',
-          gender: 'male',
-          birthYear: 1992,
-          startYearMonth: '2020-03',
-          skillLevel: 3,
-          mannerScore: 4.2,
-          ntrpScore: 3.8,
-          reviewCount: 15,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-        'confirmedAt': DateTime.now().subtract(const Duration(hours: 2)),
-      },
-      {
-        'user': User(
-          id: 6,
-          email: 'guest2@example.com',
-          nickname: '테니스초보',
-          gender: 'female',
-          birthYear: 1995,
-          startYearMonth: '2023-01',
-          skillLevel: 2,
-          mannerScore: 4.5,
-          ntrpScore: 2.5,
-          reviewCount: 8,
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-        'confirmedAt': DateTime.now().subtract(const Duration(hours: 1)),
-      },
-    ];
+  // 확정된 게스트 목록 가져오기 (실제 데이터 사용)
+  List<Map<String, dynamic>> _getConfirmedGuests() {
+    if (_currentMatching == null) return [];
+    
+    final confirmedUserIds = _currentMatching!.confirmedUserIds ?? [];
+    if (confirmedUserIds.isEmpty) return [];
+    
+    // guests에서 confirmedUserIds에 해당하는 사용자만 필터링
+    final guests = _currentMatching!.guests ?? [];
+    final confirmedGuests = guests
+        .where((guest) => confirmedUserIds.contains(guest.id))
+        .map((guest) => {
+              'user': guest,
+              'confirmedAt': _currentMatching!.updatedAt,
+            })
+        .toList();
+    
+    return confirmedGuests;
   }
-  */
+
+  // 확정된 게스트 카드 위젯
+  Widget _buildConfirmedGuestCard(Map<String, dynamic> guestData) {
+    final user = guestData['user'] as User;
+    final confirmedAt = guestData['confirmedAt'] as DateTime?;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.cardBorder),
+      ),
+      child: Row(
+        children: [
+          // 프로필 이미지
+          CircleAvatar(
+            radius: 24,
+            backgroundImage: user.profileImage != null
+                ? NetworkImage(user.profileImage!)
+                : null,
+            child: user.profileImage == null
+                ? Text(
+                    user.nickname.isNotEmpty ? user.nickname[0] : '?',
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 12),
+          // 사용자 정보
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.nickname,
+                  style: AppTextStyles.body.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (confirmedAt != null)
+                  Text(
+                    '확정: ${_formatDate(confirmedAt)}',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // 확정 상태 표시
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '확정',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.success,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
 
   Widget _buildInfoRow(String label, String value) {
@@ -1393,6 +1525,10 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
                         _buildHostInfo(),
                         const SizedBox(height: 24),
                         _buildApplicantsSection(),
+                        if (isHost && _getConfirmedGuests().isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          _buildConfirmedGuestsSection(),
+                        ],
                       ],
                     ),
                   ),
@@ -2189,15 +2325,38 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
             child: const Text('취소'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
-              // TODO: 매칭 상태를 'completed'로 변경하는 로직 구현
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('매칭이 완료되었습니다.'),
-                  backgroundColor: AppColors.success,
-                ),
-              );
+              
+              // 매칭 상태를 'completed'로 변경
+              final stateService = MatchingStateService();
+              final success = await stateService.completeMatching(widget.matching.id);
+              
+              if (success && mounted) {
+                // 상태 업데이트
+                setState(() {
+                  _currentMatchingStatus = 'completed';
+                });
+                
+                // 상위 화면에 매칭 업데이트 알림
+                if (widget.onMatchingUpdated != null) {
+                  widget.onMatchingUpdated!();
+                }
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('매칭이 완료되었습니다.'),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+              } else if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('매칭 완료 처리에 실패했습니다.'),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
             },
             child: const Text('완료'),
           ),
@@ -2205,5 +2364,4 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
       ),
     );
   }
-}
-  
+} 

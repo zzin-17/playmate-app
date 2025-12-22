@@ -916,17 +916,23 @@ const getMatchingApplicants = asyncHandler(async (req, res) => {
         // 이미 확정된 사용자는 제외
         const isConfirmed = matching.confirmedUserIds && matching.confirmedUserIds.includes(applicantId);
         if (!isConfirmed) {
+          // User 모델의 필수 필드 포함
+          const userData = {
+            id: user.id,
+            nickname: user.nickname,
+            email: user.email || null,
+            profileImage: user.profileImage || null,
+            bio: user.bio || null,
+            birthYear: user.birthYear || null,
+            gender: user.gender || null,
+            region: user.location || null,
+            skillLevel: user.skillLevel || null,
+            createdAt: user.createdAt ? (typeof user.createdAt === 'string' ? user.createdAt : new Date(user.createdAt).toISOString()) : new Date().toISOString(),
+            updatedAt: user.updatedAt ? (typeof user.updatedAt === 'string' ? user.updatedAt : new Date(user.updatedAt).toISOString()) : new Date().toISOString(),
+          };
+          
           applicants.push({
-            user: {
-              id: user.id,
-              email: user.email,
-              nickname: user.nickname,
-              profileImage: user.profileImage,
-              skillLevel: user.skillLevel || 'N/A',
-              region: user.location || 'N/A',
-              createdAt: user.createdAt,
-              updatedAt: user.updatedAt,
-            },
+            user: userData,
             appliedAt: matching.createdAt, // 신청 시간은 매칭 생성 시간으로 임시 설정
             message: '', // 신청 메시지는 추후 추가 가능
           });
@@ -950,6 +956,117 @@ const getMatchingApplicants = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Respond to matching request (accept/reject)
+// @route   POST /api/matchings/:id/respond
+// @access  Private (Host only)
+const respondToMatching = asyncHandler(async (req, res) => {
+  try {
+    const matchingId = parseInt(req.params.id);
+    const userId = req.user.id;
+    const { request_user_id, action } = req.body;
+    
+    console.log(`🔍 매칭 응답 요청: 매칭 ${matchingId}, 사용자 ${userId}, 신청자 ${request_user_id}, 액션 ${action}`);
+    
+    // 필수 필드 검증
+    if (!request_user_id || !action) {
+      return res.status(400).json({
+        success: false,
+        message: 'request_user_id and action are required'
+      });
+    }
+    
+    if (action !== 'accept' && action !== 'reject') {
+      return res.status(400).json({
+        success: false,
+        message: 'action must be "accept" or "reject"'
+      });
+    }
+    
+    // 메모리에서 매칭 찾기
+    const matching = memoryStore.matchings.get(matchingId);
+    
+    if (!matching) {
+      console.log(`❌ 매칭을 찾을 수 없음: ${matchingId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Matching not found'
+      });
+    }
+    
+    // 호스트 권한 확인
+    if (matching.host.id !== userId) {
+      console.log(`❌ 매칭 응답 권한 없음: 사용자 ${userId}, 호스트 ${matching.host.id}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Only host can respond to matching requests'
+      });
+    }
+    
+    // 신청자 목록 확인
+    if (!matching.appliedUserIds || !matching.appliedUserIds.includes(request_user_id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'User has not applied to this matching'
+      });
+    }
+    
+    if (action === 'accept') {
+      // 신청자를 확정자로 이동
+      if (!matching.confirmedUserIds) {
+        matching.confirmedUserIds = [];
+      }
+      
+      // 이미 확정된 사용자인지 확인
+      if (matching.confirmedUserIds.includes(request_user_id)) {
+        return res.status(400).json({
+          success: false,
+          message: 'User is already confirmed'
+        });
+      }
+      
+      // 확정자 목록에 추가
+      matching.confirmedUserIds.push(request_user_id);
+      
+      // 신청자 목록에서 제거
+      matching.appliedUserIds = matching.appliedUserIds.filter(id => id !== request_user_id);
+      
+      console.log(`✅ 게스트 확정: 매칭 ${matchingId}, 사용자 ${request_user_id}`);
+    } else if (action === 'reject') {
+      // 신청자 목록에서 제거
+      matching.appliedUserIds = matching.appliedUserIds.filter(id => id !== request_user_id);
+      
+      console.log(`✅ 게스트 거절: 매칭 ${matchingId}, 사용자 ${request_user_id}`);
+    }
+    
+    matching.updatedAt = new Date().toISOString();
+    
+    // 메모리 업데이트
+    memoryStore.matchings.set(matchingId, matching);
+    
+    // 파일에 저장
+    saveToFile();
+    
+    res.json({
+      success: true,
+      message: `Matching request ${action === 'accept' ? 'accepted' : 'rejected'} successfully`,
+      data: {
+        matchingId: matchingId,
+        requestUserId: request_user_id,
+        action: action,
+        appliedUserIds: matching.appliedUserIds,
+        confirmedUserIds: matching.confirmedUserIds
+      }
+    });
+  } catch (error) {
+    console.error('❌ 매칭 응답 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to respond to matching request',
+      error: error.message
+    });
+  }
+});
+
 module.exports = {
   getMatchings,
   getMatching,
@@ -963,5 +1080,6 @@ module.exports = {
   cancelMatching,
   completeMatching,
   cancelMatchingConfirmation,
-  getMatchingApplicants
+  getMatchingApplicants,
+  respondToMatching
 };

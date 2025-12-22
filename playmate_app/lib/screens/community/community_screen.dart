@@ -1217,10 +1217,11 @@ class _CommunityScreenState extends State<CommunityScreen>
     });
 
     try {
-      // 실제 API 호출로 변경 (향후 구현)
-      await Future.delayed(const Duration(milliseconds: 800)); // 로딩 시뮬레이션
-      
-      final newPosts = _getMockPostsForPage(_currentPage);
+      // 실제 API 호출
+      final newPosts = await _communityService.getPosts(
+        page: _currentPage,
+        limit: _pageSize,
+      );
       
       if (newPosts.isEmpty) {
         setState(() {
@@ -1234,6 +1235,9 @@ class _CommunityScreenState extends State<CommunityScreen>
       }
     } catch (e) {
       print('추가 데이터 로딩 실패: $e');
+      setState(() {
+        _hasMoreData = false;
+      });
     } finally {
       setState(() {
         _isLoading = false;
@@ -1269,23 +1273,6 @@ class _CommunityScreenState extends State<CommunityScreen>
   }
   */
 
-  /// 페이지별 목업 데이터 생성 (폴백용)
-  List<Post> _getMockPostsForPage(int page) {
-    if (page > 3) return []; // 3페이지까지만 데이터 제공
-    
-    final startIndex = (page - 1) * _pageSize;
-    final allPosts = _getAllMockPosts();
-    
-    if (startIndex >= allPosts.length) return [];
-    
-    final endIndex = (startIndex + _pageSize).clamp(0, allPosts.length);
-    return allPosts.sublist(startIndex, endIndex);
-  }
-
-  /// 모든 목업 데이터 (폴백용) - 실제 환경에서는 사용하지 않음
-  List<Post> _getAllMockPosts() {
-    return []; // 실제 환경에서는 빈 목록 반환
-  }
 
 
 

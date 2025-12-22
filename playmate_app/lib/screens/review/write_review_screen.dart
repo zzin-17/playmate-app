@@ -7,17 +7,21 @@ import '../../models/review.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../services/review_service.dart';
+import '../../services/user_service.dart';
 import '../../utils/error_handler.dart';
+import '../../utils/logger.dart';
 import '../../providers/auth_provider.dart';
 
 class WriteReviewScreen extends StatefulWidget {
   final User targetUser; // 리뷰 대상자
   final Matching matching; // 해당 매칭
+  final VoidCallback? onReviewCompleted; // 후기 작성 완료 콜백
 
   const WriteReviewScreen({
     super.key,
     required this.targetUser,
     required this.matching,
+    this.onReviewCompleted,
   });
 
   @override
@@ -28,12 +32,85 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
   double _ntrpScore = 3.0; // 기본값 3.0
   double _mannerScore = 4.0; // 기본값 4.0
   final TextEditingController _commentController = TextEditingController();
+  final UserService _userService = UserService();
+  bool _isFollowing = false; // 팔로우 상태
+  bool _isLoadingFollowStatus = false; // 팔로우 상태 로딩 중
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFollowStatus();
+  }
 
   @override
   void dispose() {
     _commentController.dispose();
     super.dispose();
+  }
+
+  // 팔로우 상태 로드
+  Future<void> _loadFollowStatus() async {
+    setState(() {
+      _isLoadingFollowStatus = true;
+    });
+
+    try {
+      final isFollowing = await _userService.isFollowing(widget.targetUser.id);
+      if (mounted) {
+        setState(() {
+          _isFollowing = isFollowing;
+          _isLoadingFollowStatus = false;
+        });
+      }
+    } catch (e) {
+      Logger.error('팔로우 상태 확인 실패: $e', tag: 'WriteReviewScreen');
+      if (mounted) {
+        setState(() {
+          _isLoadingFollowStatus = false;
+        });
+      }
+    }
+  }
+
+  // 팔로우/언팔로우 토글
+  Future<void> _toggleFollow() async {
+    try {
+      final success = _isFollowing
+          ? await _userService.unfollowUser(widget.targetUser.id)
+          : await _userService.followUser(widget.targetUser.id);
+
+      if (success && mounted) {
+        setState(() {
+          _isFollowing = !_isFollowing;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isFollowing
+                  ? '${widget.targetUser.nickname}님 팔로우를 성공했습니다!'
+                  : '${widget.targetUser.nickname}님 팔로우를 취소했습니다!',
+            ),
+            backgroundColor: _isFollowing ? AppColors.success : AppColors.textSecondary,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      } else {
+        throw Exception('팔로우 상태 변경에 실패했습니다');
+      }
+    } catch (e) {
+      Logger.error('팔로우 토글 실패: $e', tag: 'WriteReviewScreen');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('팔로우 상태 변경에 실패했습니다: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -144,32 +221,20 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
 
   // 팔로우 버튼 위젯
   Widget _buildFollowButton() {
-    // TODO: 실제 팔로우 상태 확인 로직으로 대체
-    bool isFollowing = false; // 임시로 false로 설정
-    
+    if (_isLoadingFollowStatus) {
+      return const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          isFollowing = !isFollowing;
-        });
-        
-        // 팔로우/언팔로우 성공 메시지
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isFollowing 
-                ? '${widget.targetUser.nickname}님 팔로우를 성공했습니다!' 
-                : '${widget.targetUser.nickname}님 팔로우를 취소했습니다!',
-            ),
-            backgroundColor: isFollowing ? AppColors.success : AppColors.textSecondary,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      },
+      onTap: _toggleFollow,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.primary,
+          color: _isFollowing ? AppColors.textSecondary : AppColors.primary,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: Colors.transparent,
@@ -180,13 +245,13 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.person_add,
+              _isFollowing ? Icons.person_remove : Icons.person_add,
               size: 14,
               color: Colors.white,
             ),
             const SizedBox(width: 4),
             Text(
-              '팔로우',
+              _isFollowing ? '언팔로우' : '팔로우',
               style: AppTextStyles.caption.copyWith(
                 color: Colors.white,
                 fontSize: 11,
@@ -561,8 +626,13 @@ class _WriteReviewScreenState extends State<WriteReviewScreen> {
           '후기가 성공적으로 작성되었습니다!',
         );
         
-        // 이전 화면으로 돌아가기
-        Navigator.of(context).pop(true);
+        // 콜백 호출 (배치 후기 작성 화면에서 사용)
+        if (widget.onReviewCompleted != null) {
+          widget.onReviewCompleted!();
+        } else {
+          // 이전 화면으로 돌아가기
+          Navigator.of(context).pop(true);
+        }
       }
     } catch (e) {
       if (mounted) {

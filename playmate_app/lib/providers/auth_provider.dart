@@ -3,6 +3,8 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:kakao_flutter_sdk/kakao_flutter_sdk.dart' hide User;
+import 'package:kakao_flutter_sdk/kakao_flutter_sdk.dart' as kakao show User;
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../utils/error_handler.dart';
@@ -293,15 +295,64 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // 카카오 로그인 (임시 구현)
+  // 카카오 로그인
   Future<bool> loginWithKakao() async {
     _setLoading(true);
     _clearError();
 
     try {
-      // TODO: 실제 카카오 로그인 구현
-      await Future.delayed(const Duration(seconds: 1));
-      _setError('카카오 로그인은 아직 구현되지 않았습니다.');
+      // 카카오 로그인 시도
+      await UserApi.instance.loginWithKakaoTalk();
+      
+      // 카카오 사용자 정보 가져오기
+      kakao.User kakaoUser = await UserApi.instance.me();
+      
+      // 카카오 계정 정보 추출
+      final kakaoId = kakaoUser.id.toString();
+      final email = kakaoUser.kakaoAccount?.email;
+      final nickname = kakaoUser.kakaoAccount?.profile?.nickname ?? 
+                      kakaoUser.kakaoAccount?.name ?? 
+                      '카카오 사용자';
+      final profileImage = kakaoUser.kakaoAccount?.profile?.profileImageUrl;
+      
+      // 백엔드 API 호출
+      final response = await ApiService.loginWithKakao(
+        kakaoId: kakaoId,
+        email: email,
+        nickname: nickname,
+        profileImage: profileImage,
+      );
+
+      // API 응답 처리
+      if (response['success'] == true && response['data'] != null) {
+        final data = response['data'] as Map<String, dynamic>;
+        
+        await _saveToken(data['token'] as String);
+        
+        // API 응답에 누락된 필드 추가
+        final userData = Map<String, dynamic>.from(data);
+        userData['createdAt'] = userData['createdAt'] ?? DateTime.now().toIso8601String();
+        userData['updatedAt'] = userData['updatedAt'] ?? DateTime.now().toIso8601String();
+        
+        _currentUser = User.fromJson(userData);
+        
+        // 프로필 자동 동기화 시작
+        _startProfileSync();
+        
+        _setLoading(false);
+        notifyListeners();
+        return true;
+      } else {
+        throw Exception('카카오 로그인 실패: ${response['message'] ?? '알 수 없는 오류'}');
+      }
+    } on KakaoException catch (e) {
+      // 카카오 로그인 취소 또는 오류
+      final errorMessage = e.toString().toLowerCase();
+      if (errorMessage.contains('cancelled') || errorMessage.contains('cancel')) {
+        _setError('로그인이 취소되었습니다.');
+      } else {
+        _setError('카카오 로그인 실패: ${e.toString()}');
+      }
       _setLoading(false);
       return false;
     } catch (e) {

@@ -48,6 +48,7 @@ dependencies:
   # 로컬 저장소
   shared_preferences: ^2.5.4
   crypto: ^3.0.7
+  path_provider: ^2.1.4
   
   # 지도 & 위치
   google_maps_flutter: ^2.6.0

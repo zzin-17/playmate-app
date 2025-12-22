@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
+import 'matching_event_bus.dart';
 
 class MatchingStateService extends ChangeNotifier {
   static final MatchingStateService _instance = MatchingStateService._internal();
@@ -26,6 +27,14 @@ class MatchingStateService extends ChangeNotifier {
     // 상태가 변경된 경우에만 알림
     if (oldStatus != status) {
       _notifyStateChange(matchingId, status);
+      
+      // 글로벌 이벤트 발생
+      MatchingEventBus.instance.emit(MatchingStatusChanged(
+        matchingId: matchingId,
+        oldStatus: oldStatus ?? 'unknown',
+        newStatus: status,
+      ));
+      
       if (kDebugMode) {
         print('매칭 상태 변경: ID $matchingId, $oldStatus → $status');
       }

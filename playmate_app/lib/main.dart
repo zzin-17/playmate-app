@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:kakao_flutter_sdk/kakao_flutter_sdk.dart';
 import 'providers/auth_provider.dart';
 import 'providers/home_provider.dart';
 import 'screens/auth/login_screen.dart';
@@ -13,12 +14,19 @@ import 'models/matching.dart';
 
 import 'constants/app_colors.dart';
 import 'constants/app_text_styles.dart';
+import 'constants/app_constants.dart';
 
 import 'services/fcm_service.dart';
 import 'services/connection_monitor_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // 카카오 SDK 초기화
+  KakaoSdk.init(
+    nativeAppKey: AppConstants.kakaoApiKey,
+    javaScriptAppKey: AppConstants.kakaoApiKey,
+  );
   
   // FCM 서비스 초기화 (Firebase 초기화와 무관하게 먼저 실행)
   // 이렇게 하면 Firebase 초기화 실패해도 알림 권한은 요청됨
@@ -33,6 +41,9 @@ void main() async {
   runApp(const PlayMateApp());
 }
 
+// 전역 네비게이터 키
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 class PlayMateApp extends StatelessWidget {
   const PlayMateApp({super.key});
 
@@ -44,6 +55,7 @@ class PlayMateApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => HomeProvider()),
       ],
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         title: '플메 - 테니스 동호인 매칭',
         locale: const Locale('ko', 'KR'),
         localizationsDelegates: const [

@@ -98,10 +98,19 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
         throw Exception('인증 토큰이 없습니다.');
       }
 
-      final applicants = await ApiService.getMatchingApplicants(widget.matching.id, token);
+      final applicantsData = await ApiService.getMatchingApplicants(widget.matching.id, token);
       
+      // 백엔드 응답 형식에 맞게 변환: { user: {...}, appliedAt: ..., message: ... }
       setState(() {
-        _applicants = applicants;
+        _applicants = applicantsData.map<Map<String, dynamic>>((data) {
+          // user 객체를 User 모델로 변환
+          final userData = data['user'] as Map<String, dynamic>;
+          return {
+            'user': User.fromJson(userData),
+            'appliedAt': data['appliedAt'],
+            'message': data['message'] ?? '',
+          };
+        }).toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -690,12 +699,23 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
             ],
             if (!isConfirmed) ...[
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: AppButton(
-                  text: '확정하기',
-                  onPressed: () => _confirmApplicant(user.id),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      text: '거절하기',
+                      type: ButtonType.secondary,
+                      onPressed: () => _rejectApplicant(user.id),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: AppButton(
+                      text: '확정하기',
+                      onPressed: () => _confirmApplicant(user.id),
+                    ),
+                  ),
+                ],
               ),
             ],
           ],
@@ -928,11 +948,140 @@ class _ImprovedMatchingDetailScreenState extends State<ImprovedMatchingDetailScr
     );
   }
 
-  void _confirmApplicant(int userId) {
-    // 신청자 확정 로직
-    setState(() {
-      _confirmedUserIds.add(userId);
-    });
+  Future<void> _confirmApplicant(int userId) async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('playmate_auth_token');
+
+      if (token == null) {
+        throw Exception('인증 토큰이 없습니다');
+      }
+
+      // API 호출로 게스트 확정
+      await ApiService.respondToMatching(
+        matchingId: widget.matching.id,
+        requestUserId: userId,
+        action: 'accept',
+        token: token,
+      );
+
+      // 상태 업데이트
+      setState(() {
+        _confirmedUserIds.add(userId);
+        // 신청자 목록에서 제거 (확정된 사용자는 guests로 이동)
+        _applicants.removeWhere((applicant) => (applicant['user'] as User).id == userId);
+      });
+
+      // 신청자 목록 새로고침
+      await _loadApplicants();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('게스트가 확정되었습니다.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('게스트 확정에 실패했습니다: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _rejectApplicant(int userId) async {
+    // 거절 확인 다이얼로그
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('게스트 거절'),
+        content: const Text('이 신청자를 거절하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+            ),
+            child: const Text('거절'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('playmate_auth_token');
+
+      if (token == null) {
+        throw Exception('인증 토큰이 없습니다');
+      }
+
+      // API 호출로 게스트 거절
+      await ApiService.respondToMatching(
+        matchingId: widget.matching.id,
+        requestUserId: userId,
+        action: 'reject',
+        token: token,
+      );
+
+      // 신청자 목록에서 제거
+      setState(() {
+        _applicants.removeWhere((applicant) => (applicant['user'] as User).id == userId);
+      });
+
+      // 신청자 목록 새로고침
+      await _loadApplicants();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('게스트가 거절되었습니다.'),
+            backgroundColor: AppColors.warning,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('게스트 거절에 실패했습니다: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _applyToMatching() {

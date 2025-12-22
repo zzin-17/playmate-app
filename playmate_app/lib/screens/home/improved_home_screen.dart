@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -9,6 +10,7 @@ import '../../widgets/home/filter_tabs.dart';
 import '../../widgets/home/sort_and_filter_summary.dart';
 import '../../widgets/home/matching_list.dart';
 import '../../widgets/home/simple_filter_modal.dart';
+import '../../services/matching_event_bus.dart';
 import '../matching/improved_matching_detail_screen.dart';
 import '../matching/edit_matching_screen.dart';
 import '../notification/notification_list_screen.dart';
@@ -32,6 +34,7 @@ class ImprovedHomeScreen extends StatefulWidget {
 class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProviderStateMixin {
   late TabController _filterTabController;
   final TextEditingController _searchController = TextEditingController();
+  StreamSubscription? _matchingEventSub;
   // 알림 서비스는 필요시에만 사용
   // final MatchingNotificationService _notificationService = MatchingNotificationService();
 
@@ -52,6 +55,13 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
     
     // MainScreen에 새로고침 콜백 등록
     _registerRefreshCallback();
+    
+    // 매칭 이벤트 구독
+    _matchingEventSub = MatchingEventBus.instance.stream.listen((event) {
+      if (mounted) {
+        _handleMatchingEvent(event);
+      }
+    });
     
     // Provider 초기화
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -76,9 +86,36 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
 
   @override
   void dispose() {
+    _matchingEventSub?.cancel();
     _filterTabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  // 매칭 이벤트 처리
+  void _handleMatchingEvent(MatchingEvent event) {
+    if (event is MatchingCreated) {
+      // 새 매칭 생성 시 홈 화면 새로고침
+      print('🔄 매칭 생성 이벤트 수신: ${event.matching.id}');
+      context.read<HomeProvider>().addMatching(event.matching);
+      widget.onMatchingAdded?.call();
+    } else if (event is MatchingUpdated) {
+      // 매칭 업데이트 시 홈 화면 새로고침
+      print('🔄 매칭 업데이트 이벤트 수신: ${event.matching.id}');
+      context.read<HomeProvider>().refresh();
+    } else if (event is MatchingDeleted) {
+      // 매칭 삭제 시 홈 화면 새로고침
+      print('🔄 매칭 삭제 이벤트 수신: ${event.matchingId}');
+      context.read<HomeProvider>().refresh();
+    } else if (event is MatchingStatusChanged) {
+      // 매칭 상태 변경 시 홈 화면 새로고침
+      print('🔄 매칭 상태 변경 이벤트 수신: ${event.matchingId} (${event.oldStatus} → ${event.newStatus})');
+      context.read<HomeProvider>().refresh();
+    } else if (event is MatchingRefreshRequested) {
+      // 새로고침 요청 시 홈 화면 새로고침
+      print('🔄 매칭 새로고침 요청 이벤트 수신');
+      _refresh();
+    }
   }
 
   // MainScreen에 새로고침 콜백 등록
@@ -318,6 +355,8 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
   // 탭별 매칭 개수 계산
   List<int> _getTabCounts(HomeProvider homeProvider) {
     final allMatchings = homeProvider.matchings;
+    final currentUser = context.read<AuthProvider>().currentUser;
+    final currentUserId = currentUser?.id;
     
     // 각 탭별로 필터링된 매칭 개수 계산
     final recruitingMatchings = allMatchings.where((m) => 
@@ -336,14 +375,55 @@ class _ImprovedHomeScreenState extends State<ImprovedHomeScreen> with TickerProv
       !m.date.isBefore(DateTime.now()) // 일정이 도래하지 않음
     ).length;
     
-    // TODO: 내가 만든, 참여중, 팔로우 매칭 개수 계산 로직 추가
+    // 내가 만든 매칭 개수
+    final myCreatedMatchings = currentUserId != null
+        ? allMatchings.where((m) => 
+            m.host.id == currentUserId &&
+            m.actualStatus != 'completed' && 
+            m.actualStatus != 'cancelled' && 
+            m.actualStatus != 'deleted'
+          ).length
+        : 0;
+    
+    // 참여중 매칭 개수 (게스트로 참여하거나 확정된 경우)
+    final participatingMatchings = currentUserId != null
+        ? allMatchings.where((m) {
+            // 호스트는 제외
+            if (m.host.id == currentUserId) return false;
+            
+            // 게스트 목록에 포함되어 있는지 확인
+            final isGuest = m.guests?.any((guest) => guest.id == currentUserId) ?? false;
+            
+            // 확정된 사용자 목록에 포함되어 있는지 확인
+            final isConfirmed = m.confirmedUserIds?.contains(currentUserId) ?? false;
+            
+            // 신청한 사용자 목록에 포함되어 있는지 확인
+            final isApplied = m.appliedUserIds?.contains(currentUserId) ?? false;
+            
+            return (isGuest || isConfirmed || isApplied) &&
+                   m.actualStatus != 'completed' && 
+                   m.actualStatus != 'cancelled' && 
+                   m.actualStatus != 'deleted';
+          }).length
+        : 0;
+    
+    // 팔로우 매칭 개수 (팔로우하는 사용자가 만든 매칭)
+    final followingMatchings = currentUserId != null && currentUser?.followingIds != null
+        ? allMatchings.where((m) {
+            final isFollowingHost = currentUser!.followingIds!.contains(m.host.id);
+            return isFollowingHost &&
+                   m.actualStatus != 'completed' && 
+                   m.actualStatus != 'cancelled' && 
+                   m.actualStatus != 'deleted';
+          }).length
+        : 0;
     
     return [
       recruitingMatchings, // 모집중
       confirmedMatchings, // 확정
-      0, // 내가 만든
-      0, // 참여중
-      0, // 팔로우
+      myCreatedMatchings, // 내가 만든
+      participatingMatchings, // 참여중
+      followingMatchings, // 팔로우
       allMatchings.where((m) => 
         m.actualStatus != 'completed' && 
         m.actualStatus != 'cancelled' && 

@@ -1,6 +1,12 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/logger.dart';
+import '../main.dart';
+import '../services/api_service.dart';
+import '../services/community_service.dart';
+import '../screens/matching/matching_detail_screen.dart';
+import '../screens/community/comment_screen.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -44,9 +50,113 @@ class NotificationService {
   }
 
   /// 알림 탭 처리
-  void _onNotificationTapped(NotificationResponse response) {
-    // TODO: 알림 탭 시 해당 화면으로 이동
-    Logger.info('알림 탭됨: ${response.payload}', tag: 'NotificationService');
+  void _onNotificationTapped(NotificationResponse response) async {
+    final payload = response.payload;
+    Logger.info('알림 탭됨: $payload', tag: 'NotificationService');
+    
+    if (payload == null || navigatorKey.currentContext == null) {
+      Logger.warning('알림 탭 처리 실패: payload 또는 context가 없습니다', tag: 'NotificationService');
+      return;
+    }
+
+    final context = navigatorKey.currentContext!;
+    
+    try {
+      // 인증 토큰 확인
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('playmate_auth_token');
+      
+      if (token == null) {
+        Logger.warning('알림 탭 처리 실패: 로그인이 필요합니다', tag: 'NotificationService');
+        return;
+      }
+
+      // payload 파싱 (향후 JSON 형식으로 확장 가능)
+      // 현재는 단순 문자열이므로 기본 동작만 수행
+      if (payload.startsWith('matching_')) {
+        // 매칭 관련 알림
+        // payload에서 matchingId 추출 시도 (예: "matching_confirmed:123")
+        final parts = payload.split(':');
+        if (parts.length > 1) {
+          final matchingId = int.tryParse(parts[1]);
+          if (matchingId != null) {
+            await _navigateToMatching(context, matchingId, token);
+            return;
+          }
+        }
+        // matchingId가 없으면 알림 목록 화면으로 이동
+        _navigateToNotificationList(context);
+      } else if (payload.startsWith('post:')) {
+        // 게시글 관련 알림
+        final parts = payload.split(':');
+        if (parts.length > 1) {
+          final postId = int.tryParse(parts[1]);
+          if (postId != null) {
+            await _navigateToPost(context, postId);
+            return;
+          }
+        }
+        // postId가 없으면 알림 목록 화면으로 이동
+        _navigateToNotificationList(context);
+      } else {
+        // 기타 알림은 알림 목록 화면으로 이동
+        _navigateToNotificationList(context);
+      }
+    } catch (e) {
+      Logger.error('알림 탭 처리 오류', tag: 'NotificationService', error: e);
+    }
+  }
+
+  /// 매칭 상세 화면으로 이동
+  Future<void> _navigateToMatching(BuildContext context, int matchingId, String token) async {
+    try {
+      final matching = await ApiService.getMatchingDetail(matchingId, token);
+      
+      // 현재 사용자 정보는 AuthProvider에서 가져와야 하지만, 여기서는 간단히 처리
+      // 실제로는 Provider를 통해 가져와야 함
+      
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => MatchingDetailScreen(
+            matching: matching,
+            currentUser: matching.host, // 임시로 호스트 사용 (실제로는 현재 사용자 필요)
+          ),
+        ),
+      );
+    } catch (e) {
+      Logger.error('매칭 상세 화면 이동 실패', tag: 'NotificationService', error: e);
+      _navigateToNotificationList(context);
+    }
+  }
+
+  /// 게시글 상세 화면으로 이동
+  Future<void> _navigateToPost(BuildContext context, int postId) async {
+    try {
+      final communityService = CommunityService();
+      final post = await communityService.getPost(postId);
+      
+      if (post != null) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => CommentScreen(post: post),
+          ),
+        );
+      } else {
+        Logger.warning('게시글을 찾을 수 없습니다: $postId', tag: 'NotificationService');
+        _navigateToNotificationList(context);
+      }
+    } catch (e) {
+      Logger.error('게시글 상세 화면 이동 실패', tag: 'NotificationService', error: e);
+      _navigateToNotificationList(context);
+    }
+  }
+
+  /// 알림 목록 화면으로 이동
+  void _navigateToNotificationList(BuildContext context) {
+    // 알림 목록 화면으로 이동 (현재는 홈 화면으로 이동)
+    // 실제로는 NotificationListScreen으로 이동해야 하지만,
+    // 현재 사용자 정보가 필요하므로 일단 홈 화면으로 이동
+    Navigator.of(context).pushNamed('/main');
   }
 
   /// 댓글 알림

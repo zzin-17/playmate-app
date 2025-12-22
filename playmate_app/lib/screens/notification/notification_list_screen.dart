@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/user.dart';
-import '../../models/matching.dart';
 
 import '../../services/matching_notification_service.dart';
+import '../../services/api_service.dart';
+import '../../services/community_service.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
+import '../../utils/logger.dart';
 import '../matching/matching_detail_screen.dart';
 import '../chat/chat_screen.dart';
 import '../review/write_review_screen.dart';
+import '../community/comment_screen.dart';
 
 class NotificationListScreen extends StatefulWidget {
   final User currentUser;
@@ -111,101 +115,129 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
   }
 
   void _navigateToMatchingDetail(MatchingNotification notification) async {
+    // 로딩 다이얼로그 표시
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
     try {
-      // 임시로 매칭 상세 화면으로 이동 (API 연동은 나중에)
-      // TODO: 실제 매칭 데이터를 가져와서 처리
-      
-      // 임시 매칭 객체 생성
-      final matching = Matching(
-        id: notification.matchingId,
-        type: 'host',
-        courtName: '임시 코트',
-        courtLat: 37.5665,
-        courtLng: 126.9780,
-        date: DateTime.now(),
-        timeSlot: '10:00~12:00',
-        gameType: 'mixed',
-        maleRecruitCount: 2,
-        femaleRecruitCount: 2,
-        status: 'completed',
-        host: User(
-          id: 1,
-          email: 'temp@example.com',
-          nickname: '임시 호스트',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        ),
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-      
-      if (true) { // 임시로 항상 true
-        // 알림 타입에 따라 다른 화면으로 이동
-        if (notification.type == 'new_chat') {
-          // 새로운 채팅 알림인 경우 채팅 화면으로 이동
-          final guestId = notification.additionalData?['guestId'] as int?;
-          User? chatPartner;
-          
-          if (guestId != null) {
-            // 게스트 정보 찾기
-            chatPartner = matching.guests?.firstWhere(
-              (guest) => guest.id == guestId,
-              orElse: () => matching.host,
-            );
-          }
-          
+      // 인증 토큰 가져오기
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('playmate_auth_token');
+
+      if (token == null) {
+        throw Exception('로그인이 필요합니다');
+      }
+
+      // 커뮤니티 알림인 경우 (postId가 있는 경우)
+      final postId = notification.additionalData?['postId'] as int?;
+      if (postId != null) {
+        // 게시글 상세 조회
+        final communityService = CommunityService();
+        final post = await communityService.getPost(postId);
+        
+        if (!mounted) return;
+        Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+        
+        if (post != null) {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => ChatScreen(
-                matching: matching,
-                currentUser: widget.currentUser,
-                chatPartner: chatPartner,
-              ),
-            ),
-          );
-        } else if (notification.type == 'review_available') {
-          // 후기 작성 알림인 경우 후기 작성 화면으로 이동
-          final targetForReviewId = notification.additionalData?['targetForReviewId'] as int?;
-          User? targetForReview;
-          
-          if (targetForReviewId != null) {
-            // 후기 대상 사용자 찾기
-            if (matching.host.id == targetForReviewId) {
-              targetForReview = matching.host;
-            } else {
-              targetForReview = matching.guests?.firstWhere(
-                (guest) => guest.id == targetForReviewId,
-                orElse: () => matching.host,
-              );
-            }
-          }
-          
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => WriteReviewScreen(
-                matching: matching,
-                targetUser: targetForReview ?? matching.host, // null이면 호스트를 기본값으로
-              ),
+              builder: (context) => CommentScreen(post: post),
             ),
           );
         } else {
-          // 기타 알림은 매칭 상세 화면으로 이동
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => MatchingDetailScreen(
-                matching: matching,
-                currentUser: widget.currentUser,
-              ),
-            ),
+          throw Exception('게시글을 찾을 수 없습니다');
+        }
+        return;
+      }
+
+      // 매칭 관련 알림인 경우
+      // 실제 매칭 데이터 조회
+      final matching = await ApiService.getMatchingDetail(
+        notification.matchingId,
+        token,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+
+      // 알림 타입에 따라 다른 화면으로 이동
+      if (notification.type == 'new_chat') {
+        // 새로운 채팅 알림인 경우 채팅 화면으로 이동
+        final guestId = notification.additionalData?['guestId'] as int?;
+        User? chatPartner;
+
+        if (guestId != null) {
+          // 게스트 정보 찾기
+          chatPartner = matching.guests?.firstWhere(
+            (guest) => guest.id == guestId,
+            orElse: () => matching.host,
           );
         }
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              matching: matching,
+              currentUser: widget.currentUser,
+              chatPartner: chatPartner,
+            ),
+          ),
+        );
+      } else if (notification.type == 'review_available') {
+        // 후기 작성 알림인 경우 후기 작성 화면으로 이동
+        final targetForReviewId = notification.additionalData?['targetForReviewId'] as int?;
+        User? targetForReview;
+
+        if (targetForReviewId != null) {
+          // 후기 대상 사용자 찾기
+          if (matching.host.id == targetForReviewId) {
+            targetForReview = matching.host;
+          } else {
+            targetForReview = matching.guests?.firstWhere(
+              (guest) => guest.id == targetForReviewId,
+              orElse: () => matching.host,
+            );
+          }
+        }
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => WriteReviewScreen(
+              matching: matching,
+              targetUser: targetForReview ?? matching.host, // null이면 호스트를 기본값으로
+            ),
+          ),
+        );
+      } else {
+        // 기타 알림은 매칭 상세 화면으로 이동
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => MatchingDetailScreen(
+              matching: matching,
+              currentUser: widget.currentUser,
+            ),
+          ),
+        );
       }
     } catch (e) {
-      // 오류 발생 시
+      Logger.error('알림 탭 이동 오류: $e', tag: 'NotificationListScreen');
+      
+      if (!mounted) return;
+      Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+      
+      // 오류 발생 시 사용자에게 알림
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('화면 이동 중 오류가 발생했습니다: $e'),
-          duration: const Duration(seconds: 2),
+          content: Text('화면 이동 중 오류가 발생했습니다: ${e.toString()}'),
+          duration: const Duration(seconds: 3),
+          backgroundColor: AppColors.error,
         ),
       );
     }

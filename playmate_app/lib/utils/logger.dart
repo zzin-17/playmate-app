@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
 enum LogLevel {
   debug,
@@ -11,8 +14,104 @@ enum LogLevel {
 class Logger {
   static LogLevel _minLevel = kDebugMode ? LogLevel.debug : LogLevel.info;
   
+  // 파일 저장 관련
+  static const int _maxLogFileSize = 5 * 1024 * 1024; // 5MB
+  static const int _maxLogFiles = 5; // 최대 5개 파일 유지
+  static const String _logFileName = 'app_logs.txt';
+  static Directory? _logDirectory;
+  static File? _currentLogFile;
+  static final List<String> _logBuffer = [];
+  static Timer? _flushTimer;
+  static const Duration _flushInterval = Duration(seconds: 5);
+  
   static void setMinLevel(LogLevel level) {
     _minLevel = level;
+  }
+  
+  // 로그 디렉토리 초기화
+  static Future<void> _initializeLogDirectory() async {
+    if (_logDirectory != null) return;
+    
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      _logDirectory = Directory('${directory.path}/logs');
+      
+      if (!await _logDirectory!.exists()) {
+        await _logDirectory!.create(recursive: true);
+      }
+      
+      // 현재 로그 파일 설정
+      _currentLogFile = File('${_logDirectory!.path}/$_logFileName');
+      
+      // 기존 로그 파일 정리
+      await _cleanupOldLogs();
+      
+      // 주기적으로 버퍼 플러시
+      _flushTimer = Timer.periodic(_flushInterval, (_) => _flushLogBuffer());
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ 로그 디렉토리 초기화 실패: $e');
+      }
+    }
+  }
+  
+  // 오래된 로그 파일 정리
+  static Future<void> _cleanupOldLogs() async {
+    if (_logDirectory == null) return;
+    
+    try {
+      final files = _logDirectory!.listSync()
+          .whereType<File>()
+          .where((f) => f.path.contains('app_logs'))
+          .toList();
+      
+      // 파일명으로 정렬 (오래된 것부터)
+      files.sort((a, b) => a.path.compareTo(b.path));
+      
+      // 최대 개수 초과 시 오래된 파일 삭제
+      if (files.length >= _maxLogFiles) {
+        for (int i = 0; i < files.length - _maxLogFiles + 1; i++) {
+          await files[i].delete();
+        }
+      }
+      
+      // 현재 로그 파일 크기 확인
+      if (_currentLogFile != null && await _currentLogFile!.exists()) {
+        final size = await _currentLogFile!.length();
+        if (size > _maxLogFileSize) {
+          // 파일 크기가 초과하면 새 파일로 로테이션
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final newFileName = 'app_logs_$timestamp.txt';
+          await _currentLogFile!.copy('${_logDirectory!.path}/$newFileName');
+          await _currentLogFile!.delete();
+          _currentLogFile = File('${_logDirectory!.path}/$_logFileName');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ 로그 파일 정리 실패: $e');
+      }
+    }
+  }
+  
+  // 로그 버퍼를 파일에 플러시
+  static Future<void> _flushLogBuffer() async {
+    if (_logBuffer.isEmpty || _currentLogFile == null) return;
+    
+    try {
+      final logsToWrite = List<String>.from(_logBuffer);
+      _logBuffer.clear();
+      
+      await _currentLogFile!.writeAsString(
+        logsToWrite.join('\n') + '\n',
+        mode: FileMode.append,
+        flush: true,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ 로그 파일 쓰기 실패: $e');
+      }
+    }
   }
   
   static void debug(String message, {String? tag, Object? error, StackTrace? stackTrace}) {
@@ -66,16 +165,85 @@ class Logger {
       }
     }
     
-    // TODO: 프로덕션에서는 로그를 파일이나 원격 서버에 저장
+    // 프로덕션에서는 에러 레벨 이상의 로그를 파일에 저장
     if (!kDebugMode && level.index >= LogLevel.error.index) {
-      // 프로덕션에서 에러 로그만 별도 처리
+      _saveToFile(logMessage);
+    }
+    
+    // 디버그 모드에서도 에러 로그는 파일에 저장
+    if (kDebugMode && level.index >= LogLevel.error.index) {
       _saveToFile(logMessage);
     }
   }
   
-  static void _saveToFile(String message) {
-    // TODO: 파일 저장 로직 구현
-    // SharedPreferences나 파일 시스템을 사용하여 로그 저장
+  static Future<void> _saveToFile(String message) async {
+    try {
+      await _initializeLogDirectory();
+      
+      if (_currentLogFile == null) return;
+      
+      // 버퍼에 추가 (주기적으로 플러시)
+      _logBuffer.add(message);
+      
+      // 버퍼가 너무 크면 즉시 플러시
+      if (_logBuffer.length >= 10) {
+        await _flushLogBuffer();
+      }
+    } catch (e) {
+      // 파일 저장 실패해도 앱은 계속 실행
+      if (kDebugMode) {
+        print('❌ 로그 파일 저장 실패: $e');
+      }
+    }
+  }
+  
+  // 로그 파일 읽기 (디버깅용)
+  static Future<String?> getLogFileContent() async {
+    try {
+      await _initializeLogDirectory();
+      
+      if (_currentLogFile == null || !await _currentLogFile!.exists()) {
+        return null;
+      }
+      
+      return await _currentLogFile!.readAsString();
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ 로그 파일 읽기 실패: $e');
+      }
+      return null;
+    }
+  }
+  
+  // 로그 파일 삭제
+  static Future<void> clearLogs() async {
+    try {
+      await _initializeLogDirectory();
+      
+      if (_logDirectory == null) return;
+      
+      final files = _logDirectory!.listSync()
+          .whereType<File>()
+          .where((f) => f.path.contains('app_logs'))
+          .toList();
+      
+      for (final file in files) {
+        await file.delete();
+      }
+      
+      _logBuffer.clear();
+      _currentLogFile = File('${_logDirectory!.path}/$_logFileName');
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ 로그 파일 삭제 실패: $e');
+      }
+    }
+  }
+  
+  // 앱 종료 시 버퍼 플러시
+  static Future<void> dispose() async {
+    _flushTimer?.cancel();
+    await _flushLogBuffer();
   }
   
   // API 호출 로깅

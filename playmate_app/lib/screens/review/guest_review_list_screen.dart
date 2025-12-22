@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/user.dart';
 import '../../models/matching.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
+import '../../services/review_service.dart';
+import '../../utils/logger.dart';
 import 'write_review_screen.dart';
+import 'batch_review_screen.dart';
 
 class GuestReviewListScreen extends StatefulWidget {
   final Matching matching;
@@ -21,7 +25,7 @@ class GuestReviewListScreen extends StatefulWidget {
 }
 
 class _GuestReviewListScreenState extends State<GuestReviewListScreen> {
-  final Set<int> _reviewedUserIds = <int>{};
+  Set<int> _reviewedUserIds = <int>{};
   bool _isLoading = false;
 
   @override
@@ -31,13 +35,48 @@ class _GuestReviewListScreenState extends State<GuestReviewListScreen> {
   }
 
   // 이미 후기를 작성한 사용자 목록 로드
-  void _loadReviewedUsers() {
-    // TODO: 실제 API 호출로 대체
+  Future<void> _loadReviewedUsers() async {
     setState(() {
-      _isLoading = false;
-      // 임시로 빈 목록으로 시작
-      _reviewedUserIds.clear();
+      _isLoading = true;
     });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('playmate_auth_token');
+
+      if (token == null) {
+        setState(() {
+          _reviewedUserIds.clear();
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // 내 후기 목록 조회
+      final myReviews = await ReviewService.getMyReviews();
+      
+      // 현재 매칭의 게스트들에 대한 후기만 필터링
+      final guestIds = widget.matching.guests?.map((g) => g.id).toSet() ?? <int>{};
+      final reviewedIds = myReviews
+          .where((review) => 
+              review.matchingId == widget.matching.id &&
+              guestIds.contains(review.reviewedUserId))
+          .map((review) => review.reviewedUserId)
+          .toSet();
+
+      setState(() {
+        _reviewedUserIds = reviewedIds;
+        _isLoading = false;
+      });
+
+      Logger.info('후기 작성 완료 사용자 로드: ${_reviewedUserIds.length}명', tag: 'GuestReviewListScreen');
+    } catch (e) {
+      Logger.error('후기 작성 완료 사용자 로드 실패: $e', tag: 'GuestReviewListScreen');
+      setState(() {
+        _reviewedUserIds.clear();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -303,13 +342,42 @@ class _GuestReviewListScreenState extends State<GuestReviewListScreen> {
   }
 
   // 모든 후기 작성 화면으로 이동
-  void _navigateToAllReviews() {
-    // TODO: 모든 게스트 후기를 한 번에 작성할 수 있는 화면 구현
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('모든 후기 작성 기능은 추후 구현 예정입니다.'),
-        backgroundColor: AppColors.info,
+  void _navigateToAllReviews() async {
+    final guests = widget.matching.guests ?? [];
+    if (guests.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('후기를 작성할 게스트가 없습니다.'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => BatchReviewScreen(
+          matching: widget.matching,
+          hostUser: widget.hostUser,
+          guests: guests,
+          alreadyReviewedIds: _reviewedUserIds,
+        ),
       ),
     );
+
+    if (result == true && mounted) {
+      // 모든 후기 작성 완료
+      setState(() {
+        // 이미 작성한 후기 목록 새로고침
+        _loadReviewedUsers();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('모든 게스트에 대한 후기 작성이 완료되었습니다.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    }
   }
 }

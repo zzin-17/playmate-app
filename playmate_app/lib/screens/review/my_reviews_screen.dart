@@ -6,6 +6,7 @@ import '../../models/user.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_text_styles.dart';
 import '../../services/review_service.dart';
+import '../../utils/logger.dart';
 
 class MyReviewsScreen extends StatefulWidget {
   final User currentUser;
@@ -38,7 +39,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> with TickerProviderSt
 
   // 자동 새로고침 타이머 시작
   void _startAutoRefreshTimer() {
-    print('🔄 후기 자동 새로고침 활성화');
+    Logger.info('후기 자동 새로고침 활성화', tag: 'MyReviewsScreen');
     _autoRefreshTimer = Timer.periodic(_refreshInterval, (timer) {
       if (mounted) {
         _refreshReviewData();
@@ -50,7 +51,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> with TickerProviderSt
   
   // 후기 데이터 새로고침 (기존 후기 보존하면서 새 후기 추가)
   void _refreshReviewData() {
-    print('🔄 후기 데이터 자동 새로고침 시작');
+    Logger.info('후기 데이터 자동 새로고침 시작', tag: 'MyReviewsScreen');
     
     // 새로운 후기만 로드하여 기존 목록에 병합
     _loadMyReviews();
@@ -76,66 +77,13 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> with TickerProviderSt
         _myReviews = reviews;
         _isLoading = false;
       });
+      
+      Logger.info('내 후기 목록 로드 완료: ${reviews.length}개', tag: 'MyReviewsScreen');
     } catch (e) {
+      Logger.error('내 후기 목록 로드 실패', tag: 'MyReviewsScreen', error: e);
       setState(() {
+        _myReviews = [];
         _isLoading = false;
-        // 오류 발생 시 빈 리스트 유지
-      });
-    }
-    
-    // 임시로 모의 데이터 사용 (API가 구현되지 않은 경우)
-    if (_myReviews.isEmpty) {
-      setState(() {
-        _isLoading = false;
-        // 임시로 모의 데이터 사용
-        _myReviews = [
-          // NTRP 후기
-          Review(
-            id: 1,
-            matchingId: 101,
-            reviewerId: 201,
-            reviewedUserId: widget.currentUser.id,
-            ntrpScore: 3.5,
-            mannerScore: 4.8,
-            comment: '테니스 실력이 정말 좋으시네요! 기본기가 탄탄하고 다양한 샷을 구사하실 수 있어서 함께 치기 편했습니다. 시간 약속도 잘 지키시고 매너도 좋아요.',
-            createdAt: DateTime.now().subtract(const Duration(days: 2)),
-            updatedAt: DateTime.now().subtract(const Duration(days: 2)),
-            reviewer: User(
-              id: 201,
-              email: 'reviewer1@example.com',
-              nickname: '테니스마스터',
-              skillLevel: 4,
-              gender: 'male',
-              startYearMonth: '2020-01',
-              mannerScore: 4.5,
-              createdAt: DateTime.now(),
-              updatedAt: DateTime.now(),
-            ),
-          ),
-          // 매너 후기
-          Review(
-            id: 2,
-            matchingId: 102,
-            reviewerId: 202,
-            reviewedUserId: widget.currentUser.id,
-            ntrpScore: 4.2,
-            mannerScore: 5.0,
-            comment: '정말 친절하고 예의 바른 분이에요! 게임 중에도 상대방을 배려하고, 스코어를 정확하게 쳐주셔서 편하게 게임할 수 있었습니다. 다음에도 함께 치고 싶어요!',
-            createdAt: DateTime.now().subtract(const Duration(days: 5)),
-            updatedAt: DateTime.now().subtract(const Duration(days: 5)),
-            reviewer: User(
-              id: 202,
-              email: 'reviewer2@example.com',
-              nickname: '테니스러버',
-              skillLevel: 3,
-              gender: 'female',
-              startYearMonth: '2021-06',
-              mannerScore: 4.7,
-              createdAt: DateTime.now(),
-              updatedAt: DateTime.now(),
-            ),
-          ),
-        ];
       });
     }
   }

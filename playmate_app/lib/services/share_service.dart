@@ -20,7 +20,7 @@ class ShareService {
       
       if (result != null) {
         // 공유 성공 시 카운트 증가
-        _incrementShareCount(post);
+        await _incrementShareCount(post);
         
         // 성공 메시지 표시
         if (context.mounted) {
@@ -184,9 +184,22 @@ class ShareService {
   }
 
   /// 공유 카운트 증가
-  void _incrementShareCount(Post post) {
-    // TODO: 실제 API 호출로 공유 카운트 증가
-    Logger.debug('공유 카운트 증가: ${post.id}', tag: 'ShareService');
+  Future<void> _incrementShareCount(Post post) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('playmate_auth_token');
+
+      if (token == null) {
+        Logger.warning('인증 토큰이 없어 공유 카운트를 증가시킬 수 없습니다', tag: 'ShareService');
+        return;
+      }
+
+      await ApiService.incrementPostShare(post.id, token);
+      Logger.info('공유 카운트 증가 완료: 게시글 ID ${post.id}', tag: 'ShareService');
+    } catch (e) {
+      Logger.error('공유 카운트 증가 실패: $e', tag: 'ShareService');
+      // 공유 카운트 증가 실패는 사용자에게 알리지 않음 (공유 자체는 성공했으므로)
+    }
   }
 
   /// 공유 통계 가져오기

@@ -1590,7 +1590,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   // 매칭 확정 취소 처리
-  void _processMatchingCancellation() {
+  void _processMatchingCancellation() async {
     setState(() {
       _isMatchingConfirmed = false;
     });
@@ -1604,15 +1604,25 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
 
-    // TODO: 실제 매칭 상태를 'recruiting'으로 변경하는 로직 구현
-    // widget.matching.status = 'recruiting';
+    // 실제 매칭 상태를 'recruiting'으로 변경
+    final stateService = MatchingStateService();
+    final success = await stateService.cancelMatchingConfirmation(widget.matching.id);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('매칭 확정이 취소되었습니다.'),
-        backgroundColor: AppColors.warning,
-      ),
-    );
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('매칭 확정이 취소되었습니다.'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('매칭 확정 취소에 실패했습니다.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
 
     // 스크롤을 맨 아래로
     WidgetsBinding.instance.addPostFrameCallback((_) {

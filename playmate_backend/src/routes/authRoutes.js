@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { registerUser, loginUser, getCurrentUser, getMe, updateProfile, loginWithApple } = require('../controllers/authController');
+const { registerUser, loginUser, getCurrentUser, getMe, updateProfile, loginWithApple, loginWithKakao } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
 // 인증 관련 라우트
@@ -12,6 +12,9 @@ router.route('/login')
 
 router.route('/apple')
   .post(loginWithApple);
+
+router.route('/kakao')
+  .post(loginWithKakao);
 
 router.route('/me')
   .get(protect, getCurrentUser);

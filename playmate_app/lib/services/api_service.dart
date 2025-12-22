@@ -4,6 +4,7 @@ import '../models/matching.dart';
 import '../models/user.dart';
 import '../models/review.dart';
 import '../config/api_config.dart';
+import '../utils/logger.dart';
 
 class ApiService {
   static String _currentBaseUrl = ApiConfig.fullBaseUrl;
@@ -503,6 +504,39 @@ class ApiService {
       } else {
         final errorBody = json.decode(response.body);
         throw ApiException('애플 로그인 실패: ${errorBody['message'] ?? response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('네트워크 오류: $e');
+    }
+  }
+
+  // 카카오 로그인
+  static Future<Map<String, dynamic>> loginWithKakao({
+    required String kakaoId,
+    String? email,
+    String? nickname,
+    String? profileImage,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/auth/kakao');
+      
+      final response = await http.post(
+        uri,
+        headers: _headers,
+        body: json.encode({
+          'kakaoId': kakaoId,
+          'email': email,
+          'nickname': nickname,
+          'profileImage': profileImage,
+        }),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return json.decode(response.body);
+      } else {
+        final errorBody = json.decode(response.body);
+        throw ApiException('카카오 로그인 실패: ${errorBody['message'] ?? response.statusCode}');
       }
     } catch (e) {
       if (e is ApiException) rethrow;
@@ -1294,6 +1328,32 @@ class ApiService {
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException('공유 통계 조회 실패: $e');
+    }
+  }
+
+  // 공유 카운트 증가
+  static Future<void> incrementPostShare(int postId, String token) async {
+    try {
+      final response = await _makeRequest(
+        'POST',
+        '/community/posts/$postId/share',
+        headers: _getAuthHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          Logger.info('공유 카운트 증가 성공: 게시글 ID $postId', tag: 'ApiService');
+          return;
+        } else {
+          throw ApiException('공유 카운트 증가 실패: ${data['message']}');
+        }
+      } else {
+        throw ApiException('공유 카운트 증가 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('공유 카운트 증가 실패: $e');
     }
   }
 }

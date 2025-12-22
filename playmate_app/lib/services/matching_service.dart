@@ -135,163 +135,6 @@ class MatchingService {
     }
   }
 
-  // Mock 데이터에서 매칭 조회 (임시 구현)
-  /*
-  Matching? _getMockMatchingById(int matchingId) { // 사용되지 않음
-    final now = DateTime.now();
-    
-    // 홈 화면에서 사용하는 mock 매칭 데이터와 동일한 구조
-    final mockMatchings = [
-      Matching(
-        id: 1,
-        type: 'host',
-        courtName: '잠실종합운동장',
-        courtLat: 37.5665,
-        courtLng: 127.0080,
-        date: DateTime.now().add(const Duration(days: 2)),
-        timeSlot: '14:00-16:00',
-        gameType: 'singles',
-        maleRecruitCount: 2,
-        femaleRecruitCount: 2,
-        status: 'recruiting',
-        message: '테니스 초보자도 환영합니다!',
-        host: User(
-          id: 1,
-          email: 'test@playmate.com',
-          nickname: '테스트유저',
-          profileImage: null,
-          createdAt: now.subtract(const Duration(days: 30)),
-          updatedAt: now,
-        ),
-        guests: [
-          User(
-            id: 3,
-            email: 'tennis@example.com',
-            nickname: '테니스러버',
-            profileImage: null,
-            createdAt: now.subtract(const Duration(days: 20)),
-            updatedAt: now,
-          ),
-          User(
-            id: 4,
-            email: 'beginner@example.com',
-            nickname: '테니스초보',
-            profileImage: null,
-            createdAt: now.subtract(const Duration(days: 15)),
-            updatedAt: now,
-          ),
-        ],
-        confirmedUserIds: [3, 4],
-        createdAt: now.subtract(const Duration(days: 5)),
-        updatedAt: now,
-      ),
-      Matching(
-        id: 2,
-        type: 'host',
-        courtName: '양재시민의숲',
-        courtLat: 37.4692,
-        courtLng: 127.0476,
-        date: DateTime(2024, 9, 3),
-        timeSlot: '20:00-22:00',
-        gameType: 'mixed',
-        maleRecruitCount: 2,
-        femaleRecruitCount: 2,
-        status: 'recruiting',
-        message: '양재에서 테니스 치실 분 구합니다!',
-        host: User(
-          id: 2,
-          email: 'yangjae@example.com',
-          nickname: '양재러버',
-          profileImage: null,
-          createdAt: now.subtract(const Duration(days: 25)),
-          updatedAt: now,
-        ),
-        guests: [],
-        confirmedUserIds: [],
-        createdAt: now.subtract(const Duration(days: 3)),
-        updatedAt: now,
-      ),
-      Matching(
-        id: 3,
-        type: 'host',
-        courtName: '올림픽공원 테니스장',
-        courtLat: 37.5211,
-        courtLng: 127.1214,
-        date: DateTime.now().add(const Duration(days: 1)),
-        timeSlot: '16:00-18:00',
-        gameType: 'singles',
-        maleRecruitCount: 2,
-        femaleRecruitCount: 2,
-        status: 'completed',
-        message: '올림픽공원에서 테니스 치실 분!',
-        host: User(
-          id: 5,
-          email: 'olympic@example.com',
-          nickname: '올림픽러버',
-          profileImage: null,
-          createdAt: now.subtract(const Duration(days: 40)),
-          updatedAt: now,
-        ),
-        guests: [
-          User(
-            id: 6,
-            email: 'advanced@example.com',
-            nickname: '고급러버',
-            profileImage: null,
-            createdAt: now.subtract(const Duration(days: 35)),
-            updatedAt: now,
-          ),
-          User(
-            id: 7,
-            email: 'intermediate@example.com',
-            nickname: '중급러버',
-            profileImage: null,
-            createdAt: now.subtract(const Duration(days: 30)),
-            updatedAt: now,
-          ),
-        ],
-        confirmedUserIds: [6, 7],
-        completedAt: now.subtract(const Duration(hours: 2)),
-        createdAt: now.subtract(const Duration(days: 7)),
-        updatedAt: now,
-      ),
-      Matching(
-        id: 4,
-        type: 'host',
-        courtName: '한강공원 테니스장',
-        courtLat: 37.5665,
-        courtLng: 126.9780,
-        date: DateTime.now().add(const Duration(days: 4)),
-        timeSlot: '09:00-11:00',
-        gameType: 'singles',
-        maleRecruitCount: 2,
-        femaleRecruitCount: 2,
-        status: 'cancelled',
-        message: '한강공원에서 테니스 치실 분!',
-        host: User(
-          id: 8,
-          email: 'hangang@example.com',
-          nickname: '한강러버',
-          profileImage: null,
-          createdAt: now.subtract(const Duration(days: 45)),
-          updatedAt: now,
-        ),
-        guests: [],
-        confirmedUserIds: [],
-        cancelledAt: now.subtract(const Duration(days: 1)),
-        createdAt: now.subtract(const Duration(days: 10)),
-        updatedAt: now,
-      ),
-    ];
-
-    try {
-      return mockMatchings.firstWhere((matching) => matching.id == matchingId);
-    } catch (e) {
-      print('매칭 ID $matchingId를 찾을 수 없습니다: $e');
-      return null;
-    }
-  }
-  */
 
   // 매칭 참여 시 호스트에게 알림 생성
   Future<bool> joinMatchingWithNotification(Matching matching, User guest) async {
@@ -519,11 +362,14 @@ class MatchingService {
   }
 
   // 게스트 관리 화면 표시
+  // 참고: 게스트 관리 기능은 ImprovedMatchingDetailScreen의 Participants 탭에서 구현됨
+  // 호스트는 신청자 목록을 보고 확정/거절할 수 있음
   void _showGuestManagement(BuildContext context, Matching matching) {
-    // TODO: 게스트 관리 화면 구현
+    // 게스트 관리는 매칭 상세 화면에서 처리됨
+    // 별도 화면이 필요하면 여기에 구현
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('게스트 관리 기능은 곧 구현될 예정입니다!'),
+        content: Text('게스트 관리는 매칭 상세 화면에서 가능합니다.'),
         backgroundColor: AppColors.info,
       ),
     );

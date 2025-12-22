@@ -924,6 +924,50 @@ const getPostShareStatistics = (req, res) => {
   }
 };
 
+// 게시글 공유 카운트 증가
+const incrementPostShare = (req, res) => {
+  try {
+    const postId = parseInt(req.params.id);
+    const userId = req.user.id;
+    
+    console.log(`게시글 공유 카운트 증가 요청: 게시글 ID ${postId}, 사용자 ID ${userId}`);
+    
+    const post = posts.find(p => p.id === postId);
+    
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: '게시글을 찾을 수 없습니다.'
+      });
+    }
+    
+    // 공유 카운트 증가
+    post.shares = (post.shares || 0) + 1;
+    post.updatedAt = new Date().toISOString();
+    
+    // 파일에 저장
+    saveToFile();
+    
+    console.log(`게시글 공유 카운트 증가 완료: 게시글 ID ${postId}, 총 공유 수 ${post.shares}`);
+    
+    res.json({
+      success: true,
+      data: {
+        postId: post.id,
+        shareCount: post.shares
+      },
+      message: '공유 카운트가 증가되었습니다.'
+    });
+  } catch (error) {
+    console.error('게시글 공유 카운트 증가 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '공유 카운트 증가에 실패했습니다.',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getPosts,
   getPostById,
@@ -942,6 +986,7 @@ module.exports = {
   getMyLikes,
   getMyCommentedPosts,
   getPostShareStatistics,
+  incrementPostShare,
   loadFromFile,
   saveToFile
 };
