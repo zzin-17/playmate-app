@@ -1,7 +1,10 @@
+import 'dart:io';
+
 class ApiConfig {
   // 환경별 API URL 설정 (더 안정적인 localhost 사용)
   static const String devBaseUrl = 'http://192.168.6.100:3000'; // 네트워크 IP 사용
   static const String devBaseUrlIOS = 'http://localhost:3000'; // iOS 시뮬레이터용
+  static const String devBaseUrlAndroid = 'http://10.0.2.2:3000'; // Android 에뮬레이터용
   static const String devBaseUrlNetwork = 'http://192.168.6.100:3000'; // 네트워크용 (백업)
   static const String stagingBaseUrl = 'https://staging-api.playmate.com';
   static const String prodBaseUrl = 'https://api.playmate.com';
@@ -18,8 +21,14 @@ class ApiConfig {
         return stagingBaseUrl;
       case 'development':
       default:
-        // Android 에뮬레이터는 10.0.2.2를 localhost로 사용
-        return devBaseUrl; // 기본적으로 Android 에뮬레이터용 사용
+        // 플랫폼에 따라 자동 선택
+        if (Platform.isIOS) {
+          return devBaseUrlIOS; // iOS 시뮬레이터는 localhost 사용
+        } else if (Platform.isAndroid) {
+          return devBaseUrlAndroid; // Android 에뮬레이터는 10.0.2.2 사용
+        } else {
+          return devBaseUrl; // 기타 플랫폼은 네트워크 IP 사용
+        }
     }
   }
   
@@ -27,11 +36,28 @@ class ApiConfig {
   static List<String> get fallbackUrls {
     final urls = <String>[];
     
-    // 기본 포트들 (3000-3010)
-    for (int port = 3000; port <= 3010; port++) {
-      urls.add('http://192.168.6.100:$port');  // 네트워크 IP
-      urls.add('http://10.0.2.2:$port');       // Android 에뮬레이터
-      urls.add('http://localhost:$port');       // iOS 시뮬레이터
+    // 플랫폼에 따라 우선순위 조정
+    if (Platform.isIOS) {
+      // iOS 시뮬레이터: localhost 우선
+      for (int port = 3000; port <= 3010; port++) {
+        urls.add('http://localhost:$port');       // iOS 시뮬레이터 (우선)
+        urls.add('http://127.0.0.1:$port');      // iOS 시뮬레이터 (백업)
+        urls.add('http://192.168.6.100:$port');  // 네트워크 IP
+      }
+    } else if (Platform.isAndroid) {
+      // Android 에뮬레이터: 10.0.2.2 우선
+      for (int port = 3000; port <= 3010; port++) {
+        urls.add('http://10.0.2.2:$port');       // Android 에뮬레이터 (우선)
+        urls.add('http://192.168.6.100:$port');  // 네트워크 IP
+        urls.add('http://localhost:$port');       // 로컬 (백업)
+      }
+    } else {
+      // 기타 플랫폼: 네트워크 IP 우선
+      for (int port = 3000; port <= 3010; port++) {
+        urls.add('http://192.168.6.100:$port');  // 네트워크 IP (우선)
+        urls.add('http://localhost:$port');       // 로컬
+        urls.add('http://10.0.2.2:$port');       // Android 에뮬레이터
+      }
     }
     
     return urls;

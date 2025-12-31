@@ -20,7 +20,7 @@ Comment _$CommentFromJson(Map<String, dynamic> json) => Comment(
           .toList() ??
       const [],
   likeCount: (json['likeCount'] as num).toInt(),
-  isLikedByCurrentUser: json['isLiked'] as bool? ?? false,
+  isLikedByCurrentUser: json['isLiked'] as bool,
   createdAt: DateTime.parse(json['createdAt'] as String),
   updatedAt: DateTime.parse(json['updatedAt'] as String),
 );

@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'community_service.dart';
-import 'chat_service.dart';
-import '../models/user.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'api_service.dart';
+import '../utils/logger.dart';
 
 // 배치 요청 타입
 enum BatchRequestType {
@@ -146,63 +146,306 @@ class BatchUpdateService {
     }
   }
 
+  // 인증 토큰 가져오기
+  Future<String?> _getAuthToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString('playmate_auth_token');
+    } catch (e) {
+      return null;
+    }
+  }
+
   // 게시글 배치 로드
   Future<void> _batchLoadPosts(List<BatchRequest> requests) async {
-    // TODO: 여러 사용자의 게시글을 한 번에 로드하는 API 구현
-    final results = await CommunityService().getPosts();
-    
-    for (final request in requests) {
-      if (!request.completer.isCompleted) {
-        request.completer.complete(results);
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('인증 토큰이 없습니다');
+      }
+
+      // 모든 요청에서 userIds 수집
+      final userIds = <int>{};
+      for (final request in requests) {
+        final userId = request.params['userId'] as int?;
+        if (userId != null) {
+          userIds.add(userId);
+        }
+      }
+
+      if (userIds.isEmpty) {
+        // userIds가 없으면 빈 결과 반환
+        for (final request in requests) {
+          if (!request.completer.isCompleted) {
+            request.completer.complete([]);
+          }
+        }
+        return;
+      }
+
+      // 배치 API 호출
+      final limit = requests.first.params['limit'] as int? ?? 20;
+      final offset = requests.first.params['offset'] as int? ?? 0;
+      
+      final results = await ApiService.batchLoadPosts(
+        userIds: userIds.toList(),
+        limit: limit,
+        offset: offset,
+        token: token,
+      );
+
+      // 모든 요청에 동일한 결과 반환 (실제로는 요청별로 필터링 필요)
+      for (final request in requests) {
+        if (!request.completer.isCompleted) {
+          final userId = request.params['userId'] as int?;
+          if (userId != null) {
+            // 특정 사용자의 게시글만 필터링
+            final filteredResults = results.where((post) => 
+              post['userId'] == userId
+            ).toList();
+            request.completer.complete(filteredResults);
+          } else {
+            request.completer.complete(results);
+          }
+        }
+      }
+    } catch (e) {
+      Logger.error('배치 게시글 로드 실패', tag: 'BatchUpdateService', error: e);
+      for (final request in requests) {
+        if (!request.completer.isCompleted) {
+          request.completer.completeError(e);
+        }
       }
     }
   }
 
   // 채팅방 배치 로드
   Future<void> _batchLoadChatRooms(List<BatchRequest> requests) async {
-    // TODO: 여러 사용자의 채팅방을 한 번에 로드하는 API 구현
-    for (final request in requests) {
-      if (!request.completer.isCompleted) {
-        final userId = request.params['userId'] as int;
-        // 개별 처리 (추후 배치 API로 개선)
-        final results = await ChatService().getMyChatRooms(User(
-          id: userId, 
-          email: '', 
-          nickname: '', 
-          createdAt: DateTime.now(), 
-          updatedAt: DateTime.now()
-        ));
-        request.completer.complete(results);
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('인증 토큰이 없습니다');
+      }
+
+      // 모든 요청에서 userIds 수집
+      final userIds = <int>{};
+      for (final request in requests) {
+        final userId = request.params['userId'] as int?;
+        if (userId != null) {
+          userIds.add(userId);
+        }
+      }
+
+      if (userIds.isEmpty) {
+        for (final request in requests) {
+          if (!request.completer.isCompleted) {
+            request.completer.complete([]);
+          }
+        }
+        return;
+      }
+
+      // 배치 API 호출
+      final results = await ApiService.batchLoadChatRooms(
+        userIds: userIds.toList(),
+        token: token,
+      );
+
+      // 각 요청에 해당하는 채팅방 필터링
+      for (final request in requests) {
+        if (!request.completer.isCompleted) {
+          final userId = request.params['userId'] as int?;
+          if (userId != null) {
+            // 특정 사용자가 참여한 채팅방만 필터링
+            final filteredResults = results.where((room) {
+              final participants = room['participants'] as List<dynamic>?;
+              return participants != null && participants.contains(userId);
+            }).toList();
+            request.completer.complete(filteredResults);
+          } else {
+            request.completer.complete(results);
+          }
+        }
+      }
+    } catch (e) {
+      Logger.error('배치 채팅방 로드 실패', tag: 'BatchUpdateService', error: e);
+      for (final request in requests) {
+        if (!request.completer.isCompleted) {
+          request.completer.completeError(e);
+        }
       }
     }
   }
 
   // 알림 배치 로드
   Future<void> _batchLoadNotifications(List<BatchRequest> requests) async {
-    // TODO: 배치 알림 로드 API 구현
-    for (final request in requests) {
-      if (!request.completer.isCompleted) {
-        request.completer.complete([]);
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('인증 토큰이 없습니다');
+      }
+
+      // 모든 요청에서 userIds 수집
+      final userIds = <int>{};
+      for (final request in requests) {
+        final userId = request.params['userId'] as int?;
+        if (userId != null) {
+          userIds.add(userId);
+        }
+      }
+
+      if (userIds.isEmpty) {
+        for (final request in requests) {
+          if (!request.completer.isCompleted) {
+            request.completer.complete([]);
+          }
+        }
+        return;
+      }
+
+      // 배치 API 호출
+      final limit = requests.first.params['limit'] as int? ?? 50;
+      final offset = requests.first.params['offset'] as int? ?? 0;
+      
+      final results = await ApiService.batchLoadNotifications(
+        userIds: userIds.toList(),
+        limit: limit,
+        offset: offset,
+        token: token,
+      );
+
+      // 모든 요청에 결과 반환
+      for (final request in requests) {
+        if (!request.completer.isCompleted) {
+          request.completer.complete(results);
+        }
+      }
+    } catch (e) {
+      Logger.error('배치 알림 로드 실패', tag: 'BatchUpdateService', error: e);
+      for (final request in requests) {
+        if (!request.completer.isCompleted) {
+          request.completer.completeError(e);
+        }
       }
     }
   }
 
   // 후기 배치 로드
   Future<void> _batchLoadReviews(List<BatchRequest> requests) async {
-    // TODO: 배치 후기 로드 API 구현
-    for (final request in requests) {
-      if (!request.completer.isCompleted) {
-        request.completer.complete([]);
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('인증 토큰이 없습니다');
+      }
+
+      // 모든 요청에서 userIds 수집
+      final userIds = <int>{};
+      for (final request in requests) {
+        final userId = request.params['userId'] as int?;
+        if (userId != null) {
+          userIds.add(userId);
+        }
+      }
+
+      if (userIds.isEmpty) {
+        for (final request in requests) {
+          if (!request.completer.isCompleted) {
+            request.completer.complete([]);
+          }
+        }
+        return;
+      }
+
+      // 배치 API 호출
+      final limit = requests.first.params['limit'] as int? ?? 20;
+      final offset = requests.first.params['offset'] as int? ?? 0;
+      
+      final results = await ApiService.batchLoadReviews(
+        userIds: userIds.toList(),
+        limit: limit,
+        offset: offset,
+        token: token,
+      );
+
+      // 각 요청에 해당하는 후기 필터링
+      for (final request in requests) {
+        if (!request.completer.isCompleted) {
+          final userId = request.params['userId'] as int?;
+          if (userId != null) {
+            // 특정 사용자에 대한 후기만 필터링
+            final filteredResults = results.where((review) => 
+              review['targetUserId'] == userId
+            ).toList();
+            request.completer.complete(filteredResults);
+          } else {
+            request.completer.complete(results);
+          }
+        }
+      }
+    } catch (e) {
+      Logger.error('배치 후기 로드 실패', tag: 'BatchUpdateService', error: e);
+      for (final request in requests) {
+        if (!request.completer.isCompleted) {
+          request.completer.completeError(e);
+        }
       }
     }
   }
 
   // 프로필 배치 동기화
   Future<void> _batchSyncProfiles(List<BatchRequest> requests) async {
-    // TODO: 배치 프로필 동기화 API 구현
-    for (final request in requests) {
-      if (!request.completer.isCompleted) {
-        request.completer.complete(null);
+    try {
+      final token = await _getAuthToken();
+      if (token == null) {
+        throw Exception('인증 토큰이 없습니다');
+      }
+
+      // 모든 요청에서 userIds 수집
+      final userIds = <int>{};
+      for (final request in requests) {
+        final userId = request.params['userId'] as int?;
+        if (userId != null) {
+          userIds.add(userId);
+        }
+      }
+
+      if (userIds.isEmpty) {
+        for (final request in requests) {
+          if (!request.completer.isCompleted) {
+            request.completer.complete(null);
+          }
+        }
+        return;
+      }
+
+      // 배치 API 호출
+      final results = await ApiService.batchSyncProfiles(
+        userIds: userIds.toList(),
+        token: token,
+      );
+
+      // 각 요청에 해당하는 프로필 반환
+      for (final request in requests) {
+        if (!request.completer.isCompleted) {
+          final userId = request.params['userId'] as int?;
+          if (userId != null) {
+            // 특정 사용자의 프로필만 필터링
+            final profile = results.firstWhere(
+              (profile) => profile['id'] == userId,
+              orElse: () => null,
+            );
+            request.completer.complete(profile);
+          } else {
+            request.completer.complete(results);
+          }
+        }
+      }
+    } catch (e) {
+      Logger.error('배치 프로필 동기화 실패', tag: 'BatchUpdateService', error: e);
+      for (final request in requests) {
+        if (!request.completer.isCompleted) {
+          request.completer.completeError(e);
+        }
       }
     }
   }

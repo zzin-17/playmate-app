@@ -84,6 +84,14 @@ class ConnectionMonitorService {
       print('❌ 서버 연결 실패: $reason (연속 실패: $_consecutiveFailures회)');
       _isConnected = false;
       _connectionStatusController.add(false);
+      
+      // 개발 환경에서 서버 미실행 감지 시 안내
+      if (_consecutiveFailures == 1 && 
+          (reason.toLowerCase().contains('connection refused') ||
+           reason.toLowerCase().contains('socketexception'))) {
+        print('⚠️ 백엔드 서버가 실행되지 않은 것으로 보입니다.');
+        print('💡 서버 시작 방법: cd playmate_backend && npm run dev:stable');
+      }
     } else {
       print('❌ 서버 연결 지속 실패: $reason (연속 실패: $_consecutiveFailures회)');
     }

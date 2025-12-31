@@ -593,6 +593,42 @@
       "confirmedUserIds": [],
       "completedAt": null,
       "cancelledAt": null
+    },
+    "1767072241713": {
+      "id": 1767072241713,
+      "type": "host",
+      "courtName": "테스트 코트",
+      "courtLat": 37.5665,
+      "courtLng": 126.978,
+      "date": "2025-12-31T05:23:47.101Z",
+      "timeSlot": "18:00~20:00",
+      "minLevel": 1,
+      "maxLevel": 5,
+      "minAge": null,
+      "maxAge": null,
+      "gameType": "mixed",
+      "maleRecruitCount": 1,
+      "femaleRecruitCount": 1,
+      "status": "recruiting",
+      "message": "",
+      "guestCost": 0,
+      "isFollowersOnly": false,
+      "host": {
+        "id": 974640,
+        "nickname": "개발자",
+        "email": "dev@playmate.com",
+        "profileImage": null,
+        "createdAt": "2025-12-30T05:24:01.713Z",
+        "updatedAt": "2025-12-30T05:24:01.713Z"
+      },
+      "guests": [],
+      "createdAt": "2025-12-30T05:24:01.713Z",
+      "updatedAt": "2025-12-30T05:24:01.713Z",
+      "recoveryCount": 0,
+      "appliedUserIds": [],
+      "confirmedUserIds": [],
+      "completedAt": null,
+      "cancelledAt": null
     }
   },
   "nextId": 1

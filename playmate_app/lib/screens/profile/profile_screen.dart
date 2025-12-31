@@ -16,6 +16,7 @@ import '../review/my_reviews_screen.dart';
 import '../community/community_screen.dart';
 import '../profile/edit_profile_screen.dart';
 import '../settings/notification_settings_screen.dart';
+import '../transaction/my_transactions_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -123,6 +124,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildMenuSection(
                   title: '추가 기능',
                   items: [
+                    MenuItem(
+                      icon: Icons.shopping_bag_outlined,
+                      title: '내 거래',
+                      subtitle: '중고거래 목록 및 관리',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const MyTransactionsScreen(),
+                          ),
+                        );
+                      },
+                    ),
                     MenuItem(
                       icon: Icons.bookmark_outline,
                       title: '내가 북마크한 게시글',
@@ -486,19 +499,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /*
-  void _navigateToTransactions(BuildContext context) { // 사용되지 않음
-    // 내 거래 페이지로 이동
-    // TODO: 내 거래 페이지 구현
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('거래 기능은 곧 구현될 예정입니다! 💰'),
-        duration: Duration(seconds: 2),
-        backgroundColor: Colors.orange,
-      ),
-    );
-  }
-  */
 
   Widget _buildMenuSection({
     required String title,

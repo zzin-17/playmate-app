@@ -1356,6 +1356,205 @@ class ApiService {
       throw ApiException('공유 카운트 증가 실패: $e');
     }
   }
+
+  // 배치 API 메서드들
+  // 배치 게시글 로드
+  static Future<List<dynamic>> batchLoadPosts({
+    required List<int> userIds,
+    int limit = 20,
+    int offset = 0,
+    required String token,
+  }) async {
+    try {
+      final response = await _makeRequest(
+        'POST',
+        '/batch/posts',
+        headers: _getAuthHeaders(token),
+        body: json.encode({
+          'userIds': userIds,
+          'limit': limit,
+          'offset': offset,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return List<dynamic>.from(data['data']);
+        } else {
+          throw ApiException('배치 게시글 로드 실패: ${data['error']}');
+        }
+      } else {
+        throw ApiException('배치 게시글 로드 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('배치 게시글 로드 실패: $e');
+    }
+  }
+
+  // 배치 채팅방 로드
+  static Future<List<dynamic>> batchLoadChatRooms({
+    required List<int> userIds,
+    required String token,
+  }) async {
+    try {
+      final response = await _makeRequest(
+        'POST',
+        '/batch/chat-rooms',
+        headers: _getAuthHeaders(token),
+        body: json.encode({
+          'userIds': userIds,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return List<dynamic>.from(data['data']);
+        } else {
+          throw ApiException('배치 채팅방 로드 실패: ${data['error']}');
+        }
+      } else {
+        throw ApiException('배치 채팅방 로드 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('배치 채팅방 로드 실패: $e');
+    }
+  }
+
+  // 배치 알림 로드
+  static Future<List<dynamic>> batchLoadNotifications({
+    required List<int> userIds,
+    int limit = 50,
+    int offset = 0,
+    required String token,
+  }) async {
+    try {
+      final response = await _makeRequest(
+        'POST',
+        '/batch/notifications',
+        headers: _getAuthHeaders(token),
+        body: json.encode({
+          'userIds': userIds,
+          'limit': limit,
+          'offset': offset,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return List<dynamic>.from(data['data']);
+        } else {
+          throw ApiException('배치 알림 로드 실패: ${data['error']}');
+        }
+      } else {
+        throw ApiException('배치 알림 로드 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('배치 알림 로드 실패: $e');
+    }
+  }
+
+  // 배치 후기 로드
+  static Future<List<dynamic>> batchLoadReviews({
+    required List<int> userIds,
+    int limit = 20,
+    int offset = 0,
+    required String token,
+  }) async {
+    try {
+      final response = await _makeRequest(
+        'POST',
+        '/batch/reviews',
+        headers: _getAuthHeaders(token),
+        body: json.encode({
+          'userIds': userIds,
+          'limit': limit,
+          'offset': offset,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return List<dynamic>.from(data['data']);
+        } else {
+          throw ApiException('배치 후기 로드 실패: ${data['error']}');
+        }
+      } else {
+        throw ApiException('배치 후기 로드 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('배치 후기 로드 실패: $e');
+    }
+  }
+
+  // 배치 프로필 동기화
+  static Future<List<dynamic>> batchSyncProfiles({
+    required List<int> userIds,
+    required String token,
+  }) async {
+    try {
+      final response = await _makeRequest(
+        'POST',
+        '/batch/profiles',
+        headers: _getAuthHeaders(token),
+        body: json.encode({
+          'userIds': userIds,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return List<dynamic>.from(data['data']);
+        } else {
+          throw ApiException('배치 프로필 동기화 실패: ${data['error']}');
+        }
+      } else {
+        throw ApiException('배치 프로필 동기화 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('배치 프로필 동기화 실패: $e');
+    }
+  }
+
+  // 통합 배치 요청
+  static Future<List<dynamic>> batchRequest({
+    required List<Map<String, dynamic>> requests,
+    required String token,
+  }) async {
+    try {
+      final response = await _makeRequest(
+        'POST',
+        '/batch/request',
+        headers: _getAuthHeaders(token),
+        body: json.encode({
+          'requests': requests,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return List<dynamic>.from(data['data']);
+        } else {
+          throw ApiException('통합 배치 요청 실패: ${data['error']}');
+        }
+      } else {
+        throw ApiException('통합 배치 요청 실패: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('통합 배치 요청 실패: $e');
+    }
+  }
 }
 
 // API 예외 클래스

@@ -14,8 +14,12 @@ class ErrorHandler {
     
     // 네트워크 연결 오류
     if (errorString.contains('connection refused') || 
-        errorString.contains('socketexception') ||
-        errorString.contains('failed host lookup') ||
+        errorString.contains('socketexception')) {
+      // 개발 환경에서 서버 미실행 안내
+      return '서버에 연결할 수 없습니다.\n\n백엔드 서버가 실행 중인지 확인해주세요.\n\n터미널에서 다음 명령어로 서버를 시작하세요:\ncd playmate_backend && npm run dev:stable';
+    }
+    
+    if (errorString.contains('failed host lookup') ||
         errorString.contains('network is unreachable') ||
         errorString.contains('connection reset') ||
         errorString.contains('connection aborted') ||

@@ -28,6 +28,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _bioController = TextEditingController();
   
   String? _selectedImagePath;
+  String? _selectedSkillLevel;
+  String? _selectedGameType;
   bool _isLoading = false;
 
   @override
@@ -35,6 +37,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.initState();
     _nicknameController.text = widget.currentUser.nickname;
     _bioController.text = widget.currentUser.bio ?? '';
+    _selectedSkillLevel = widget.currentUser.ntrpScore?.toString() ?? '3.0';
+    _selectedGameType = widget.currentUser.preferredGameType ?? 'both';
   }
 
   @override
@@ -271,18 +275,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Widget _buildSkillLevelSelector() {
-    final skillLevels = [
-      {'value': 'beginner', 'label': '초급 (1-2년)'},
-      {'value': 'intermediate', 'label': '중급 (3-5년)'},
-      {'value': 'advanced', 'label': '고급 (6년 이상)'},
-      {'value': 'expert', 'label': '전문가 (10년 이상)'},
+    // NTRP 점수 선택 드롭다운 (1.0 ~ 7.0, 0.5 단위)
+    final ntrpLevels = [
+      {'value': '1.0', 'label': '1.0 - 초보자'},
+      {'value': '1.5', 'label': '1.5 - 초보자'},
+      {'value': '2.0', 'label': '2.0 - 입문자'},
+      {'value': '2.5', 'label': '2.5 - 입문자'},
+      {'value': '3.0', 'label': '3.0 - 초급자'},
+      {'value': '3.5', 'label': '3.5 - 초급자'},
+      {'value': '4.0', 'label': '4.0 - 중급자'},
+      {'value': '4.5', 'label': '4.5 - 중급자'},
+      {'value': '5.0', 'label': '5.0 - 고급자'},
+      {'value': '5.5', 'label': '5.5 - 고급자'},
+      {'value': '6.0', 'label': '6.0 - 전문가'},
+      {'value': '6.5', 'label': '6.5 - 전문가'},
+      {'value': '7.0', 'label': '7.0 - 엘리트'},
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '테니스 구력',
+          'NTRP 점수',
           style: AppTextStyles.body.copyWith(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w500,
@@ -296,19 +310,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: DropdownButtonFormField<String>(
-            value: widget.currentUser.skillLevel?.toString() ?? 'beginner',
+            value: _selectedSkillLevel,
             decoration: const InputDecoration(
               border: InputBorder.none,
               contentPadding: EdgeInsets.zero,
             ),
-            items: skillLevels.map((level) {
+            items: ntrpLevels.map((level) {
               return DropdownMenuItem(
                 value: level['value'],
                 child: Text(level['label']!),
               );
             }).toList(),
             onChanged: (value) {
-              // TODO: 사용자 정보 업데이트
+              if (value != null) {
+                setState(() {
+                  _selectedSkillLevel = value;
+                });
+              }
             },
           ),
         ),
@@ -341,7 +359,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: DropdownButtonFormField<String>(
-            value: widget.currentUser.preferredGameType ?? 'both',
+            value: _selectedGameType,
             decoration: const InputDecoration(
               border: InputBorder.none,
               contentPadding: EdgeInsets.zero,
@@ -353,7 +371,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               );
             }).toList(),
             onChanged: (value) {
-              // TODO: 사용자 정보 업데이트
+              if (value != null) {
+                setState(() {
+                  _selectedSkillLevel = value;
+                });
+              }
             },
           ),
         ),
@@ -437,6 +459,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'nickname': _nicknameController.text.trim(),
         'bio': _bioController.text.trim(),
         if (profileImageUrl != null) 'profileImage': profileImageUrl,
+        if (_selectedSkillLevel != null) 'ntrpScore': double.tryParse(_selectedSkillLevel!) ?? widget.currentUser.ntrpScore,
+        if (_selectedGameType != null) 'preferredGameType': _selectedGameType,
       };
 
       // API 호출

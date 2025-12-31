@@ -1487,12 +1487,7 @@ class _MatchingDetailScreenState extends State<MatchingDetailScreen> {
                 ),
               ],
             ),
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              // TODO: 매칭 상세 정보 표시
-            },
-          ),
+          // 정보 아이콘 제거 (이미 매칭 상세 화면이므로 불필요)
         ],
       ),
       body: _isLoading

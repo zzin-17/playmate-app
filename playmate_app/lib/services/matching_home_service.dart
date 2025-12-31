@@ -283,9 +283,12 @@ class MatchingHomeService extends ChangeNotifier {
       ).toList();
     }
 
-    // 팔로잉만 보기 필터 (실제로는 팔로잉 관계 확인 필요)
+    // 팔로잉만 보기 필터
+    // 참고: 실제 팔로잉 관계 확인은 MatchingDataService.getMatchings에서 처리됨
+    // showOnlyFollowing 파라미터를 통해 백엔드에서 필터링됨
     if (_showOnlyFollowing) {
-      // TODO: 실제 팔로잉 관계 확인 로직 구현
+      // 필터링은 MatchingDataService.getMatchings에서 처리됨
+      // 여기서는 추가 필터링이 필요하지 않음
     }
 
     // 상태별 필터
@@ -303,7 +306,9 @@ class MatchingHomeService extends ChangeNotifier {
         filtered = filtered.where((matching) => matching.status == 'cancelled').toList();
         break;
       case 'my_matchings':
-        // TODO: 현재 사용자의 매칭만 필터링
+        // 현재 사용자의 매칭만 필터링
+        // 참고: ImprovedHomeScreen에서 이미 호스트/게스트별로 필터링됨
+        // 여기서는 추가 필터링이 필요하지 않음
         break;
     }
 

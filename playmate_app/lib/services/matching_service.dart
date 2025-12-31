@@ -8,6 +8,7 @@ import '../constants/app_colors.dart';
 import 'matching_notification_service.dart';
 import 'api_service.dart';
 import 'chat_service.dart';
+import '../screens/review/write_review_screen.dart';
 
 class MatchingService {
   static final MatchingService _instance = MatchingService._internal();
@@ -261,7 +262,7 @@ class MatchingService {
         return [
           Expanded(
             child: ElevatedButton(
-              onPressed: () => _showWriteReviewDialog(context),
+              onPressed: () => _showWriteReviewDialog(context, matching, currentUser),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.secondary,
                 foregroundColor: Colors.white,
@@ -376,12 +377,20 @@ class MatchingService {
   }
 
   // 후기 작성 다이얼로그
-  void _showWriteReviewDialog(BuildContext context) {
-    // TODO: 후기 작성 화면으로 이동
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('후기 작성 화면으로 이동합니다!'),
-        backgroundColor: AppColors.info,
+  void _showWriteReviewDialog(BuildContext context, Matching matching, User currentUser) {
+    // 후기 작성 화면으로 이동
+    // 호스트인지 게스트인지에 따라 대상자 결정
+    final isHost = matching.host.email == currentUser.email;
+    final targetUser = isHost 
+        ? (matching.guests?.isNotEmpty == true ? matching.guests!.first : matching.host)
+        : matching.host;
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => WriteReviewScreen(
+          matching: matching,
+          targetUser: targetUser,
+        ),
       ),
     );
   }
